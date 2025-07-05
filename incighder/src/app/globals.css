@@ -1,15 +1,6 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
 body {
-  background-color: #ffffff; /* Light mode default */
-  color: #1a1a1a; /* Dark text for light mode */
-}
-
-@media (prefers-color-scheme: dark) {
-  body {
-    background-color: #1a1a1a; /* Dark mode background */
-    color: #ffffff; /* Light text for dark mode */
-  }
+  margin: 0;
+  font-family: sans-serif;
+  background-color: #f0f0f0;
+  color: #333;
 }

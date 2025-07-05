@@ -56,20 +56,20 @@ export default function Home() {
   };
 
   if (loading) {
-    return <div className="flex min-h-screen items-center justify-center">Loading artists...</div>;
+    return <div>Loading artists...</div>;
   }
 
   if (error) {
-    return <div className="flex min-h-screen items-center justify-center text-red-500">Error: {error}</div>;
+    return <div>Error: {error}</div>;
   }
 
   return (
-    <div className="min-h-screen p-8">
-      <h1 className="text-4xl font-bold mb-8 text-center">Artists from Spotify</h1>
+    <div>
+      <h1>Artists from Spotify</h1>
       {artists.length === 0 ? (
-        <p className="text-center text-lg">No artists found in the database. Try running the scraper!</p>
+        <p>No artists found in the database. Try running the scraper!</p>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div>
           {artists.map((artist) => {
             let parsedGenres: string[] = [];
             try {
@@ -82,39 +82,33 @@ export default function Home() {
             const spotifyUrl = artist.external_urls ? artist.external_urls.spotify : null;
 
             return (
-              <div key={artist.id} className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 relative grid grid-cols-[96px_1fr] gap-4 items-start">
-                <button
-                  onClick={() => handleDelete(artist.id)}
-                  className="absolute top-2 right-2 bg-red-500 hover:bg-red-700 text-white font-bold py-1 px-2 rounded-full text-xs"
-                >
-                  X
-                </button>
+              <div key={artist.id} style={{ border: '1px solid black', padding: '10px', margin: '10px' }}>
+                <button onClick={() => handleDelete(artist.id)} style={{ float: 'right' }}>X</button>
                 {/* Image container */}
                 <div>
                   {displayImage && (
                     <img
                       src={displayImage}
                       alt={artist.name}
-                      className="w-24 h-24" // Removed rounded-full
+                      style={{ width: '96px', height: '96px' }}
                     />
                   )}
                 </div>
                 {/* Info container */}
                 <div>
-                  <h2 className="text-2xl font-semibold mb-2 text-gray-900 dark:text-white">
-                    <a href={`/artists/${artist.id}`} className="hover:underline">
+                  <h2>
+                    <a href={`/artists/${artist.id}`}>
                       {artist.name}
                     </a>
                   </h2>
-                  <p className="text-gray-700 dark:text-gray-300"><strong>Followers:</strong> {artist.followers.toLocaleString()}</p>
-                  <p className="text-gray-700 dark:text-gray-300"><strong>Popularity:</strong> {artist.popularity}</p>
-                  <p className="text-gray-700 dark:text-gray-300"><strong>Genres:</strong> {parsedGenres.length > 0 ? parsedGenres.join(', ') : 'N/A'}</p>
+                  <p><strong>Followers:</strong> {artist.followers.toLocaleString()}</p>
+                  <p><strong>Popularity:</strong> {artist.popularity}</p>
+                  <p><strong>Genres:</strong> {parsedGenres.length > 0 ? parsedGenres.join(', ') : 'N/A'}</p>
                   {spotifyUrl && (
                     <a
                       href={spotifyUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-blue-500 hover:underline mt-2 block"
                     >
                       View on Spotify
                     </a>
