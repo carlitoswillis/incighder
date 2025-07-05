@@ -82,7 +82,7 @@ export default function Home() {
             const spotifyUrl = artist.external_urls ? artist.external_urls.spotify : null;
 
             return (
-              <div key={artist.id} className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 relative grid grid-cols-[auto_1fr] gap-4 items-center">
+              <div key={artist.id} className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 relative grid grid-cols-[96px_1fr] gap-4 items-center">
                 <button
                   onClick={() => handleDelete(artist.id)}
                   className="absolute top-2 right-2 bg-red-500 hover:bg-red-700 text-white font-bold py-1 px-2 rounded-full text-xs"
