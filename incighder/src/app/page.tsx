@@ -89,14 +89,18 @@ export default function Home() {
                 >
                   X
                 </button>
-                {displayImage && (
-                  <img
-                    src={displayImage}
-                    alt={artist.name}
-                    className="w-24 h-24 rounded-full"
-                  />
-                )}
-                <div> {/* This div will contain all the text info */}
+                {/* Image container */}
+                <div>
+                  {displayImage && (
+                    <img
+                      src={displayImage}
+                      alt={artist.name}
+                      className="w-24 h-24 rounded-full"
+                    />
+                  )}
+                </div>
+                {/* Info container */}
+                <div>
                   <h2 className="text-2xl font-semibold mb-2 text-gray-900 dark:text-white">
                     <a href={`/artists/${artist.id}`} className="hover:underline">
                       {artist.name}
