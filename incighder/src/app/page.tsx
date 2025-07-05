@@ -82,38 +82,40 @@ export default function Home() {
             const spotifyUrl = artist.external_urls ? artist.external_urls.spotify : null;
 
             return (
-              <div key={artist.id} className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 relative">
+              <div key={artist.id} className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 relative flex items-center space-x-4">
                 <button
                   onClick={() => handleDelete(artist.id)}
                   className="absolute top-2 right-2 bg-red-500 hover:bg-red-700 text-white font-bold py-1 px-2 rounded-full text-xs"
                 >
                   X
                 </button>
-                <h2 className="text-2xl font-semibold mb-2 text-gray-900 dark:text-white">
-                  <a href={`/artists/${artist.id}`} className="hover:underline">
-                    {artist.name}
-                  </a>
-                </h2>
-                <p className="text-gray-700 dark:text-gray-300"><strong>Followers:</strong> {artist.followers.toLocaleString()}</p>
-                <p className="text-gray-700 dark:text-gray-300"><strong>Popularity:</strong> {artist.popularity}</p>
-                <p className="text-gray-700 dark:text-gray-300"><strong>Genres:</strong> {parsedGenres.length > 0 ? parsedGenres.join(', ') : 'N/A'}</p>
                 {displayImage && (
                   <img
                     src={displayImage}
                     alt={artist.name}
-                    className="w-24 h-24 rounded-full mx-auto mt-4"
+                    className="w-24 h-24 rounded-full flex-shrink-0"
                   />
                 )}
-                {spotifyUrl && (
-                  <a
-                    href={spotifyUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-blue-500 hover:underline mt-4 block"
-                  >
-                    View on Spotify
-                  </a>
-                )}
+                <div className="flex flex-col justify-center">
+                  <h2 className="text-2xl font-semibold mb-2 text-gray-900 dark:text-white">
+                    <a href={`/artists/${artist.id}`} className="hover:underline">
+                      {artist.name}
+                    </a>
+                  </h2>
+                  <p className="text-gray-700 dark:text-gray-300"><strong>Followers:</strong> {artist.followers.toLocaleString()}</p>
+                  <p className="text-gray-700 dark:text-gray-300"><strong>Popularity:</strong> {artist.popularity}</p>
+                  <p className="text-gray-700 dark:text-gray-300"><strong>Genres:</strong> {parsedGenres.length > 0 ? parsedGenres.join(', ') : 'N/A'}</p>
+                  {spotifyUrl && (
+                    <a
+                      href={spotifyUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-500 hover:underline mt-2 block"
+                    >
+                      View on Spotify
+                    </a>
+                  )}
+                </div>
               </div>
             );
           })}
