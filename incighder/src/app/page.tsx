@@ -64,7 +64,7 @@ export default function Home() {
   }
 
   return (
-    <div>
+    <div style={{ padding: '20px' }}>
       <h1>Artists from Spotify</h1>
       {artists.length === 0 ? (
         <p>No artists found in the database. Try running the scraper!</p>
@@ -82,20 +82,19 @@ export default function Home() {
             const spotifyUrl = artist.external_urls ? artist.external_urls.spotify : null;
 
             return (
-              <div key={artist.id} style={{ border: '1px solid black', padding: '10px', margin: '10px' }}>
-                <button onClick={() => handleDelete(artist.id)} style={{ float: 'right' }}>X</button>
+              <div key={artist.id} className="artist-card-layout">
+                <button onClick={() => handleDelete(artist.id)} style={{ position: 'absolute', top: '10px', right: '10px' }}>X</button>
                 {/* Image container */}
                 <div>
                   {displayImage && (
                     <img
                       src={displayImage}
                       alt={artist.name}
-                      style={{ width: '96px', height: '96px' }}
                     />
                   )}
                 </div>
                 {/* Info container */}
-                <div>
+                <div className="artist-info-column">
                   <h2>
                     <a href={`/artists/${artist.id}`}>
                       {artist.name}

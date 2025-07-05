@@ -4,3 +4,39 @@ body {
   background-color: #f0f0f0;
   color: #333;
 }
+
+.artist-card-layout {
+  display: grid;
+  grid-template-columns: 96px 1fr; /* Image column (fixed width) | Info column (takes remaining space) */
+  gap: 16px; /* Space between image and info */
+  align-items: center; /* Vertically align items in the center */
+  border: 1px solid #ccc;
+  padding: 10px;
+  margin-bottom: 10px;
+  background-color: #fff;
+  position: relative; /* For the absolute positioned button */
+}
+
+.artist-card-layout img {
+  width: 96px;
+  height: 96px;
+  object-fit: cover; /* Ensures image covers the area without distortion */
+}
+
+.artist-info-column {
+  /* This div will contain all the text info */
+}
+
+.artist-info-column h2 {
+  margin-top: 0;
+  margin-bottom: 5px;
+}
+
+.artist-info-column p {
+  margin-bottom: 3px;
+}
+
+.artist-info-column a {
+  display: block;
+  margin-top: 8px;
+}
