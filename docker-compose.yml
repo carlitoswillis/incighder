@@ -38,9 +38,9 @@ services:
   data-api:
     build:
       context: .
-      dockerfile: ./scraper/Dockerfile
+      dockerfile: ./data-api/Dockerfile
     volumes:
-      - ./scraper:/app
+      - ./data-api:/app
     depends_on:
       db:
         condition: service_healthy

@@ -36,7 +36,7 @@ export async function POST(request: Request) {
 
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(`Scraper service error: ${response.status} - ${errorText}`);
+      throw new Error(`Data API service error: ${response.status} - ${errorText}`);
     }
 
     const data = await response.json();

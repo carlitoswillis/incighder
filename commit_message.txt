@@ -1,0 +1,24 @@
+feat: Dockerized development environment with data-api service
+
+This commit establishes a robust Dockerized development environment for the Incighder application, enabling consistent setups and live-reloading. It also renames the 'scraper' service to 'data-api' to better reflect its functionality.
+
+Key changes and improvements include:
+
+- **Docker Compose Setup:**
+    - Introduced `docker-compose.yml` to orchestrate `db` (PostgreSQL), `data-api` (Python Flask API), and `incighder-dev` (Next.js development server) services.
+    - Configured `db` service with a healthcheck to ensure it's ready before dependent services start.
+    - Renamed the `scraper` service to `data-api` for clearer semantic meaning, reflecting its role in handling data ingestion and Spotify API interactions.
+    - Added a `Dockerfile.dev` for the Next.js application (`incighder-dev`) to facilitate live-reloading during development via bind mounts.
+    - Configured `data-api` service to depend on `db` being healthy, and `incighder-dev` to depend on both `db` and `data-api` being healthy, ensuring proper startup order.
+
+- **Data API (formerly Scraper) Enhancements:**
+    - Created `scraper/app.py` to expose `insert_artist_from_json.py` and `spotify_search.py` functionalities as Flask API endpoints.
+    - Modified `scraper/apply_schema.py`, `scraper/insert_artist_from_json.py`, and `scraper/spotify_search.py` to read input from `sys.stdin` and use environment variables for database connection, making them compatible with the Flask API and Docker environment.
+    - Updated `scraper/Dockerfile` to install `curl` for healthchecks and to run the Flask application (`app.py`).
+    - Ensured `schema.sql` is correctly copied into the `data-api` container.
+
+- **Next.js Application Updates:**
+    - Modified `incighder/src/app/api/artists/route.ts` and `incighder/src/app/api/spotify-search/route.ts` to communicate with the new `data-api` service via HTTP requests, replacing direct Python subprocess calls.
+    - Updated database connection host in Next.js API routes to `db` (the Docker Compose service name for PostgreSQL).
+
+This setup significantly streamlines the development workflow by providing a consistent and isolated environment with live-reloading capabilities.
