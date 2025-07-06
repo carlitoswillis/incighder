@@ -71,7 +71,7 @@ export default function Home() {
       {artists.length === 0 ? (
         <p style={{ textAlign: 'center', fontSize: '1.2em' }}>No artists found in the database. Try running the scraper!</p>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '20px' }}>
+        <div> {/* Changed from grid to simple div */}
           {artists.map((artist) => {
             let parsedGenres: string[] = [];
             try {

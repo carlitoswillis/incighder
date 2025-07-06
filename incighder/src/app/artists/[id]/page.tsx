@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
-import { calculateArtistScore } from '../../utils/score';
+import { calculateArtistScore } from '../../../utils/score'; // Corrected import path
 
 interface Artist {
   id: string;
