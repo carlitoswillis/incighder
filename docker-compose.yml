@@ -49,6 +49,10 @@ services:
       PGPASSWORD: password
       PGDATABASE: incighder
       PGHOST: db
+      SPOTIFY_CLIENT_ID: ${SPOTIFY_CLIENT_ID}
+      SPOTIFY_CLIENT_SECRET: ${SPOTIFY_CLIENT_SECRET}
+    env_file:
+      - ./.env
     command: python app.py
     healthcheck:
       test: ["CMD-SHELL", "python -c 'import socket; s = socket.socket(socket.AF_INET, socket.SOCK_STREAM); s.connect((\"localhost\", 5000)); s.close()'"]
