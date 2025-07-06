@@ -4,10 +4,8 @@ import sys
 import json
 import spotipy
 from spotipy.oauth2 import SpotifyClientCredentials
-from dotenv import load_dotenv
+import traceback
 
-# Load environment variables from .env file in the parent directory
-load_dotenv(dotenv_path='../.env')
 
 def get_spotify_client():
     client_id = os.getenv("SPOTIFY_CLIENT_ID")
@@ -38,15 +36,12 @@ def search_artist(sp, query):
         return {"artists": {"items": simplified_results}}
     except Exception as e:
         print(json.dumps({"error": f"Spotify API error: {e}"}), file=sys.stderr)
+        traceback.print_exc(file=sys.stderr)
         sys.exit(1)
 
 if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        print(json.dumps({"error": "Usage: python spotify_search.py <artist_name>"}), file=sys.stderr)
-        sys.exit(1)
-
-    artist_name_query = sys.argv[1]
+    query = sys.stdin.read().strip()
     spotify_client = get_spotify_client()
     if spotify_client:
-        search_results = search_artist(spotify_client, artist_name_query)
+        search_results = search_artist(spotify_client, query)
         print(json.dumps(search_results))
