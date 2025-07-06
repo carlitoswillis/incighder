@@ -36,20 +36,72 @@ body {
   background-color: #f0f0f0; /* Highlight row on hover */
 }
 
-/* Basic styles for the main page (from previous step) */
-.artist-card-layout {
-  border: 1px solid black;
-  padding: 10px;
-  margin: 10px;
+/* Artist Card specific styles */
+.artist-card {
+  display: grid;
+  grid-template-columns: 96px 1fr; /* Image column (fixed width) | Info column (takes remaining space) */
+  gap: 16px; /* Space between image and info */
+  align-items: center; /* Vertically align items in the center */
+  border: 1px solid #e0e0e0;
+  padding: 15px;
+  border-radius: 8px;
+  background-color: #fff;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+  position: relative; /* For the absolute positioned button */
 }
 
-.artist-card-layout img {
+.artist-card img {
   width: 96px;
   height: 96px;
+  object-fit: cover; /* Ensures image covers the area without distortion */
+  border-radius: 4px; /* Slightly rounded corners for the image */
 }
 
-.artist-card-layout button {
+.artist-card .artist-info {
+  /* This div will contain all the text info */
+}
+
+.artist-card h2 {
+  margin-top: 0;
+  margin-bottom: 5px;
+  font-size: 1.5em;
+  color: #333;
+}
+
+.artist-card p {
+  margin-bottom: 3px;
+  font-size: 0.95em;
+  color: #555;
+}
+
+.artist-card a {
+  color: #007bff;
+  text-decoration: none;
+}
+
+.artist-card a:hover {
+  text-decoration: underline;
+}
+
+.artist-card .remove-button {
   position: absolute;
   top: 10px;
   right: 10px;
+  background-color: #dc3545;
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  font-size: 0.8em;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  padding: 0;
+}
+
+.artist-card .remove-button:hover {
+  background-color: #c82333;
 }

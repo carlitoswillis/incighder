@@ -58,18 +58,18 @@ export default function Home() {
   };
 
   if (loading) {
-    return <div>Loading artists...</div>;
+    return <div style={{ display: 'flex', minHeight: '100vh', alignItems: 'center', justifyContent: 'center' }}>Loading artists...</div>;
   }
 
   if (error) {
-    return <div>Error: {error}</div>;
+    return <div style={{ display: 'flex', minHeight: '100vh', alignItems: 'center', justifyContent: 'center', color: 'red' }}>Error: {error}</div>;
   }
 
   return (
     <div style={{ padding: '20px' }}>
-      <h1>Artists from Spotify</h1>
+      <h1 style={{ fontSize: '2em', marginBottom: '20px', textAlign: 'center' }}>Artists from Spotify</h1>
       {artists.length === 0 ? (
-        <p>No artists found in the database. Try running the scraper!</p>
+        <p style={{ textAlign: 'center', fontSize: '1.2em' }}>No artists found in the database. Try running the scraper!</p>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '20px' }}>
           {artists.map((artist) => {
@@ -86,8 +86,8 @@ export default function Home() {
             const { score } = calculateArtistScore(artist);
 
             return (
-              <div key={artist.id} className="artist-card-layout">
-                <button onClick={() => handleDelete(artist.id)} style={{ position: 'absolute', top: '10px', right: '10px' }}>X</button>
+              <div key={artist.id} className="artist-card">
+                <button onClick={() => handleDelete(artist.id)} className="remove-button">X</button>
                 {/* Image container */}
                 <div>
                   {displayImage && (
@@ -98,7 +98,7 @@ export default function Home() {
                   )}
                 </div>
                 {/* Info container */}
-                <div>
+                <div className="artist-info">
                   <h2>
                     <a href={`/artists/${artist.id}`}>
                       {artist.name}
