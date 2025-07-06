@@ -1,11 +1,10 @@
 import { NextResponse } from 'next/server';
 import { Pool } from 'pg';
-import { spawn } from 'child_process';
-import path from 'path';
+
 
 const pool = new Pool({
   user: process.env.DB_USER || 'postgres',
-  host: process.env.DB_HOST || 'localhost',
+  host: process.env.DB_HOST || 'db',
   database: process.env.DB_NAME || 'incighder',
   password: process.env.DB_PASSWORD || 'password',
   port: parseInt(process.env.DB_PORT || '5432', 10),
@@ -26,43 +25,26 @@ export async function GET() {
 export async function POST(request: Request) {
   const artistData = await request.json();
 
-  return new Promise((resolve) => {
-    const pythonScriptPath = path.join(process.cwd(), '..', 'scraper', 'insert_artist_from_json.py');
-    const venvPython = path.join(process.cwd(), '..', 'scraper', '.venv', 'bin', 'python3');
-
-    const pythonProcess = spawn(venvPython, [pythonScriptPath, JSON.stringify(artistData)]);
-
-    let stdout = '';
-    let stderr = '';
-
-    pythonProcess.stdout.on('data', (data) => {
-      stdout += data.toString();
+  try {
+    const response = await fetch('http://data-api:5000/insert_artist', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(artistData),
     });
 
-    pythonProcess.stderr.on('data', (data) => {
-      stderr += data.toString();
-    });
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Scraper service error: ${response.status} - ${errorText}`);
+    }
 
-    pythonProcess.on('close', (code) => {
-      if (code === 0) {
-        try {
-          const jsonResponse = JSON.parse(stdout);
-          resolve(NextResponse.json(jsonResponse));
-        } catch (e) {
-          console.error('Failed to parse Python script output:', e, stdout);
-          resolve(NextResponse.json({ error: 'Internal server error: Invalid Python script output' }, { status: 500 }));
-        }
-      } else {
-        console.error(`Python script exited with code ${code}: ${stderr}`);
-        resolve(NextResponse.json({ error: `Failed to insert artist: ${stderr}` }, { status: 500 }));
-      }
-    });
-
-    pythonProcess.on('error', (err) => {
-      console.error('Failed to start Python subprocess:', err);
-      resolve(NextResponse.json({ error: 'Internal server error: Could not execute Python script' }, { status: 500 }));
-    });
-  });
+    const data = await response.json();
+    return NextResponse.json(data);
+  } catch (error) {
+    console.error('Error inserting artist via scraper service:', error);
+    return NextResponse.json({ error: 'Failed to insert artist' }, { status: 500 });
+  }
 }
 
 export async function DELETE(request: Request, { params }: { params: { id: string } }) {

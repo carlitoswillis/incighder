@@ -16,17 +16,15 @@ This application currently focuses on Spotify data and provides the following fe
 
 -   **Frontend:** Next.js (React, TypeScript, Tailwind CSS)
 -   **Backend (API):** Next.js API Routes (TypeScript) interacting with Python scripts.
--   **Scraping/Data Processing:** Python (with `spotipy` for Spotify API interaction and `psycopg2` for PostgreSQL).
+-   **Data API:** Python (with `spotipy` for Spotify API interaction and `psycopg2` for PostgreSQL) providing data ingestion and Spotify search functionality.
 -   **Database:** PostgreSQL (running via Docker).
 
 ## Setup and Running the Application
 
 ### Prerequisites
 
--   [Docker](https://www.docker.com/get-started) (for PostgreSQL database)
--   [Node.js](https://nodejs.org/en/download/) (LTS version recommended)
--   [npm](https://www.npmjs.com/get-npm) (comes with Node.js)
--   Python 3.9+ (and `pip`)
+-   [Docker Desktop](https://www.docker.com/products/docker-desktop) (includes Docker Engine and Docker Compose)
+-   Git
 
 ### 1. Clone the Repository
 
@@ -39,57 +37,53 @@ cd incighder_gemini
 
 1.  Go to the [Spotify Developer Dashboard](https://developer.spotify.com/dashboard).
 2.  Log in and create a new application to get your `Client ID` and `Client Secret`.
-3.  Create a `.env` file in the root of the `incighder_gemini` directory (next to `package.json`) with the following content, replacing the placeholders with your actual credentials:
+3.  Create a `.env` file in the root of the `incighder_gemini` directory (next to `docker-compose.yml`) with the following content, replacing the placeholders with your actual credentials:
 
     ```
     SPOTIFY_CLIENT_ID=your_spotify_client_id
     SPOTIFY_CLIENT_SECRET=your_spotify_client_secret
     ```
 
-### 3. Start the PostgreSQL Database
+### 3. Start the Application Services (Database, Data API, and Next.js Development Server)
 
-Navigate to the `incighder_gemini` directory and run Docker Compose:
-
-```bash
-docker compose up -d
-```
-
-This will start a PostgreSQL container named `incighder-db-1` on port `5432`.
-
-### 4. Set up Python Environment and Apply Database Schema
-
-Navigate to the `scraper` directory, create a Python virtual environment, install dependencies, and apply the database schema:
+Navigate to the root of the `incighder_gemini` directory and run:
 
 ```bash
-cd scraper
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt # You might need to create this file first with `pip freeze > requirements.txt`
-pip install psycopg2-binary spotipy python-dotenv
-python apply_schema.py
-cd ..
+docker-compose up --build -d db data-api
 ```
+This command will:
+-   Build the Docker images for the `db` (PostgreSQL) and `data-api` (Python Flask API) services.
+-   Start these services in detached mode (`-d`).
+-   The `data-api` service will automatically start its Flask API, which exposes endpoints for data insertion and Spotify search.
 
-### 5. Install Frontend Dependencies
+### 4. Apply Database Schema
 
-Navigate to the `incighder_gemini/incighder` directory and install Node.js dependencies:
+Once the `db` service is healthy, apply the database schema using a one-off command:
 
 ```bash
-cd incighder
-npm install
-cd ..
+docker-compose run --rm data-api python apply_schema.py
 ```
+This command will:
+-   Create a temporary container from the `data-api` image.
+-   Run the `apply_schema.py` script, which will set up the necessary tables in your PostgreSQL database.
+-   Automatically remove the temporary container (`--rm`) after execution.
 
-### 6. Run the Next.js Application
+### 5. Start the Next.js Development Server with Live-Reloading
 
-Navigate to the `incighder_gemini/incighder` directory and start the development server:
+Now, start the Next.js development server. This service is configured for live-reloading, so changes you make to your local files will automatically update in the browser.
 
 ```bash
-cd incighder
-npm run dev
+docker-compose up -d incighder-dev
 ```
+The application will be accessible at `http://localhost:3000`. Any changes you make to the files in the `incighder` directory on your local machine will be reflected in the running container.
 
-The application will be accessible at `http://localhost:3000`.
+### 6. Stopping the Services
+
+To stop all running services, navigate to the `incighder_gemini` directory and run:
+
+```bash
+docker-compose down
+```
 
 ## Usage
 
