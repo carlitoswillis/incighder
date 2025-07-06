@@ -39,27 +39,41 @@ body {
 /* Artist Card specific styles */
 .artist-card {
   display: grid;
-  grid-template-columns: 96px 1fr; /* Image column (fixed width) | Info column (takes remaining space) */
-  gap: 16px; /* Space between image and info */
-  align-items: center; /* Vertically align items in the center */
+  grid-template-columns: minmax(50%, 500px) 1fr;
+  gap: 16px;
+  align-items: center;
   border: 1px solid #e0e0e0;
   padding: 15px;
   border-radius: 8px;
   background-color: #fff;
   box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-  position: relative; /* For the absolute positioned button */
-  margin-bottom: 20px; /* Added margin-bottom */
+  position: relative;
+  margin-bottom: 20px;
+  max-height: 500px; /* Uniform row height */
+  overflow: hidden; /* Prevents content from overflowing the fixed height */
+  max-width: 1000px; /* Stop the card from growing too large */
+  margin-left: auto; /* Center the card */
+  margin-right: auto; /* Center the card */
+}
+
+.artist-card .artist-image-container {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden; /* Hide parts of image that don't fit */
 }
 
 .artist-card img {
-  width: 96px;
-  height: 96px;
-  object-fit: cover; /* Ensures image covers the area without distortion */
-  border-radius: 4px; /* Slightly rounded corners for the image */
+  width: 100%;
+  height: 100%;
+  object-fit: contain; /* This will fit the image within the container */
+  border-radius: 4px;
 }
 
 .artist-card .artist-info {
-  /* This div will contain all the text info */
+  text-align: right; /* Right-align the info */
 }
 
 .artist-card h2 {
@@ -101,6 +115,7 @@ body {
   justify-content: center;
   line-height: 1;
   padding: 0;
+  z-index: 1; /* Ensure button is on top */
 }
 
 .artist-card .remove-button:hover {
