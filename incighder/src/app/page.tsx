@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { calculateArtistScore } from '../utils/score';
 
 interface Artist {
   id: string;
@@ -10,6 +11,7 @@ interface Artist {
   genres: string | null;
   images: any[] | null;
   external_urls: any | null;
+  monthly_listeners: number | null; // Added monthly_listeners
 }
 
 export default function Home() {
@@ -56,20 +58,20 @@ export default function Home() {
   };
 
   if (loading) {
-    return <div>Loading artists...</div>;
+    return <div style={{ display: 'flex', minHeight: '100vh', alignItems: 'center', justifyContent: 'center' }}>Loading artists...</div>;
   }
 
   if (error) {
-    return <div>Error: {error}</div>;
+    return <div style={{ display: 'flex', minHeight: '100vh', alignItems: 'center', justifyContent: 'center', color: 'red' }}>Error: {error}</div>;
   }
 
   return (
     <div style={{ padding: '20px' }}>
-      <h1>Artists from Spotify</h1>
+      <h1 style={{ fontSize: '2em', marginBottom: '20px', textAlign: 'center' }}>Artists from Spotify</h1>
       {artists.length === 0 ? (
-        <p>No artists found in the database. Try running the scraper!</p>
+        <p style={{ textAlign: 'center', fontSize: '1.2em' }}>No artists found in the database. Try running the scraper!</p>
       ) : (
-        <div>
+        <div> {/* Changed from grid to simple div */}
           {artists.map((artist) => {
             let parsedGenres: string[] = [];
             try {
@@ -81,9 +83,11 @@ export default function Home() {
             const displayImage = artist.images && artist.images.length > 0 ? artist.images[0].url : null;
             const spotifyUrl = artist.external_urls ? artist.external_urls.spotify : null;
 
+            const { score } = calculateArtistScore(artist);
+
             return (
-              <div key={artist.id} className="artist-card-layout">
-                <button onClick={() => handleDelete(artist.id)} style={{ position: 'absolute', top: '10px', right: '10px' }}>X</button>
+              <div key={artist.id} className="artist-card">
+                <button onClick={() => handleDelete(artist.id)} className="remove-button">X</button>
                 {/* Image container */}
                 <div>
                   {displayImage && (
@@ -94,15 +98,19 @@ export default function Home() {
                   )}
                 </div>
                 {/* Info container */}
-                <div className="artist-info-column">
+                <div className="artist-info">
                   <h2>
                     <a href={`/artists/${artist.id}`}>
                       {artist.name}
                     </a>
                   </h2>
+                  <p><strong>Score:</strong> {score}</p>
                   <p><strong>Followers:</strong> {artist.followers.toLocaleString()}</p>
                   <p><strong>Popularity:</strong> {artist.popularity}</p>
                   <p><strong>Genres:</strong> {parsedGenres.length > 0 ? parsedGenres.join(', ') : 'N/A'}</p>
+                  {artist.monthly_listeners !== null && (
+                    <p><strong>Monthly Listeners:</strong> {artist.monthly_listeners.toLocaleString()}</p>
+                  )}
                   {spotifyUrl && (
                     <a
                       href={spotifyUrl}

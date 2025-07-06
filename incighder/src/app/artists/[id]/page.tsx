@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
+import { calculateArtistScore } from '../../../utils/score';
 
 interface Artist {
   id: string;
@@ -16,6 +17,7 @@ interface Artist {
 
 export default function ArtistDetailPage() {
   const params = useParams();
+  const router = useRouter();
   const artistId = params.id as string;
 
   const [artist, setArtist] = useState<Artist | null>(null);
@@ -78,15 +80,15 @@ export default function ArtistDetailPage() {
   };
 
   if (loading) {
-    return <div className="flex min-h-screen items-center justify-center">Loading artist details...</div>;
+    return <div style={{ display: 'flex', minHeight: '100vh', alignItems: 'center', justifyContent: 'center' }}>Loading artist details...</div>;
   }
 
   if (error) {
-    return <div className="flex min-h-screen items-center justify-center text-red-500">Error: {error}</div>;
+    return <div style={{ display: 'flex', minHeight: '100vh', alignItems: 'center', justifyContent: 'center', color: 'red' }}>Error: {error}</div>;
   }
 
   if (!artist) {
-    return <div className="flex min-h-screen items-center justify-center">Artist not found.</div>;
+    return <div style={{ display: 'flex', minHeight: '100vh', alignItems: 'center', justifyContent: 'center' }}>Artist not found.</div>;
   }
 
   let parsedGenres: string[] = [];
@@ -99,38 +101,53 @@ export default function ArtistDetailPage() {
   const displayImage = artist.images && artist.images.length > 0 ? artist.images[0].url : null;
   const spotifyUrl = artist.external_urls ? artist.external_urls.spotify : null;
 
+  const { score, breakdown } = calculateArtistScore(artist);
+
   return (
-    <div className="min-h-screen p-8">
-      <h1 className="text-4xl font-bold mb-8 text-center">{artist.name}</h1>
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 max-w-2xl mx-auto">
+    <div style={{ padding: '20px' }}>
+      <h1 style={{ fontSize: '2em', marginBottom: '20px', textAlign: 'center' }}>{artist.name}</h1>
+      <div style={{ border: '1px solid #ccc', padding: '15px', borderRadius: '8px', maxWidth: '600px', margin: '0 auto', backgroundColor: '#fff' }}>
         {displayImage && (
           <img
             src={displayImage}
             alt={artist.name}
-            className="w-32 h-32 rounded-full mx-auto mb-4"
+            style={{ width: '120px', height: '120px', borderRadius: '50%', display: 'block', margin: '0 auto 15px' }}
           />
         )}
-        <p className="text-gray-700 dark:text-gray-300 mb-2"><strong>ID:</strong> {artist.id}</p>
-        <p className="text-gray-700 dark:text-gray-300 mb-2"><strong>Followers:</strong> {artist.followers.toLocaleString()}</p>
-        <p className="text-gray-700 dark:text-gray-300 mb-2"><strong>Popularity:</strong> {artist.popularity}</p>
-        <p className="text-gray-700 dark:text-gray-300 mb-2"><strong>Genres:</strong> {parsedGenres.length > 0 ? parsedGenres.join(', ') : 'N/A'}</p>
+        <p><strong>ID:</strong> {artist.id}</p>
+        <p><strong>Score:</strong> {score}</p>
+        <pre style={{ backgroundColor: '#f5f5f5', padding: '10px', borderRadius: '5px', fontSize: '0.9em', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{breakdown}</pre>
+        <p><strong>Followers:</strong> {artist.followers.toLocaleString()}</p>
+        <p><strong>Popularity:</strong> {artist.popularity}</p>
+        <p><strong>Genres:</strong> {parsedGenres.length > 0 ? parsedGenres.join(', ') : 'N/A'}</p>
+        {artist.monthly_listeners !== null && (
+          <p><strong>Monthly Listeners:</strong> {artist.monthly_listeners.toLocaleString()}</p>
+        )}
         {spotifyUrl && (
-          <p className="mb-2">
+          <p>
             <a
               href={spotifyUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-blue-500 hover:underline"
             >
               View on Spotify
             </a>
           </p>
         )}
 
-        <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
-          <h2 className="text-2xl font-semibold mb-4">Edit Data</h2>
-          <div className="mb-4">
-            <label htmlFor="monthlyListeners" className="block text-gray-700 dark:text-gray-300 text-sm font-bold mb-2">
+        <div style={{ marginTop: '20px', paddingTop: '15px', borderTop: '1px solid #eee' }}>
+          <h2 style={{ fontSize: '1.5em', marginBottom: '10px' }}>Edit Data</h2>
+          {/* Link to the new edit page */}
+          <button
+            onClick={() => router.push(`/artists/${artistId}/edit`)}
+            style={{ backgroundColor: '#28a745', color: 'white', padding: '10px 15px', border: 'none', borderRadius: '4px', cursor: 'pointer', marginBottom: '15px' }}
+          >
+            Edit All Fields
+          </button>
+
+          {/* Original Monthly Listeners Edit Form */}
+          <div style={{ marginBottom: '15px' }}>
+            <label htmlFor="monthlyListeners" style={{ display: 'block', marginBottom: '5px' }}>
               Monthly Listeners:
             </label>
             <input
@@ -138,18 +155,18 @@ export default function ArtistDetailPage() {
               id="monthlyListeners"
               value={monthlyListenersInput}
               onChange={(e) => setMonthlyListenersInput(e.target.value)}
-              className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline bg-gray-100 dark:bg-gray-700 dark:text-white"
+              style={{ width: '100%', padding: '8px', border: '1px solid #ccc', borderRadius: '4px' }}
               placeholder="Enter monthly listeners"
             />
           </div>
           <button
             onClick={handleSave}
-            className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
+            style={{ backgroundColor: '#007bff', color: 'white', padding: '10px 15px', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
           >
-            Save Changes
+            Save Monthly Listeners
           </button>
-          {message && <p className="text-green-500 mt-4">{message}</p>}
-          {error && <p className="text-red-500 mt-4">Error: {error}</p>}
+          {message && <p style={{ color: 'green', marginTop: '10px' }}>{message}</p>}
+          {error && <p style={{ color: 'red', marginTop: '10px' }}>Error: {error}</p>}
         </div>
       </div>
     </div>
