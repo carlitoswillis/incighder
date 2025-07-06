@@ -161,22 +161,21 @@ Comprehensive Data Integration Plan for Artist Assessment (Revised)
   Technical Steps (Backend):
 
 
-   1. Rename `data-api/spotify_search.py` to
-      `data-api/fetch_artist_data.py`: This script will become the central
-      point for fetching data from various platforms for a given artist.
-       * Action: Rename the file.
-       * Action: Update data-api/app.py to call fetch_artist_data.py
-         instead of spotify_search.py.
-   2. Modify `data-api/fetch_artist_data.py`:
-       * Add googleapiclient.discovery to requirements.txt.
-       * Initialize the YouTube API client using the YOUTUBE_API_KEY.
-       * Implement a function to search for an artist's official YouTube
-         channel using their name.
-       * If a channel is found, fetch its subscriber count.
-       * Identify and fetch details for the artist's most popular video (as
-         a proxy for "Top YouTube Song" and "YouTube Top Song Plays").
-       * Integrate this YouTube data into the existing artist data
-         structure before returning it.
+   1. Create `data-api/youtube_search.py`:
+       * This new Python script will be responsible for:
+           * Initializing the YouTube API client using the YOUTUBE_API_KEY.
+           * Implementing a function to search for an artist's official YouTube
+             channel using their name.
+           * If a channel is found, fetching its subscriber count.
+           * Identifying and fetching details for the artist's most popular video (as
+             a proxy for "Top YouTube Song" and "YouTube Top Song Plays").
+           * Returning this YouTube data.
+   2. Modify `data-api/app.py`:
+       * Add a new endpoint (e.g., `/youtube_search`) that calls this new
+         `youtube_search.py` script. This endpoint will receive an artist query
+         and return YouTube-specific data.
+       * The existing `/insert_artist` endpoint will need to be able to receive
+         combined data from both Spotify and YouTube.
    3. Update `data-api/schema.sql`:
        * Add new columns to the artists table:
            * youtube_channel_id (VARCHAR)
@@ -193,10 +192,14 @@ Comprehensive Data Integration Plan for Artist Assessment (Revised)
   Technical Steps (Frontend - Next.js):
 
 
-   1. Update API Calls: Ensure the frontend's API calls to /api/artists and
-       /api/spotify-search (which will now internally call
-      fetch_artist_data.py) are updated to expect and handle the new
-      YouTube data fields.
+   1. Update API Calls:
+       * The frontend will need to make *separate* calls: one to
+         `/api/spotify-search` (which calls `data-api/spotify_search.py`) and a
+         *new* call to `/api/youtube-search` (which calls
+         `data-api/youtube_search.py`).
+       * Before sending data to the `/api/artists` endpoint (which calls
+         `data-api/insert_artist`), the frontend will need to **combine** the
+         Spotify and YouTube data into a single payload.
    2. Modify Homepage (`/`): Update the artist card component to display
       relevant YouTube data (e.g., subscriber count, top song).
    3. Modify Table View (`/table`): Add new columns to the table to display
