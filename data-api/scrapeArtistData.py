@@ -70,6 +70,17 @@ def insert_artist_data(conn, artist_data):
 
     try:
         with conn.cursor() as cur:
+            print(f"Executing SQL: {sql}", file=sys.stderr)
+            print(f"With values: {(
+                artist_data['id'],
+                artist_data['name'],
+                artist_data['followers']['total'],
+                artist_data['popularity'],
+                json.dumps(artist_data['genres']),
+                json.dumps(artist_data['images']),
+                json.dumps(artist_data['external_urls']),
+                None # monthly_listeners will be null initially
+            )}", file=sys.stderr)
             cur.execute(sql, (
                 artist_data['id'],
                 artist_data['name'],
@@ -81,6 +92,7 @@ def insert_artist_data(conn, artist_data):
                 None # monthly_listeners will be null initially
             ))
         conn.commit()
+        print(f"SQL execution successful. Rows affected: {cur.rowcount}", file=sys.stderr)
         return True
     except psycopg2.Error as e:
         print(f"Database error: {e}", file=sys.stderr)
