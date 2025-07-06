@@ -1,3 +1,4 @@
+
 import { NextResponse } from 'next/server';
 import { Pool } from 'pg';
 
@@ -27,13 +28,42 @@ export async function GET(request: Request, { params }: { params: { id: string }
 
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
   const { id } = params;
-  const { monthly_listeners } = await request.json();
+  const updatedFields = await request.json();
+
+  const setClauses: string[] = [];
+  const values: any[] = [];
+  let paramIndex = 1;
+
+  // Dynamically build the SET clause for the SQL query
+  for (const key in updatedFields) {
+    if (updatedFields.hasOwnProperty(key) && key !== 'id') { // Exclude 'id' from update
+      setClauses.push(`${key} = $${paramIndex}`);
+      
+      // Handle JSON string fields (genres, images, external_urls)
+      if (key === 'genres' || key === 'images' || key === 'external_urls') {
+        try {
+          values.push(JSON.parse(updatedFields[key]));
+        } catch (e) {
+          return NextResponse.json({ error: `Invalid JSON for field: ${key}` }, { status: 400 });
+        }
+      } else {
+        values.push(updatedFields[key]);
+      }
+      paramIndex++;
+    }
+  }
+
+  if (setClauses.length === 0) {
+    return NextResponse.json({ message: 'No fields to update' }, { status: 200 });
+  }
+
+  values.push(id); // Add ID for the WHERE clause
 
   try {
     const client = await pool.connect();
     const result = await client.query(
-      'UPDATE artists SET monthly_listeners = $1 WHERE id = $2 RETURNING *;',
-      [monthly_listeners, id]
+      `UPDATE artists SET ${setClauses.join(', ')} WHERE id = $${paramIndex} RETURNING *;`,
+      values
     );
     client.release();
 

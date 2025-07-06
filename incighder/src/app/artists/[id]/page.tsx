@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useParams } from 'next/navigation';
-import { calculateArtistScore } from '../../../utils/score'; // Corrected import path
+import { useParams, useRouter } from 'next/navigation';
+import { calculateArtistScore } from '../../../utils/score';
 
 interface Artist {
   id: string;
@@ -17,6 +17,7 @@ interface Artist {
 
 export default function ArtistDetailPage() {
   const params = useParams();
+  const router = useRouter();
   const artistId = params.id as string;
 
   const [artist, setArtist] = useState<Artist | null>(null);
@@ -136,6 +137,15 @@ export default function ArtistDetailPage() {
 
         <div style={{ marginTop: '20px', paddingTop: '15px', borderTop: '1px solid #eee' }}>
           <h2 style={{ fontSize: '1.5em', marginBottom: '10px' }}>Edit Data</h2>
+          {/* Link to the new edit page */}
+          <button
+            onClick={() => router.push(`/artists/${artistId}/edit`)}
+            style={{ backgroundColor: '#28a745', color: 'white', padding: '10px 15px', border: 'none', borderRadius: '4px', cursor: 'pointer', marginBottom: '15px' }}
+          >
+            Edit All Fields
+          </button>
+
+          {/* Original Monthly Listeners Edit Form */}
           <div style={{ marginBottom: '15px' }}>
             <label htmlFor="monthlyListeners" style={{ display: 'block', marginBottom: '5px' }}>
               Monthly Listeners:
@@ -153,7 +163,7 @@ export default function ArtistDetailPage() {
             onClick={handleSave}
             style={{ backgroundColor: '#007bff', color: 'white', padding: '10px 15px', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
           >
-            Save Changes
+            Save Monthly Listeners
           </button>
           {message && <p style={{ color: 'green', marginTop: '10px' }}>{message}</p>}
           {error && <p style={{ color: 'red', marginTop: '10px' }}>Error: {error}</p>}
