@@ -1,5 +1,6 @@
 
 import os
+import sys
 import spotipy
 from spotipy.oauth2 import SpotifyClientCredentials
 import psycopg2
@@ -56,8 +57,8 @@ def insert_artist_data(conn, artist_data):
         return
 
     sql = """
-    INSERT INTO artists (id, name, followers, popularity, genres, images, external_urls, monthly_listeners)
-    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+    INSERT INTO artists (id, name, followers, popularity, genres, images, external_urls, monthly_listeners, top_track_id, top_track_name, top_track_popularity)
+    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
     ON CONFLICT (id) DO UPDATE SET
         name = EXCLUDED.name,
         followers = EXCLUDED.followers,
@@ -65,22 +66,16 @@ def insert_artist_data(conn, artist_data):
         genres = EXCLUDED.genres,
         images = EXCLUDED.images,
         external_urls = EXCLUDED.external_urls,
-        monthly_listeners = EXCLUDED.monthly_listeners;
+        monthly_listeners = EXCLUDED.monthly_listeners,
+        top_track_id = EXCLUDED.top_track_id,
+        top_track_name = EXCLUDED.top_track_name,
+        top_track_popularity = EXCLUDED.top_track_popularity;
     """
 
     try:
         with conn.cursor() as cur:
             print(f"Executing SQL: {sql}", file=sys.stderr)
-            print(f"With values: {(
-                artist_data['id'],
-                artist_data['name'],
-                artist_data['followers']['total'],
-                artist_data['popularity'],
-                json.dumps(artist_data['genres']),
-                json.dumps(artist_data['images']),
-                json.dumps(artist_data['external_urls']),
-                None # monthly_listeners will be null initially
-            )}", file=sys.stderr)
+            print(f"With values: {artist_data}", file=sys.stderr)
             cur.execute(sql, (
                 artist_data['id'],
                 artist_data['name'],
@@ -89,7 +84,10 @@ def insert_artist_data(conn, artist_data):
                 json.dumps(artist_data['genres']),
                 json.dumps(artist_data['images']),
                 json.dumps(artist_data['external_urls']),
-                None # monthly_listeners will be null initially
+                artist_data.get('monthly_listeners'),
+                artist_data.get('top_track_id'),
+                artist_data.get('top_track_name'),
+                artist_data.get('top_track_popularity')
             ))
         conn.commit()
         print(f"SQL execution successful. Rows affected: {cur.rowcount}", file=sys.stderr)

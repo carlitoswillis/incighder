@@ -7,7 +7,10 @@ CREATE TABLE artists (
     genres TEXT,
     images JSON,
     external_urls JSON,
-    monthly_listeners INTEGER
+    monthly_listeners INTEGER,
+    top_track_id VARCHAR(255),
+    top_track_name VARCHAR(255),
+    top_track_popularity INTEGER
 );
 
 CREATE TABLE albums (
