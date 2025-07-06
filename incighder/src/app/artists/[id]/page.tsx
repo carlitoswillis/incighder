@@ -35,9 +35,11 @@ export default function ArtistDetailPage() {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       const data = await response.json();
+      console.log("Artist fetched successfully:", data);
       setArtist(data);
       setMonthlyListenersInput(data.monthly_listeners ? String(data.monthly_listeners) : '');
     } catch (e: any) {
+      console.error("Error fetching artist:", e);
       setError(e.message);
     } finally {
       setLoading(false);
@@ -73,8 +75,10 @@ export default function ArtistDetailPage() {
       }
 
       setMessage('Artist data updated successfully!');
+      console.log('Artist data updated successfully!');
       fetchArtist(); // Re-fetch to show updated data
     } catch (e: any) {
+      console.error("Error updating artist:", e);
       setError(`Failed to update artist: ${e.message}`);
     }
   };

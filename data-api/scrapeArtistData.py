@@ -4,16 +4,13 @@ import spotipy
 from spotipy.oauth2 import SpotifyClientCredentials
 import psycopg2
 import json
-from dotenv import load_dotenv
 
-# --- Configuration ---
-load_dotenv(dotenv_path='../.env') # Load environment variables from .env file
 
 def get_db_connection():
     """Establishes a connection to the PostgreSQL database."""
     try:
         conn = psycopg2.connect(
-            host="localhost",
+            host=os.getenv("PGHOST", "db"),
             database="incighder",
             user="postgres",
             password="password" # Be cautious with hardcoded passwords in production
@@ -84,40 +81,48 @@ def insert_artist_data(conn, artist_data):
                 None # monthly_listeners will be null initially
             ))
         conn.commit()
-        print(f"Successfully inserted/updated artist: {artist_data['name']}")
         return True
     except psycopg2.Error as e:
-        print(f"Database error: {e}")
+        print(f"Database error: {e}", file=sys.stderr)
+        traceback.print_exc(file=sys.stderr)
         conn.rollback()
         return False
 
 def insert_artist_data_from_json(artist_json_data):
     """Inserts artist data from a JSON object into the 'artists' table."""
-    conn = get_db_connection()
-    if conn:
-        success = insert_artist_data(conn, artist_json_data)
-        conn.close()
-        return success
-    return False
+    conn = None
+    try:
+        conn = get_db_connection()
+        if conn:
+            success = insert_artist_data(conn, artist_json_data)
+            return success
+        return False
+    except Exception as e:
+        print(f"Error in insert_artist_data_from_json: {e}", file=sys.stderr)
+        traceback.print_exc(file=sys.stderr)
+        return False
+    finally:
+        if conn:
+            conn.close()
 
 # --- Main Execution ---
-if __name__ == "__main__":
-    # Example: Fetch data for a specific artist
-    artist_to_find_id = "3FurXFst81m9HZGWlczFcb"
+# if __name__ == "__main__":
+#     # Example: Fetch data for a specific artist
+#     artist_to_find_id = "3FurXFst81m9HZGWlczFcb"
 
-    print("Connecting to Spotify and database...")
-    spotify_client = get_spotify_client()
-    db_connection = get_db_connection()
+#     print("Connecting to Spotify and database...")
+#     spotify_client = get_spotify_client()
+#     db_connection = get_db_connection()
 
-    if spotify_client and db_connection:
-        print(f"Searching for artist with ID: {artist_to_find_id}...")
-        artist_info = get_artist_data(spotify_client, artist_id=artist_to_find_id)
+#     if spotify_client and db_connection:
+#         print(f"Searching for artist with ID: {artist_to_find_id}...")
+#         artist_info = get_artist_data(spotify_client, artist_id=artist_to_find_id)
 
-        if artist_info:
-            insert_artist_data(db_connection, artist_info)
-        else:
-            print(f"Artist with ID '{artist_to_find_id}' not found on Spotify.")
+#         if artist_info:
+#             insert_artist_data(db_connection, artist_info)
+#         else:
+#             print(f"Artist with ID '{artist_to_find_id}' not found on Spotify.")
 
-        # Clean up
-        db_connection.close()
-        print("Process finished.")
+#         # Clean up
+#         db_connection.close()
+#         print("Process finished.")
