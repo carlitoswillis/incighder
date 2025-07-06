@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { calculateArtistScore } from '../utils/score';
 
 interface Artist {
   id: string;
@@ -10,6 +11,7 @@ interface Artist {
   genres: string | null;
   images: any[] | null;
   external_urls: any | null;
+  monthly_listeners: number | null; // Added monthly_listeners
 }
 
 export default function Home() {
@@ -69,7 +71,7 @@ export default function Home() {
       {artists.length === 0 ? (
         <p>No artists found in the database. Try running the scraper!</p>
       ) : (
-        <div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '20px' }}>
           {artists.map((artist) => {
             let parsedGenres: string[] = [];
             try {
@@ -80,6 +82,8 @@ export default function Home() {
 
             const displayImage = artist.images && artist.images.length > 0 ? artist.images[0].url : null;
             const spotifyUrl = artist.external_urls ? artist.external_urls.spotify : null;
+
+            const { score } = calculateArtistScore(artist);
 
             return (
               <div key={artist.id} className="artist-card-layout">
@@ -94,15 +98,19 @@ export default function Home() {
                   )}
                 </div>
                 {/* Info container */}
-                <div className="artist-info-column">
+                <div>
                   <h2>
                     <a href={`/artists/${artist.id}`}>
                       {artist.name}
                     </a>
                   </h2>
+                  <p><strong>Score:</strong> {score}</p>
                   <p><strong>Followers:</strong> {artist.followers.toLocaleString()}</p>
                   <p><strong>Popularity:</strong> {artist.popularity}</p>
                   <p><strong>Genres:</strong> {parsedGenres.length > 0 ? parsedGenres.join(', ') : 'N/A'}</p>
+                  {artist.monthly_listeners !== null && (
+                    <p><strong>Monthly Listeners:</strong> {artist.monthly_listeners.toLocaleString()}</p>
+                  )}
                   {spotifyUrl && (
                     <a
                       href={spotifyUrl}
