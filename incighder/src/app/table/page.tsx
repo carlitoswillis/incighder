@@ -37,28 +37,28 @@ export default function ArtistsTable() {
   }, []);
 
   if (loading) {
-    return <div className="flex min-h-screen items-center justify-center">Loading artists...</div>;
+    return <div style={{ display: 'flex', minHeight: '100vh', alignItems: 'center', justifyContent: 'center' }}>Loading artists...</div>;
   }
 
   if (error) {
-    return <div className="flex min-h-screen items-center justify-center text-red-500">Error: {error}</div>;
+    return <div style={{ display: 'flex', minHeight: '100vh', alignItems: 'center', justifyContent: 'center', color: 'red' }}>Error: {error}</div>;
   }
 
   return (
-    <div className="min-h-screen p-8">
-      <h1 className="text-4xl font-bold mb-8 text-center">Artists Data Table</h1>
+    <div style={{ padding: '20px' }}>
+      <h1 style={{ fontSize: '2em', marginBottom: '20px', textAlign: 'center' }}>Artists Data Table</h1>
       {artists.length === 0 ? (
-        <p className="text-center text-lg">No artists found in the database. Try running the scraper!</p>
+        <p style={{ textAlign: 'center', fontSize: '1.2em' }}>No artists found in the database. Try running the scraper!</p>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="min-w-full bg-white dark:bg-gray-800 shadow-md rounded-lg overflow-hidden">
-            <thead className="bg-gray-200 dark:bg-gray-700">
+        <div style={{ overflowX: 'auto' }}>
+          <table className="spreadsheet-table">
+            <thead>
               <tr>
-                <th className="py-3 px-4 text-left text-gray-600 dark:text-gray-200 font-semibold text-sm">Name</th>
-                <th className="py-3 px-4 text-left text-gray-600 dark:text-gray-200 font-semibold text-sm">Followers</th>
-                <th className="py-3 px-4 text-left text-gray-600 dark:text-gray-200 font-semibold text-sm">Popularity</th>
-                <th className="py-3 px-4 text-left text-gray-600 dark:text-gray-200 font-semibold text-sm">Genres</th>
-                <th className="py-3 px-4 text-left text-gray-600 dark:text-gray-200 font-semibold text-sm">Spotify URL</th>
+                <th>Name</th>
+                <th>Followers</th>
+                <th>Popularity</th>
+                <th>Genres</th>
+                <th>Spotify URL</th>
               </tr>
             </thead>
             <tbody>
@@ -72,22 +72,21 @@ export default function ArtistsTable() {
                 const spotifyUrl = artist.external_urls ? artist.external_urls.spotify : null;
 
                 return (
-                  <tr key={artist.id} className="border-b border-gray-200 dark:border-gray-700">
-                    <td className="py-3 px-4 text-gray-800 dark:text-gray-200">
-                      <a href={`/artists/${artist.id}`} className="text-blue-500 hover:underline">
+                  <tr key={artist.id}>
+                    <td>
+                      <a href={`/artists/${artist.id}`}>
                         {artist.name}
                       </a>
                     </td>
-                    <td className="py-3 px-4 text-gray-800 dark:text-gray-200">{artist.followers.toLocaleString()}</td>
-                    <td className="py-3 px-4 text-gray-800 dark:text-gray-200">{artist.popularity}</td>
-                    <td className="py-3 px-4 text-gray-800 dark:text-gray-200">{parsedGenres.length > 0 ? parsedGenres.join(', ') : 'N/A'}</td>
-                    <td className="py-3 px-4">
+                    <td>{artist.followers.toLocaleString()}</td>
+                    <td>{artist.popularity}</td>
+                    <td>{parsedGenres.length > 0 ? parsedGenres.join(', ') : 'N/A'}</td>
+                    <td>
                       {spotifyUrl ? (
                         <a
                           href={spotifyUrl}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-blue-500 hover:underline"
                         >
                           Link
                         </a>
