@@ -44,38 +44,49 @@ cd incighder_gemini
     SPOTIFY_CLIENT_SECRET=your_spotify_client_secret
     ```
 
-### 3. Start the Application Services (Database, Data API, and Next.js Development Server)
+### 3. Development Workflow Scripts
 
-Navigate to the root of the `incighder_gemini` directory and run:
+To streamline the development process, several helper scripts are provided in the project root:
+
+-   **`./start_dev.sh`**: This script performs a full cleanup, rebuilds all services (database, data API, and Next.js development server), applies the latest database schema, and then starts all services. Use this for a fresh start or after significant changes to `docker-compose.yml` or database schema.
+
+    ```bash
+    ./start_dev.sh
+    ```
+
+-   **`./start_db.sh`**: Starts only the PostgreSQL database service.
+
+    ```bash
+    ./start_db.sh
+    ```
+
+-   **`./start_data_api.sh`**: Starts the Python data API service. It will automatically start the `db` service if it's not already running.
+
+    ```bash
+    ./start_data_api.sh
+    ```
+
+-   **`./start_incighder_dev.sh`**: Starts the Next.js development server. It will automatically start the `db` and `data-api` services if they are not already running. This script runs in the foreground to stream logs directly to your terminal.
+
+    ```bash
+    ./start_incighder_dev.sh
+    ```
+
+### 4. Initial Setup and Running the Application
+
+For the first-time setup or after significant changes (e.g., to `docker-compose.yml` or `schema.sql`), use the comprehensive `start_dev.sh` script:
 
 ```bash
-docker-compose up --build -d db data-api
+./start_dev.sh
 ```
+
 This command will:
--   Build the Docker images for the `db` (PostgreSQL) and `data-api` (Python Flask API) services.
--   Start these services in detached mode (`-d`).
--   The `data-api` service will automatically start its Flask API, which exposes endpoints for data insertion and Spotify search.
+-   Stop and remove any existing containers and volumes (ensuring a clean database state).
+-   Build and start the Docker images for all services.
+-   Apply the latest database schema.
+-   Start the Next.js development server, accessible at `http://localhost:3000`.
 
-### 4. Apply Database Schema
-
-Once the `db` service is healthy, apply the database schema using a one-off command:
-
-```bash
-docker-compose run --rm data-api python apply_schema.py
-```
-This command will:
--   Create a temporary container from the `data-api` image.
--   Run the `apply_schema.py` script, which will set up the necessary tables in your PostgreSQL database.
--   Automatically remove the temporary container (`--rm`) after execution.
-
-### 5. Start the Next.js Development Server with Live-Reloading
-
-Now, start the Next.js development server. This service is configured for live-reloading, so changes you make to your local files will automatically update in the browser.
-
-```bash
-docker-compose up -d incighder-dev
-```
-The application will be accessible at `http://localhost:3000`. Any changes you make to the files in the `incighder` directory on your local machine will be reflected in the running container.
+For subsequent development, you can use the individual `start_*.sh` scripts to start only the services you need to restart, speeding up your workflow.
 
 ### 6. Stopping the Services
 
