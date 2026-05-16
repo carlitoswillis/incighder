@@ -19,7 +19,8 @@ Incighder is a multi-service data application designed to aggregate and visualiz
 
 ### 3. Database (PostgreSQL)
 - **Role**: The source of truth for all artist metrics and historical data.
-- **Schema**: Managed via SQL scripts in `data-api/schema.sql` and applied via `data-api/apply_schema.py`.
+- **Master Schema**: Located at `data-api/schema.sql`. This is the **single source of truth**. 
+- **Application**: Schema changes must be applied via `data-api/apply_schema.py` inside the Docker container.
 
 ### 4. Infrastructure (Docker)
 - **Role**: Service orchestration and environment parity.

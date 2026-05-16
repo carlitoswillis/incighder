@@ -51,14 +51,20 @@ def get_artist_data(sp, artist_id=None, artist_name=None):
             return None
     return None
 
+import uuid
+
 def insert_artist_data(conn, artist_data):
     """Inserts artist data into the 'artists' table."""
     if not artist_data or not conn:
         return
 
+    # Use provided ID (e.g. Spotify ID) or generate a new UUID for manual entries
+    artist_id = artist_data.get('id') or str(uuid.uuid4())
+    spotify_id = artist_data.get('spotify_id') or (artist_data.get('id') if 'id' in artist_data else None)
+
     sql = """
-    INSERT INTO artists (id, name, followers, popularity, genres, images, external_urls, monthly_listeners, top_track_id, top_track_name, top_track_popularity)
-    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+    INSERT INTO artists (id, name, followers, popularity, genres, images, external_urls, monthly_listeners, spotify_id, top_track_id, top_track_name, top_track_popularity)
+    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
     ON CONFLICT (id) DO UPDATE SET
         name = EXCLUDED.name,
         followers = EXCLUDED.followers,
@@ -67,24 +73,27 @@ def insert_artist_data(conn, artist_data):
         images = EXCLUDED.images,
         external_urls = EXCLUDED.external_urls,
         monthly_listeners = EXCLUDED.monthly_listeners,
+        spotify_id = EXCLUDED.spotify_id,
         top_track_id = EXCLUDED.top_track_id,
         top_track_name = EXCLUDED.top_track_name,
         top_track_popularity = EXCLUDED.top_track_popularity;
     """
 
     try:
+        followers_total = artist_data.get('followers', {}).get('total') if isinstance(artist_data.get('followers'), dict) else artist_data.get('followers')
+        
         with conn.cursor() as cur:
             print(f"Executing SQL: {sql}", file=sys.stderr)
-            print(f"With values: {artist_data}", file=sys.stderr)
             cur.execute(sql, (
-                artist_data['id'],
-                artist_data['name'],
-                artist_data['followers']['total'],
-                artist_data['popularity'],
-                json.dumps(artist_data['genres']),
-                json.dumps(artist_data['images']),
-                json.dumps(artist_data['external_urls']),
+                artist_id,
+                artist_data.get('name'),
+                followers_total,
+                artist_data.get('popularity'),
+                json.dumps(artist_data.get('genres')) if artist_data.get('genres') is not None else None,
+                json.dumps(artist_data.get('images')) if artist_data.get('images') is not None else None,
+                json.dumps(artist_data.get('external_urls')) if artist_data.get('external_urls') is not None else None,
                 artist_data.get('monthly_listeners'),
+                spotify_id,
                 artist_data.get('top_track_id'),
                 artist_data.get('top_track_name'),
                 artist_data.get('top_track_popularity')
@@ -94,7 +103,6 @@ def insert_artist_data(conn, artist_data):
         return True
     except psycopg2.Error as e:
         print(f"Database error: {e}", file=sys.stderr)
-        traceback.print_exc(file=sys.stderr)
         conn.rollback()
         return False
 

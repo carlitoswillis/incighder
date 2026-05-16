@@ -2,15 +2,17 @@
 CREATE TABLE artists (
     id VARCHAR(255) PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
-    followers INTEGER,
-    popularity INTEGER,
-    genres TEXT,
-    images JSON,
-    external_urls JSON,
-    monthly_listeners INTEGER,
-    top_track_id VARCHAR(255),
-    top_track_name VARCHAR(255),
-    top_track_popularity INTEGER
+    followers INTEGER NULL,
+    popularity INTEGER NULL,
+    genres TEXT NULL,
+    images JSON NULL,
+    external_urls JSON NULL,
+    monthly_listeners INTEGER NULL,
+    spotify_id VARCHAR(255) NULL,
+    youtube_id VARCHAR(255) NULL,
+    top_track_id VARCHAR(255) NULL,
+    top_track_name VARCHAR(255) NULL,
+    top_track_popularity INTEGER NULL
 );
 
 CREATE TABLE albums (
