@@ -9,6 +9,7 @@ export default function AddArtistPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [newArtistId, setNewArtistId] = useState<string | null>(null);
 
   const handleManualAdd = async () => {
     const manualArtistData = {
@@ -38,7 +39,9 @@ export default function AddArtistPage() {
         throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
       }
 
+      const data = await response.json();
       setMessage(`Manual artist ${artistName} added to dataset successfully!`);
+      setNewArtistId(data.artist.id);
       setArtistName('');
     } catch (e: any) {
       setError(`Failed to add manual artist: ${e.message}`);
@@ -68,7 +71,16 @@ export default function AddArtistPage() {
       </div>
 
       {error && <p className="text-red-500 text-center mb-4">Error: {error}</p>}
-      {message && <p className="text-green-500 text-center mb-4">{message}</p>}
+      {message && (
+        <div className="text-green-500 text-center mb-4">
+          <p>{message}</p>
+          {newArtistId && (
+            <a href={`/artists/${newArtistId}`} className="text-blue-500 underline font-semibold mt-2 block">
+              Go to Edit Page
+            </a>
+          )}
+        </div>
+      )}
     </div>
   );
 }
