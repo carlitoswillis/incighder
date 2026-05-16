@@ -34,15 +34,33 @@ export default function ArtistEditPage() {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       const data = await response.json();
+      console.log("Raw API data:", data);
       setArtist(data);
-      // Initialize form data with fetched artist data
+
+      const parseListField = (field: any) => {
+        console.log("Parsing field:", field);
+        if (!field) return '';
+        if (Array.isArray(field)) return field.join(', ');
+        if (typeof field === 'string') {
+          try {
+            const parsed = JSON.parse(field);
+            return Array.isArray(parsed) ? parsed.join(', ') : parsed;
+          } catch {
+            return field.replace(/[^a-zA-Z0-9, ]/g, '');
+          }
+        }
+        return String(field);
+      };
+
+      const cleanedGenres = parseListField(data.genres);
+      console.log("Cleaned genres:", cleanedGenres);
       setFormData({
         id: data.id,
         name: data.name,
         followers: data.followers,
         popularity: data.popularity,
-        genres: data.genres ? JSON.stringify(JSON.parse(data.genres), null, 2) : '', // Pretty print JSON
-        images: data.images ? JSON.stringify(data.images, null, 2) : '',
+        genres: cleanedGenres,
+        images: parseListField(data.images),
         external_urls: data.external_urls ? JSON.stringify(data.external_urls, null, 2) : '',
         monthly_listeners: data.monthly_listeners,
       });
@@ -53,14 +71,9 @@ export default function ArtistEditPage() {
     }
   };
 
-  useEffect(() => {
-    if (artistId) {
-      fetchArtist();
-    }
-  }, [artistId]);
-
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
+    console.log(`Field ${name} changed to:`, value);
     setFormData((prev) => ({
       ...prev,
       [name]: value,
@@ -79,35 +92,27 @@ export default function ArtistEditPage() {
     e.preventDefault();
     setMessage(null);
     setError(null);
-
     try {
-      // Validate JSON fields before sending
-      const dataToSend = { ...formData };
-      if (dataToSend.genres) {
-        try { JSON.parse(dataToSend.genres as string); } catch { throw new Error("Genres must be valid JSON."); }
+      const dataToSend: any = { ...formData };
+      if (typeof dataToSend.genres === 'string') {
+        dataToSend.genres = dataToSend.genres.split(',').map((s: string) => s.trim()).filter((s: string) => s);
       }
-      if (dataToSend.images) {
-        try { JSON.parse(dataToSend.images as string); } catch { throw new Error("Images must be valid JSON."); }
+      if (typeof dataToSend.images === 'string') {
+        dataToSend.images = dataToSend.images.split(',').map((s: string) => s.trim()).filter((s: string) => s);
       }
       if (dataToSend.external_urls) {
         try { JSON.parse(dataToSend.external_urls as string); } catch { throw new Error("External URLs must be valid JSON."); }
       }
-
       const response = await fetch(`/api/artists/${artistId}`, {
         method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(dataToSend),
       });
-
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+        throw new Error(errorData.error || `HTTP error! status: ${errorData.status}`);
       }
-
       setMessage('Artist data updated successfully!');
-      // Optionally, redirect back to the artist detail page or re-fetch
       router.push(`/artists/${artistId}`);
     } catch (e: any) {
       setError(`Failed to update artist: ${e.message}`);
@@ -156,12 +161,24 @@ export default function ArtistEditPage() {
         </div>
 
         <div style={{ marginBottom: '15px' }}>
-          <label htmlFor="genres" style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>Genres (JSON Array):</label>
-          <textarea id="genres" name="genres" value={formData.genres as string || ''} onChange={handleChange} rows={5} style={{ width: '100%', padding: '8px', border: '1px solid #ccc', borderRadius: '4px' }}></textarea>
+          <label htmlFor="genres" style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>Genres (Comma-separated list):</label>
+          <textarea 
+            id="genres" 
+            name="genres" 
+            value={(() => {
+              const val = typeof formData.genres === 'string' ? formData.genres : String(formData.genres || '');
+              const clean = val.replace(/^["']+|["']+$/g, '');
+              console.log("Rendering genres textarea with value:", val, "Cleaned for display:", clean);
+              return clean;
+            })()} 
+            onChange={handleChange} 
+            rows={5} 
+            style={{ width: '100%', padding: '8px', border: '1px solid #ccc', borderRadius: '4px' }}
+          ></textarea>
         </div>
 
         <div style={{ marginBottom: '15px' }}>
-          <label htmlFor="images" style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>Images (JSON Array):</label>
+          <label htmlFor="images" style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>Images (Comma-separated list):</label>
           <textarea id="images" name="images" value={formData.images as string || ''} onChange={handleChange} rows={8} style={{ width: '100%', padding: '8px', border: '1px solid #ccc', borderRadius: '4px' }}></textarea>
         </div>
 

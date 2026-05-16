@@ -32,6 +32,7 @@ export default function ArtistDetailPage() {
     external_urls: '',
     monthly_listeners: ''
   });
+  const [showEditForm, setShowEditForm] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
   const fetchArtist = async () => {
@@ -47,12 +48,12 @@ export default function ArtistDetailPage() {
       setArtist(data);
       setFormData({
         name: data.name || '',
-        followers: String(data.followers) || '',
-        popularity: String(data.popularity) || '',
-        genres: JSON.stringify(data.genres) || '',
-        images: JSON.stringify(data.images) || '',
-        external_urls: JSON.stringify(data.external_urls) || '',
-        monthly_listeners: String(data.monthly_listeners) || ''
+        followers: String(data.followers || ''),
+        popularity: String(data.popularity || ''),
+        genres: data.genres || '',
+        images: Array.isArray(data.images) ? data.images.map((img: any) => img.url || img).join(', ') : '',
+        external_urls: data.external_urls ? JSON.stringify(data.external_urls, null, 2) : '',
+        monthly_listeners: String(data.monthly_listeners || '')
       });
     } catch (e: any) {
       console.error("Error fetching artist:", e);
@@ -65,6 +66,7 @@ export default function ArtistDetailPage() {
   useEffect(() => {
     if (artistId) {
       fetchArtist();
+      console.log(artist);
     }
   }, [artistId]);
 
@@ -76,16 +78,42 @@ export default function ArtistDetailPage() {
     });
   };
 
-  const handleSave = async () => {
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
     setMessage(null);
     setError(null);
     try {
+      let parsedUrls = null;
+      if (formData.external_urls) {
+        try {
+          parsedUrls = JSON.parse(formData.external_urls);
+        } catch (e) {
+          // Attempt to merge comma-separated JSON objects
+          const parts = formData.external_urls.split('},');
+          parsedUrls = parts.reduce((acc, curr) => {
+            const jsonString = curr.trim().endsWith('}') ? curr.trim() : curr.trim() + '}';
+            return { ...acc, ...JSON.parse(jsonString) };
+          }, {});
+        }
+      }
+
+      const dataToSend = {
+        ...formData,
+        genres: formData.genres.split(',').map((s) => s.trim()).filter((s) => s),
+        images: formData.images.split(',').map((s) => s.trim()).filter((s) => s).map(url => ({ url })),
+        external_urls: parsedUrls,
+      };
+
+      if (dataToSend.external_urls && typeof dataToSend.external_urls !== 'object') {
+        throw new Error("External URLs must be a valid JSON object.");
+      }
+
       const response = await fetch(`/api/artists/${artistId}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(dataToSend),
       });
 
       if (!response.ok) {
@@ -116,7 +144,7 @@ export default function ArtistDetailPage() {
 
   let parsedGenres: string[] = [];
   try {
-    parsedGenres = artist.genres ? JSON.parse(artist.genres) : [];
+    parsedGenres = artist.genres ? artist.genres.split(',') : [];
   } catch (e) {
     console.error("Error parsing genres:", artist.genres, e);
   }
@@ -146,123 +174,135 @@ export default function ArtistDetailPage() {
         {artist.monthly_listeners !== null && (
           <p><strong>Monthly Listeners:</strong> {artist.monthly_listeners.toLocaleString()}</p>
         )}
-        {spotifyUrl && (
-          <p>
-            <a
-              href={spotifyUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              View on Spotify
-            </a>
-          </p>
+        
+        {artist.external_urls && Object.keys(artist.external_urls).length > 0 && (
+          <div style={{ marginBottom: '15px' }}>
+            <strong>External URLs:</strong>
+            <ul style={{ listStyle: 'none', padding: 0 }}>
+              {Object.entries(artist.external_urls).map(([site, url]: [string, any]) => (
+                <li key={site} style={{ marginBottom: '5px' }}>
+                  <a href={url} target="_blank" rel="noopener noreferrer" style={{ textTransform: 'capitalize' }}>
+                    {site}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </div>
         )}
 
         <div style={{ marginTop: '20px', paddingTop: '15px', borderTop: '1px solid #eee' }}>
-          <h2 style={{ fontSize: '1.5em', marginBottom: '10px' }}>Edit Data</h2>
-          <form onSubmit={handleSave}>
-            <div style={{ marginBottom: '15px' }}>
-              <label htmlFor="name" style={{ display: 'block', marginBottom: '5px' }}>
-                Name:
-              </label>
-              <input
-                type="text"
-                id="name"
-                name="name"
-                value={formData.name}
-                onChange={handleChange}
-                style={{ width: '100%', padding: '8px', border: '1px solid #ccc', borderRadius: '4px' }}
-                placeholder="Enter artist name"
-              />
-            </div>
-            <div style={{ marginBottom: '15px' }}>
-              <label htmlFor="followers" style={{ display: 'block', marginBottom: '5px' }}>
-                Followers:
-              </label>
-              <input
-                type="number"
-                id="followers"
-                name="followers"
-                value={formData.followers}
-                onChange={handleChange}
-                style={{ width: '100%', padding: '8px', border: '1px solid #ccc', borderRadius: '4px' }}
-                placeholder="Enter followers count"
-              />
-            </div>
-            <div style={{ marginBottom: '15px' }}>
-              <label htmlFor="popularity" style={{ display: 'block', marginBottom: '5px' }}>
-                Popularity:
-              </label>
-              <input
-                type="number"
-                id="popularity"
-                name="popularity"
-                value={formData.popularity}
-                onChange={handleChange}
-                style={{ width: '100%', padding: '8px', border: '1px solid #ccc', borderRadius: '4px' }}
-                placeholder="Enter popularity score"
-              />
-            </div>
-            <div style={{ marginBottom: '15px' }}>
-              <label htmlFor="genres" style={{ display: 'block', marginBottom: '5px' }}>
-                Genres:
-              </label>
-              <textarea
-                id="genres"
-                name="genres"
-                value={formData.genres}
-                onChange={handleChange}
-                style={{ width: '100%', padding: '8px', border: '1px solid #ccc', borderRadius: '4px' }}
-                placeholder='Enter genres as JSON array (e.g. ["genre1", "genre2"])'
-              />
-            </div>
-            <div style={{ marginBottom: '15px' }}>
-              <label htmlFor="images" style={{ display: 'block', marginBottom: '5px' }}>
-                Images:
-              </label>
-              <textarea
-                id="images"
-                name="images"
-                value={formData.images}
-                onChange={handleChange}
-                style={{ width: '100%', padding: '8px', border: '1px solid #ccc', borderRadius: '4px' }}
-                placeholder='Enter images as JSON array (e.g. [{"url": "image_url"}])'
-              />
-            </div>
-            <div style={{ marginBottom: '15px' }}>
-              <label htmlFor="external_urls" style={{ display: 'block', marginBottom: '5px' }}>
-                External URLs:
-              </label>
-              <textarea
-                id="external_urls"
-                name="external_urls"
-                value={formData.external_urls}
-                onChange={handleChange}
-                style={{ width: '100%', padding: '8px', border: '1px solid #ccc', borderRadius: '4px' }}
-                placeholder='Enter external URLs as JSON object (e.g. {"spotify": "url"})'
-              />
-            </div>
-            <div style={{ marginBottom: '15px' }}>
-              <label htmlFor="monthly_listeners" style={{ display: 'block', marginBottom: '5px' }}>
-                Monthly Listeners:
-              </label>
-              <input
-                type="number"
-                id="monthly_listeners"
-                name="monthly_listeners"
-                value={formData.monthly_listeners}
-                onChange={handleChange}
-                style={{ width: '100%', padding: '8px', border: '1px solid #ccc', borderRadius: '4px' }}
-                placeholder="Enter monthly listeners count"
-              />
-            </div>
-            <button
-              type="submit"
-              style={{ backgroundColor: '#007bff', color: 'white', padding: '10px 15px', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
-            >
-              Save Changes
-            </button>
-          </form>
+          <button
+            onClick={() => setShowEditForm(!showEditForm)}
+            style={{ backgroundColor: '#6c757d', color: 'white', padding: '10px 15px', border: 'none', borderRadius: '4px', cursor: 'pointer', marginBottom: '10px' }}
+          >
+            {showEditForm ? 'Hide Edit Form' : 'Edit Data'}
+          </button>
+          
+          {showEditForm && (
+            <form onSubmit={handleSave}>
+              <div style={{ marginBottom: '15px' }}>
+                <label htmlFor="name" style={{ display: 'block', marginBottom: '5px' }}>
+                  Name:
+                </label>
+                <input
+                  type="text"
+                  id="name"
+                  name="name"
+                  value={formData.name}
+                  onChange={handleChange}
+                  style={{ width: '100%', padding: '8px', border: '1px solid #ccc', borderRadius: '4px' }}
+                  placeholder="Enter artist name"
+                />
+              </div>
+              <div style={{ marginBottom: '15px' }}>
+                <label htmlFor="followers" style={{ display: 'block', marginBottom: '5px' }}>
+                  Followers:
+                </label>
+                <input
+                  type="number"
+                  id="followers"
+                  name="followers"
+                  value={formData.followers}
+                  onChange={handleChange}
+                  style={{ width: '100%', padding: '8px', border: '1px solid #ccc', borderRadius: '4px' }}
+                  placeholder="Enter followers count"
+                />
+              </div>
+              <div style={{ marginBottom: '15px' }}>
+                <label htmlFor="popularity" style={{ display: 'block', marginBottom: '5px' }}>
+                  Popularity:
+                </label>
+                <input
+                  type="number"
+                  id="popularity"
+                  name="popularity"
+                  value={formData.popularity}
+                  onChange={handleChange}
+                  style={{ width: '100%', padding: '8px', border: '1px solid #ccc', borderRadius: '4px' }}
+                  placeholder="Enter popularity score"
+                />
+              </div>
+              <div style={{ marginBottom: '15px' }}>
+                <label htmlFor="genres" style={{ display: 'block', marginBottom: '5px' }}>
+                  Genres (Comma-separated list):
+                </label>
+                <input
+                  id="genres"
+                  name="genres"
+                  value={formData.genres}
+                  onChange={handleChange}
+                  style={{ width: '100%', padding: '8px', border: '1px solid #ccc', borderRadius: '4px' }}
+                  placeholder='e.g. rock, jazz'
+                />
+              </div>
+              <div style={{ marginBottom: '15px' }}>
+                <label htmlFor="images" style={{ display: 'block', marginBottom: '5px' }}>
+                  Images (Comma-separated list):
+                </label>
+                <textarea
+                  id="images"
+                  name="images"
+                  value={formData.images}
+                  onChange={handleChange}
+                  style={{ width: '100%', padding: '8px', border: '1px solid #ccc', borderRadius: '4px' }}
+                  placeholder='e.g. url1, url2'
+                />
+              </div>
+              <div style={{ marginBottom: '15px' }}>
+                <label htmlFor="external_urls" style={{ display: 'block', marginBottom: '5px' }}>
+                  External URLs (Valid JSON object):
+                </label>
+                <textarea
+                  id="external_urls"
+                  name="external_urls"
+                  value={formData.external_urls}
+                  onChange={handleChange}
+                  style={{ width: '100%', padding: '8px', border: '1px solid #ccc', borderRadius: '4px' }}
+                  placeholder='e.g. {"spotify": "https://spotify.com/..."}'
+                />
+              </div>
+              <div style={{ marginBottom: '15px' }}>
+                <label htmlFor="monthly_listeners" style={{ display: 'block', marginBottom: '5px' }}>
+                  Monthly Listeners:
+                </label>
+                <input
+                  type="number"
+                  id="monthly_listeners"
+                  name="monthly_listeners"
+                  value={formData.monthly_listeners}
+                  onChange={handleChange}
+                  style={{ width: '100%', padding: '8px', border: '1px solid #ccc', borderRadius: '4px' }}
+                  placeholder="Enter monthly listeners count"
+                />
+              </div>
+              <button
+                type="submit"
+                style={{ backgroundColor: '#007bff', color: 'white', padding: '10px 15px', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+              >
+                Save Changes
+              </button>
+            </form>
+          )}
           {message && <p style={{ color: 'green', marginTop: '10px' }}>{message}</p>}
           {error && <p style={{ color: 'red', marginTop: '10px' }}>Error: {error}</p>}
         </div>
