@@ -155,7 +155,7 @@ export default function ArtistDetailPage() {
   const { score, breakdown } = calculateArtistScore(artist);
 
   return (
-    <div style={{ padding: '20px' }}>
+    <div>
       <h1 style={{ fontSize: '2em', marginBottom: '20px', textAlign: 'center' }}>{artist.name}</h1>
       <div style={{ border: '1px solid #ccc', padding: '15px', borderRadius: '8px', maxWidth: '600px', margin: '0 auto', backgroundColor: '#fff' }}>
         {displayImage && (

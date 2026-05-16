@@ -66,18 +66,22 @@ export default function Home() {
   }
 
   return (
-    <div style={{ padding: '20px' }}>
-      <h1 style={{ fontSize: '2em', marginBottom: '20px', textAlign: 'center' }}>Artists from Spotify</h1>
+    <div>
+      <h1 style={{ fontSize: '2em', marginBottom: '20px', textAlign: 'center' }}>Artists</h1>
       {artists.length === 0 ? (
         <p style={{ textAlign: 'center', fontSize: '1.2em' }}>No artists found in the database. Try running the scraper!</p>
       ) : (
         <div> {/* Changed from grid to simple div */}
           {artists.map((artist) => {
             let parsedGenres: string[] = [];
-            try {
-              parsedGenres = artist.genres ? JSON.parse(artist.genres) : [];
-            } catch (e) {
-              console.error("Error parsing genres:", artist.genres, e);
+            if (artist.genres) {
+              if (Array.isArray(artist.genres)) {
+                parsedGenres = artist.genres;
+              } else if (typeof artist.genres === 'string') {
+                // Remove brackets/quotes and split by comma if needed
+                const cleaned = artist.genres.replace(/[\[\]"']/g, '');
+                parsedGenres = cleaned ? cleaned.split(',').map(s => s.trim()) : [];
+              }
             }
 
             const displayImage = artist.images && artist.images.length > 0 ? artist.images[0].url : null;

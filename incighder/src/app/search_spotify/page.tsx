@@ -98,7 +98,7 @@ export default function SearchArtists() {
 
   return (
     <div className="min-h-screen p-8">
-      <h1 className="text-4xl font-bold mb-8 text-center">Search and Add Artists</h1>
+      <h1 className="text-4xl font-bold mb-8 text-center">Search Spotify for Artists</h1>
       <div className="flex flex-col items-center mb-8">
         <input
           type="text"
@@ -109,16 +109,10 @@ export default function SearchArtists() {
         />
         <button
           onClick={handleSearch}
-          className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded mr-2"
+          className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded mb-2 w-48"
           disabled={loading}
         >
-          {loading ? 'Searching...' : 'Search Artist'}
-        </button>
-        <button
-          onClick={handleManualAdd}
-          className="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded"
-        >
-          Add Manually
+          {loading ? 'Searching...' : 'Search'}
         </button>
       </div>
 
@@ -129,20 +123,24 @@ export default function SearchArtists() {
         {searchResults.map((artist) => (
           <div key={artist.id} className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 text-black dark:text-white">
             <h2 className="text-2xl font-semibold mb-2">{artist.name}</h2>
-            {artist.images && artist.images.length > 0 && (
+            {artist.images && artist.images.length > 0 ? (
               <img src={artist.images[0].url} alt={artist.name} className="w-24 h-24 rounded-full mx-auto mb-4" />
+            ) : (
+              <div className="w-24 h-24 rounded-full mx-auto mb-4 bg-gray-300 flex items-center justify-center text-gray-600 font-bold">?</div>
             )}
             <p><strong>Popularity:</strong> {artist.popularity}</p>
             <p><strong>Followers:</strong> {artist.followers.total.toLocaleString()}</p>
             <p><strong>Genres:</strong> {artist.genres.join(', ') || 'N/A'}</p>
-            <a
-              href={artist.external_urls.spotify}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-blue-500 hover:underline block mt-2"
-            >
-              View on Spotify
-            </a>
+            {artist.external_urls?.spotify && (
+              <a
+                href={artist.external_urls.spotify}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-500 hover:underline block mt-2"
+              >
+                View on Spotify
+              </a>
+            )}
             <button
               onClick={() => handleAddToDataset(artist)}
               className="mt-4 bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded w-full"
