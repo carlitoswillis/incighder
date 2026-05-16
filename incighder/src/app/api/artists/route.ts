@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { Pool } from 'pg';
 
-
 const pool = new Pool({
   user: process.env.DB_USER || 'postgres',
   host: process.env.DB_HOST || 'db',
@@ -63,5 +62,34 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
   } catch (error) {
     console.error('Error deleting artist:', error);
     return NextResponse.json({ error: 'Failed to delete artist' }, { status: 500 });
+  }
+}
+
+export async function POST_MANUAL(request: Request) {
+  const artistData = await request.json();
+
+  try {
+    const client = await pool.connect();
+    const queryText = `
+      INSERT INTO artists (name, followers, popularity, genres, images, external_urls, monthly_listeners)
+      VALUES ($1, $2, $3, $4, $5, $6, $7)
+      RETURNING *
+    `;
+    const values = [
+      artistData.name,
+      artistData.followers,
+      artistData.popularity,
+      artistData.genres,
+      artistData.images,
+      artistData.external_urls,
+      artistData.monthly_listeners
+    ];
+    const result = await client.query(queryText, values);
+    client.release();
+
+    return NextResponse.json(result.rows[0]);
+  } catch (error) {
+    console.error('Error inserting manual artist:', error);
+    return NextResponse.json({ error: 'Failed to insert manual artist' }, { status: 500 });
   }
 }

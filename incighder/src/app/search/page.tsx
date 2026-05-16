@@ -64,6 +64,38 @@ export default function SearchArtists() {
     }
   };
 
+  const handleManualAdd = async () => {
+    const manualArtistData = {
+      name: artistName,
+      followers: 0, // Default values or user input
+      popularity: 0, // Default values or user input
+      genres: [], // Default values or user input
+      images: null, // Default values or user input
+      external_urls: { spotify: '' }, // Default values or user input
+      monthly_listeners: 0 // Default values or user input
+    };
+
+    setMessage(null);
+    try {
+      const response = await fetch('/api/artists/manual', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(manualArtistData),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+      }
+
+      setMessage(`Manual artist ${artistName} added to dataset successfully!`);
+    } catch (e: any) {
+      setError(`Failed to add manual artist: ${e.message}`);
+    }
+  };
+
   return (
     <div className="min-h-screen p-8">
       <h1 className="text-4xl font-bold mb-8 text-center">Search and Add Artists</h1>
@@ -77,10 +109,16 @@ export default function SearchArtists() {
         />
         <button
           onClick={handleSearch}
-          className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
+          className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded mr-2"
           disabled={loading}
         >
           {loading ? 'Searching...' : 'Search Artist'}
+        </button>
+        <button
+          onClick={handleManualAdd}
+          className="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded"
+        >
+          Add Manually
         </button>
       </div>
 
