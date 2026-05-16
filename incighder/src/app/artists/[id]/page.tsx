@@ -23,7 +23,15 @@ export default function ArtistDetailPage() {
   const [artist, setArtist] = useState<Artist | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [monthlyListenersInput, setMonthlyListenersInput] = useState<string>('');
+  const [formData, setFormData] = useState({
+    name: '',
+    followers: '',
+    popularity: '',
+    genres: '',
+    images: '',
+    external_urls: '',
+    monthly_listeners: ''
+  });
   const [message, setMessage] = useState<string | null>(null);
 
   const fetchArtist = async () => {
@@ -37,7 +45,15 @@ export default function ArtistDetailPage() {
       const data = await response.json();
       console.log("Artist fetched successfully:", data);
       setArtist(data);
-      setMonthlyListenersInput(data.monthly_listeners ? String(data.monthly_listeners) : '');
+      setFormData({
+        name: data.name || '',
+        followers: String(data.followers) || '',
+        popularity: String(data.popularity) || '',
+        genres: JSON.stringify(data.genres) || '',
+        images: JSON.stringify(data.images) || '',
+        external_urls: JSON.stringify(data.external_urls) || '',
+        monthly_listeners: String(data.monthly_listeners) || ''
+      });
     } catch (e: any) {
       console.error("Error fetching artist:", e);
       setError(e.message);
@@ -52,21 +68,24 @@ export default function ArtistDetailPage() {
     }
   }, [artistId]);
 
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setFormData({
+      ...formData,
+      [name]: value
+    });
+  };
+
   const handleSave = async () => {
     setMessage(null);
     setError(null);
     try {
-      const updatedMonthlyListeners = monthlyListenersInput === '' ? null : parseInt(monthlyListenersInput, 10);
-      if (monthlyListenersInput !== '' && isNaN(updatedMonthlyListeners as number)) {
-        throw new Error("Monthly listeners must be a number.");
-      }
-
       const response = await fetch(`/api/artists/${artistId}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ monthly_listeners: updatedMonthlyListeners }),
+        body: JSON.stringify(formData),
       });
 
       if (!response.ok) {
@@ -141,34 +160,109 @@ export default function ArtistDetailPage() {
 
         <div style={{ marginTop: '20px', paddingTop: '15px', borderTop: '1px solid #eee' }}>
           <h2 style={{ fontSize: '1.5em', marginBottom: '10px' }}>Edit Data</h2>
-          {/* Link to the new edit page */}
-          <button
-            onClick={() => router.push(`/artists/${artistId}/edit`)}
-            style={{ backgroundColor: '#28a745', color: 'white', padding: '10px 15px', border: 'none', borderRadius: '4px', cursor: 'pointer', marginBottom: '15px' }}
-          >
-            Edit All Fields
-          </button>
-
-          {/* Original Monthly Listeners Edit Form */}
-          <div style={{ marginBottom: '15px' }}>
-            <label htmlFor="monthlyListeners" style={{ display: 'block', marginBottom: '5px' }}>
-              Monthly Listeners:
-            </label>
-            <input
-              type="number"
-              id="monthlyListeners"
-              value={monthlyListenersInput}
-              onChange={(e) => setMonthlyListenersInput(e.target.value)}
-              style={{ width: '100%', padding: '8px', border: '1px solid #ccc', borderRadius: '4px' }}
-              placeholder="Enter monthly listeners"
-            />
-          </div>
-          <button
-            onClick={handleSave}
-            style={{ backgroundColor: '#007bff', color: 'white', padding: '10px 15px', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
-          >
-            Save Monthly Listeners
-          </button>
+          <form onSubmit={handleSave}>
+            <div style={{ marginBottom: '15px' }}>
+              <label htmlFor="name" style={{ display: 'block', marginBottom: '5px' }}>
+                Name:
+              </label>
+              <input
+                type="text"
+                id="name"
+                name="name"
+                value={formData.name}
+                onChange={handleChange}
+                style={{ width: '100%', padding: '8px', border: '1px solid #ccc', borderRadius: '4px' }}
+                placeholder="Enter artist name"
+              />
+            </div>
+            <div style={{ marginBottom: '15px' }}>
+              <label htmlFor="followers" style={{ display: 'block', marginBottom: '5px' }}>
+                Followers:
+              </label>
+              <input
+                type="number"
+                id="followers"
+                name="followers"
+                value={formData.followers}
+                onChange={handleChange}
+                style={{ width: '100%', padding: '8px', border: '1px solid #ccc', borderRadius: '4px' }}
+                placeholder="Enter followers count"
+              />
+            </div>
+            <div style={{ marginBottom: '15px' }}>
+              <label htmlFor="popularity" style={{ display: 'block', marginBottom: '5px' }}>
+                Popularity:
+              </label>
+              <input
+                type="number"
+                id="popularity"
+                name="popularity"
+                value={formData.popularity}
+                onChange={handleChange}
+                style={{ width: '100%', padding: '8px', border: '1px solid #ccc', borderRadius: '4px' }}
+                placeholder="Enter popularity score"
+              />
+            </div>
+            <div style={{ marginBottom: '15px' }}>
+              <label htmlFor="genres" style={{ display: 'block', marginBottom: '5px' }}>
+                Genres:
+              </label>
+              <textarea
+                id="genres"
+                name="genres"
+                value={formData.genres}
+                onChange={handleChange}
+                style={{ width: '100%', padding: '8px', border: '1px solid #ccc', borderRadius: '4px' }}
+                placeholder='Enter genres as JSON array (e.g. ["genre1", "genre2"])'
+              />
+            </div>
+            <div style={{ marginBottom: '15px' }}>
+              <label htmlFor="images" style={{ display: 'block', marginBottom: '5px' }}>
+                Images:
+              </label>
+              <textarea
+                id="images"
+                name="images"
+                value={formData.images}
+                onChange={handleChange}
+                style={{ width: '100%', padding: '8px', border: '1px solid #ccc', borderRadius: '4px' }}
+                placeholder='Enter images as JSON array (e.g. [{"url": "image_url"}])'
+              />
+            </div>
+            <div style={{ marginBottom: '15px' }}>
+              <label htmlFor="external_urls" style={{ display: 'block', marginBottom: '5px' }}>
+                External URLs:
+              </label>
+              <textarea
+                id="external_urls"
+                name="external_urls"
+                value={formData.external_urls}
+                onChange={handleChange}
+                style={{ width: '100%', padding: '8px', border: '1px solid #ccc', borderRadius: '4px' }}
+                placeholder='Enter external URLs as JSON object (e.g. {"spotify": "url"})'
+              />
+            </div>
+            <div style={{ marginBottom: '15px' }}>
+              <label htmlFor="monthly_listeners" style={{ display: 'block', marginBottom: '5px' }}>
+                Monthly Listeners:
+              </label>
+              <input
+                type="number"
+                id="monthly_listeners"
+                name="monthly_listeners"
+                value={formData.monthly_listeners}
+                onChange={handleChange}
+                style={{ width: '100%', padding: '8px', border: '1px solid #ccc', borderRadius: '4px' }}
+                placeholder="Enter monthly listeners count"
+              />
+            </div>
+            <button
+              type="submit"
+              style={{ backgroundColor: '#007bff', color: 'white', padding: '10px 15px', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+            >
+              Save Changes
+            </button>
+          </form>
           {message && <p style={{ color: 'green', marginTop: '10px' }}>{message}</p>}
           {error && <p style={{ color: 'red', marginTop: '10px' }}>Error: {error}</p>}
         </div>
