@@ -1,4 +1,3 @@
-
 CREATE TABLE artists (
     id VARCHAR(255) PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
@@ -7,7 +6,9 @@ CREATE TABLE artists (
     genres TEXT,
     images JSON,
     external_urls JSON,
-    monthly_listeners INTEGER
+    monthly_listeners INTEGER,
+    spotify_id VARCHAR(255) NULL,
+    youtube_id VARCHAR(255) NULL
 );
 
 CREATE TABLE albums (
