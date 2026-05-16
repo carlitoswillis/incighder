@@ -105,8 +105,8 @@ export default function Home() {
                     </a>
                   </h2>
                   <p><strong>Score:</strong> {score}</p>
-                  <p><strong>Followers:</strong> {artist.followers.toLocaleString()}</p>
-                  <p><strong>Popularity:</strong> {artist.popularity}</p>
+                  <p><strong>Followers:</strong> {artist.followers !== null ? artist.followers.toLocaleString() : 'N/A'}</p>
+                  <p><strong>Popularity:</strong> {artist.popularity !== null ? artist.popularity : 'N/A'}</p>
                   <p><strong>Genres:</strong> {parsedGenres.length > 0 ? parsedGenres.join(', ') : 'N/A'}</p>
                   {artist.monthly_listeners !== null && (
                     <p><strong>Monthly Listeners:</strong> {artist.monthly_listeners.toLocaleString()}</p>
