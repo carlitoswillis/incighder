@@ -75,7 +75,7 @@ export default function AddArtistPage() {
         <div className="text-green-500 text-center mb-4">
           <p>{message}</p>
           {newArtistId && (
-            <a href={`/artists/${newArtistId}`} className="text-blue-500 underline font-semibold mt-2 block">
+            <a href={`/artists/${newArtistId}?edit=true`} className="text-blue-500 underline font-semibold mt-2 block">
               Go to Edit Page
             </a>
           )}
