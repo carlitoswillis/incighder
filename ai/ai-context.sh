@@ -5,8 +5,7 @@
 set -e
 
 # Output file
-CONTEXT_FILE=".ai/context/current_bundle.md"
-mkdir -p .ai/context
+CONTEXT_FILE="./ai/CONTEXT_BUNDLE.md"
 
 echo "Generating AI context bundle..."
 
@@ -29,19 +28,19 @@ echo "Generating AI context bundle..."
     fi
     echo ""
 
-    echo "## 2. Current State (.ai/CURRENT_STATE.md)"
-    if [ -f ".ai/CURRENT_STATE.md" ]; then
-        cat ".ai/CURRENT_STATE.md"
+    echo "## 2. Architecture (ARCHITECTURE.md)"
+    if [ -f "ARCHITECTURE.md" ]; then
+        cat "ARCHITECTURE.md"
     else
-        echo "Warning: .ai/CURRENT_STATE.md not found."
+        echo "Warning: ARCHITECTURE.md not found."
     fi
     echo ""
 
-    echo "## 3. Active Tasks (.ai/TASKS.md)"
-    if [ -f ".ai/TASKS.md" ]; then
-        cat ".ai/TASKS.md"
+    echo "## 3. Project State (PROJECT_STATE.md)"
+    if [ -f "PROJECT_STATE.md" ]; then
+        cat "PROJECT_STATE.md"
     else
-        echo "Warning: .ai/TASKS.md not found."
+        echo "Warning: PROJECT_STATE.md not found."
     fi
     echo ""
 

@@ -32,7 +32,7 @@ Incighder is a multi-service data application designed to aggregate and visualiz
 3. **Display**: Next.js fetches structured data from the `db` via API routes and renders the dashboard.
 
 ## AI Workspace Substrate
-This repository uses an AI-assisted engineering substrate located in `.ai/` and `scripts/`.
-- **Cognition Layer**: State and tasks are tracked in `.ai/`.
+This repository uses an AI-assisted engineering substrate located in `ai/` and `scripts/`.
+- **Cognition Layer**: State and tasks are tracked in `ai/`.
 - **Rules**: Agent constraints are defined in `AGENTS.md`.
 - **Flow**: Human Pilot -> AI Implementation -> Deterministic Verification (`scripts/verify.sh`).
