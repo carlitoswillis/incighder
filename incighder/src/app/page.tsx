@@ -1,7 +1,12 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Image from 'next/image';
 import { calculateArtistScore } from '../utils/score';
+
+interface ArtistImage {
+  url: string;
+}
 
 interface Artist {
   id: string;
@@ -9,9 +14,9 @@ interface Artist {
   followers: number;
   popularity: number;
   genres: string | null;
-  images: any[] | null;
-  external_urls: any | null;
-  monthly_listeners: number | null; // Added monthly_listeners
+  images: ArtistImage[] | null;
+  external_urls: { [key: string]: string } | null;
+  monthly_listeners: number | null;
 }
 
 export default function Home() {
@@ -25,10 +30,10 @@ export default function Home() {
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-      const data = await response.json();
+      const data: Artist[] = await response.json();
       setArtists(data);
-    } catch (e: any) {
-      setError(e.message);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : String(e));
     } finally {
       setLoading(false);
     }
@@ -49,11 +54,10 @@ export default function Home() {
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-      // Refetch artists after successful deletion
       fetchArtists();
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error('Error deleting artist:', e);
-      alert(`Failed to delete artist: ${e.message}`);
+      alert(`Failed to delete artist: ${e instanceof Error ? e.message : String(e)}`);
     }
   };
 
@@ -71,37 +75,31 @@ export default function Home() {
       {artists.length === 0 ? (
         <p style={{ textAlign: 'center', fontSize: '1.2em' }}>No artists found in the database. Try running the scraper!</p>
       ) : (
-        <div> {/* Changed from grid to simple div */}
+        <div>
           {artists.map((artist) => {
             let parsedGenres: string[] = [];
             if (artist.genres) {
-              if (Array.isArray(artist.genres)) {
-                parsedGenres = artist.genres;
-              } else if (typeof artist.genres === 'string') {
-                // Remove brackets/quotes and split by comma if needed
-                const cleaned = artist.genres.replace(/[\[\]"']/g, '');
-                parsedGenres = cleaned ? cleaned.split(',').map(s => s.trim()) : [];
-              }
+              const cleaned = artist.genres.replace(/[\[\]"']/g, '');
+              parsedGenres = cleaned ? cleaned.split(',').map(s => s.trim()) : [];
             }
 
             const displayImage = artist.images && artist.images.length > 0 ? artist.images[0].url : null;
-            const spotifyUrl = artist.external_urls ? artist.external_urls.spotify : null;
-
+            const spotifyUrl = artist.external_urls?.spotify;
             const { score } = calculateArtistScore(artist);
 
             return (
               <div key={artist.id} className="artist-card">
                 <button onClick={() => handleDelete(artist.id)} className="remove-button">X</button>
-                {/* Image container */}
                 <div>
                   {displayImage && (
-                    <img
+                    <Image
                       src={displayImage}
                       alt={artist.name}
+                      width={100}
+                      height={100}
                     />
                   )}
                 </div>
-                {/* Info container */}
                 <div className="artist-info">
                   <h2>
                     <a href={`/artists/${artist.id}`}>

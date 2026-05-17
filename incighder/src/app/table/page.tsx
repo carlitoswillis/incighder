@@ -8,8 +8,8 @@ interface Artist {
   followers: number;
   popularity: number;
   genres: string | null;
-  images: any[] | null;
-  external_urls: any | null;
+  images: { url: string }[] | null;
+  external_urls: { [key: string]: string } | null;
 }
 
 export default function ArtistsTable() {
@@ -24,10 +24,10 @@ export default function ArtistsTable() {
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
-        const data = await response.json();
+        const data: Artist[] = await response.json();
         setArtists(data);
-      } catch (e: any) {
-        setError(e.message);
+      } catch (e: unknown) {
+        setError(e instanceof Error ? e.message : String(e));
       } finally {
         setLoading(false);
       }
@@ -64,12 +64,11 @@ export default function ArtistsTable() {
             <tbody>
               {artists.map((artist) => {
                 let parsedGenres: string[] = [];
-                try {
-                  parsedGenres = artist.genres ? JSON.parse(artist.genres) : [];
-                } catch (e) {
-                  console.error("Error parsing genres:", artist.genres, e);
+                if (artist.genres) {
+                  const cleaned = artist.genres.replace(/[\[\]"']/g, '');
+                  parsedGenres = cleaned ? cleaned.split(',').map(s => s.trim()) : [];
                 }
-                const spotifyUrl = artist.external_urls ? artist.external_urls.spotify : null;
+                const spotifyUrl = artist.external_urls?.spotify;
 
                 return (
                   <tr key={artist.id}>

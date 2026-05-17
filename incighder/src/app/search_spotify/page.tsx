@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Image from 'next/image';
 
 interface SpotifyArtist {
   id: string;
@@ -35,8 +36,8 @@ export default function SearchArtists() {
       if (data.artists.items.length === 0) {
         setMessage('No artists found for your search.');
       }
-    } catch (e: any) {
-      setError(e.message);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : String(e));
     } finally {
       setLoading(false);
     }
@@ -59,40 +60,8 @@ export default function SearchArtists() {
       }
 
       setMessage(`Artist ${artist.name} added to dataset successfully!`);
-    } catch (e: any) {
-      setError(`Failed to add artist: ${e.message}`);
-    }
-  };
-
-  const handleManualAdd = async () => {
-    const manualArtistData = {
-      name: artistName,
-      followers: 0, // Default values or user input
-      popularity: 0, // Default values or user input
-      genres: [], // Default values or user input
-      images: null, // Default values or user input
-      external_urls: { spotify: '' }, // Default values or user input
-      monthly_listeners: 0 // Default values or user input
-    };
-
-    setMessage(null);
-    try {
-      const response = await fetch('/api/artists/manual', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(manualArtistData),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
-      }
-
-      setMessage(`Manual artist ${artistName} added to dataset successfully!`);
-    } catch (e: any) {
-      setError(`Failed to add manual artist: ${e.message}`);
+    } catch (e: unknown) {
+      setError(`Failed to add artist: ${e instanceof Error ? e.message : String(e)}`);
     }
   };
 
@@ -124,7 +93,13 @@ export default function SearchArtists() {
           <div key={artist.id} className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 text-black dark:text-white">
             <h2 className="text-2xl font-semibold mb-2">{artist.name}</h2>
             {artist.images && artist.images.length > 0 ? (
-              <img src={artist.images[0].url} alt={artist.name} className="w-24 h-24 rounded-full mx-auto mb-4" />
+              <Image
+                src={artist.images[0].url}
+                alt={artist.name}
+                width={96}
+                height={96}
+                className="rounded-full mx-auto mb-4"
+              />
             ) : (
               <div className="w-24 h-24 rounded-full mx-auto mb-4 bg-gray-300 flex items-center justify-center text-gray-600 font-bold">?</div>
             )}

@@ -1,10 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 
 export default function AddArtistPage() {
-  const router = useRouter();
   const [artistName, setArtistName] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -43,8 +41,8 @@ export default function AddArtistPage() {
       setMessage(`Manual artist ${artistName} added to dataset successfully!`);
       setNewArtistId(data.artist.id);
       setArtistName('');
-    } catch (e: any) {
-      setError(`Failed to add manual artist: ${e.message}`);
+    } catch (e: unknown) {
+      setError(`Failed to add manual artist: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
       setLoading(false);
     }

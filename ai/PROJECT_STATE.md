@@ -43,6 +43,9 @@ PURPOSE: Tracks active work and backlog. AI agents should update this after comp
 - [x] Implement artist editing functionality (PATCH requests)
 - [x] Enable navigation to new artist page
 - [x] Add navigation bar
+- [x] QA/UX testing for artist editing workflow
+- [x] Refine error handling for PATCH submissions
+- [x] Codebase cleanup (linting fixes in API routes)
 - [x] Decouple database schema (spotify_id made nullable)
 - [x] Implement `POST /insert_artist_manual` backend endpoint
 - [x] Consolidate `schema.sql` to `data-api/`

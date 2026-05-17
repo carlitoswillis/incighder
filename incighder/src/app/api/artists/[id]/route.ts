@@ -27,26 +27,23 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
 
 export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
   const { id } = await context.params;
-  const updatedFields = await request.json();
+  const updatedFields: Record<string, any> = await request.json();
 
   const setClauses: string[] = [];
   const values: any[] = [];
   let paramIndex = 1;
 
-  // Dynamically build the SET clause for the SQL query
   for (const key in updatedFields) {
-    if (updatedFields.hasOwnProperty(key) && key !== 'id') { // Exclude 'id' from update
+    if (Object.prototype.hasOwnProperty.call(updatedFields, key) && key !== 'id') {
       setClauses.push(`${key} = $${paramIndex}`);
       
-      let val = updatedFields[key];
+      const val = updatedFields[key];
       
-      // Handle JSON fields (genres, images, external_urls)
       if (key === 'genres') {
         if (val === null || val === 'null' || val === '') {
           values.push(null);
         } else if (typeof val === 'string') {
-          // Clean up the string: remove braces, quotes, etc.
-          let cleaned = val.replace(/[\{\}\"\[\]]/g, '');
+          const cleaned = val.replace(/[\{\}\"\[\]]/g, '');
           values.push(cleaned);
         } else if (Array.isArray(val)) {
           values.push(val.join(', '));
@@ -57,14 +54,12 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
         if (val === null || val === 'null' || val === '') {
           values.push(null);
         } else if (Array.isArray(val)) {
-          // Serialize array to JSON string for Postgres JSON column
           values.push(JSON.stringify(val));
         } else if (typeof val === 'string') {
           try {
             const parsed = JSON.parse(val);
             values.push(JSON.stringify(Array.isArray(parsed) ? parsed : [val]));
-          } catch (e) {
-            // If string input, serialize as array of objects if needed, or just array of strings
+          } catch {
             values.push(JSON.stringify(val.split(',').map((s: string) => s.trim()).filter((s: string) => s).map(url => ({ url }))));
           }
         } else {
@@ -74,17 +69,15 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
         if (val === null || val === 'null' || val === '') {
           values.push(null);
         } else if (typeof val === 'object') {
-          // Serialize object to JSON string
           values.push(JSON.stringify(val));
         } else {
           try {
             values.push(JSON.stringify(JSON.parse(val)));
-          } catch (e) {
+          } catch {
             return NextResponse.json({ error: `Invalid JSON for field: ${key}` }, { status: 400 });
           }
         }
       } else {
-        // Ensure empty strings for numeric fields are treated as null
         values.push(val === '' || val === 'null' ? null : val);
       }
       paramIndex++;
@@ -95,7 +88,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     return NextResponse.json({ message: 'No fields to update' }, { status: 200 });
   }
 
-  values.push(id); // Add ID for the WHERE clause
+  values.push(id);
 
   try {
     const client = await pool.connect();

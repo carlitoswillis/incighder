@@ -1,8 +1,17 @@
 'use client';
 
 import { useState, useEffect, Suspense } from 'react';
-import { useParams, useRouter, useSearchParams } from 'next/navigation';
+import { useParams, useSearchParams } from 'next/navigation';
+import Image from 'next/image';
 import { calculateArtistScore } from '../../../utils/score';
+
+interface Image {
+  url: string;
+}
+
+interface ExternalUrls {
+  [key: string]: string;
+}
 
 interface Artist {
   id: string;
@@ -10,15 +19,14 @@ interface Artist {
   followers: number;
   popularity: number;
   genres: string | null;
-  images: any[] | null;
-  external_urls: any | null;
+  images: Image[] | null;
+  external_urls: ExternalUrls | null;
   monthly_listeners: number | null;
 }
 
 function ArtistDetailComponent() {
   const params = useParams();
   const searchParams = useSearchParams();
-  const router = useRouter();
   const artistId = params.id as string;
   const editMode = searchParams.get('edit') === 'true';
 
@@ -58,12 +66,12 @@ function ArtistDetailComponent() {
           followers: String(data.followers || ''),
           popularity: String(data.popularity || ''),
           genres: data.genres || '',
-          images: Array.isArray(data.images) ? data.images.map((img: any) => img.url || img).join(', ') : '',
+          images: Array.isArray(data.images) ? data.images.map((img: Image | string) => (typeof img === 'string' ? img : img.url)).join(', ') : '',
           external_urls: data.external_urls ? JSON.stringify(data.external_urls, null, 2) : '',
           monthly_listeners: String(data.monthly_listeners || '')
         });
-      } catch (e: any) {
-        setError(e.message);
+      } catch (e: unknown) {
+        setError(e instanceof Error ? e.message : String(e));
       } finally {
         setLoading(false);
       }
@@ -80,20 +88,25 @@ function ArtistDetailComponent() {
     e.preventDefault();
     setMessage(null);
     setError(null);
-    try {
-      let parsedUrls = null;
-      if (formData.external_urls) {
+
+    let parsedUrls = null;
+    if (formData.external_urls) {
+      try {
+        parsedUrls = JSON.parse(formData.external_urls);
+      } catch {
         try {
-          parsedUrls = JSON.parse(formData.external_urls);
-        } catch (e) {
-          const parts = formData.external_urls.split('},');
-          parsedUrls = parts.reduce((acc, curr) => {
-            const jsonString = curr.trim().endsWith('}') ? curr.trim() : curr.trim() + '}';
-            return { ...acc, ...JSON.parse(jsonString) };
-          }, {});
+          const fixedJson = formData.external_urls
+            .replace(/(\w+):/g, '"$1":')
+            .replace(/'/g, '"');
+          parsedUrls = JSON.parse(fixedJson);
+        } catch {
+          setError('External URLs must be a valid JSON object.');
+          return;
         }
       }
+    }
 
+    try {
       const dataToSend = {
         ...formData,
         genres: formData.genres.split(',').map((s) => s.trim()).filter((s) => s),
@@ -108,15 +121,16 @@ function ArtistDetailComponent() {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to update artist');
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to update artist');
       }
 
       setMessage('Artist data updated successfully!');
       const updatedResponse = await fetch(`/api/artists/${artistId}`);
       const data = await updatedResponse.json();
       setArtist(data);
-    } catch (e: any) {
-      setError(`Failed to update artist: ${e.message}`);
+    } catch (e: unknown) {
+      setError(`Failed to update artist: ${e instanceof Error ? e.message : String(e)}`);
     }
   };
 
@@ -136,9 +150,9 @@ function ArtistDetailComponent() {
       <h1 style={{ fontSize: '2em', marginBottom: '20px', textAlign: 'center' }}>{artist.name}</h1>
       <div style={{ border: '1px solid #ccc', padding: '15px', borderRadius: '8px', maxWidth: '600px', margin: '0 auto', backgroundColor: '#fff' }}>
         {artist.images && artist.images.length > 0 && (
-          <img src={artist.images[0].url} alt={artist.name} style={{ width: '120px', height: '120px', borderRadius: '50%', display: 'block', margin: '0 auto 15px' }} />
+          <Image src={artist.images[0].url} alt={artist.name} width={120} height={120} style={{ borderRadius: '50%', display: 'block', margin: '0 auto 15px' }} />
         )}
-        <p><strong>ID:</strong> {artist.id}</p>
+...        <p><strong>ID:</strong> {artist.id}</p>
         <p><strong>Score:</strong> {score}</p>
         <pre style={{ backgroundColor: '#f5f5f5', padding: '10px', borderRadius: '5px', fontSize: '0.9em', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{breakdown}</pre>
         <p><strong>Genres:</strong> {parsedGenres.length > 0 ? parsedGenres.join(', ') : 'N/A'}</p>
