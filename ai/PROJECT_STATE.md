@@ -2,13 +2,15 @@
 
 PURPOSE: High-level summary of the system's current focus and recent changes to prevent agent drift.
 
-## Last Updated: 2026-06-19
-## Current Focus: Polish Artist Management & Editing
+## Last Updated: 2026-06-20
+## Current Focus: Cross-Platform Scraping (see `SCRAPING_PLAN.md`)
 
 ## Project Goal
 Build a data application that provides a holistic view of an artist's online traction and potential, starting with Spotify and expanding to YouTube, SoundCloud, and social media.
 
 ## Recent Changes
+- **Scraping Plan**: Authored `SCRAPING_PLAN.md` for cross-platform metric scraping.
+- **Cleanup**: Fixed substrate drift, removed dead endpoints, guarded PATCH against column-name injection (branch `fix/substrate-and-api-cleanup`).
 - **Artist Editing**: Implemented PATCH request handling for artist info updates.
 - **Form UI**: Updated `src/app/artists/[id]/page.tsx` for full field editing.
 - **Navigation**: Enabled direct navigation to the new artist page.
@@ -20,21 +22,23 @@ Build a data application that provides a holistic view of an artist's online tra
 - **Blockers**: None
 
 ## Next Steps
-1. Perform QA/UX testing on the new artist editing workflow.
-2. Refine error handling for artist update submissions.
-3. Plan integration for YouTube data fetching (Future Phase).
+1. Obtain a free YouTube Data API key (`YOUTUBE_API_KEY` in `.env`).
+2. Execute `SCRAPING_PLAN.md` Phase 0 (foundations) then Phase 1 (Spotify ML, YouTube, SoundCloud).
+3. Layer in best-effort socials (IG/TikTok), X manual, then DuckDuckGo discovery.
 
 
 # Tasks
 
 PURPOSE: Tracks active work and backlog. AI agents should update this after completing tasks.
 
-## Active (Phase C: Frontend)
-- [ ] Integrate YouTube search into the frontend (Future Phase)
+## Active (Phase D: Scraping) — detailed in `SCRAPING_PLAN.md`
+- [ ] Phase 0: scraper framework, Playwright in Docker, schema columns
+- [ ] Phase 1: Spotify monthly listeners + YouTube (API) + SoundCloud scrapers, `/scrape` endpoint, UI panel
 
 ## Backlog
-- [ ] Implement YouTube data fetching in Python `data-api`
-- [ ] Add SoundCloud integration
+- [ ] Phase 2: Instagram + TikTok (best-effort), X manual entry
+- [ ] Phase 3: DuckDuckGo auto-discovery of profile links
+- [ ] Phase 4: display metrics across card/table/detail; freshness indicators
 - [ ] Implement historical data tracking for followers
 
 ## Completed
