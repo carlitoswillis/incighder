@@ -45,22 +45,3 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Failed to insert artist' }, { status: 500 });
   }
 }
-
-export async function DELETE(request: Request, { params }: { params: { id: string } }) {
-  const { id } = params;
-
-  try {
-    const client = await pool.connect();
-    const result = await client.query('DELETE FROM artists WHERE id = $1 RETURNING id', [id]);
-    client.release();
-
-    if (result.rowCount === 0) {
-      return NextResponse.json({ error: 'Artist not found' }, { status: 404 });
-    }
-
-    return NextResponse.json({ message: `Artist with ID ${id} deleted successfully` });
-  } catch (error) {
-    console.error('Error deleting artist:', error);
-    return NextResponse.json({ error: 'Failed to delete artist' }, { status: 500 });
-  }
-}

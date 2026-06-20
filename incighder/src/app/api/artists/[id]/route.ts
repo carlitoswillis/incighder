@@ -9,6 +9,14 @@ const pool = new Pool({
   port: parseInt(process.env.DB_PORT || '5432', 10),
 });
 
+// Columns on the artists table that may be updated via PATCH. Keys come from the
+// request body, so this allowlist guards against column-name (identifier) injection.
+const UPDATABLE_COLUMNS = new Set([
+  'name', 'followers', 'popularity', 'genres', 'images', 'external_urls',
+  'monthly_listeners', 'spotify_id', 'youtube_id',
+  'top_track_id', 'top_track_name', 'top_track_popularity',
+]);
+
 export async function GET(request: Request, context: { params: Promise<{ id: string }> }) {
   const { id } = await context.params;
   try {
@@ -34,7 +42,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   let paramIndex = 1;
 
   for (const key in updatedFields) {
-    if (Object.prototype.hasOwnProperty.call(updatedFields, key) && key !== 'id') {
+    if (Object.prototype.hasOwnProperty.call(updatedFields, key) && key !== 'id' && UPDATABLE_COLUMNS.has(key)) {
       setClauses.push(`${key} = $${paramIndex}`);
       
       const val = updatedFields[key];

@@ -4,6 +4,11 @@
 
 set -e
 
+# Resolve the repo root (this script lives in ai/) so it works from any CWD.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+cd "$REPO_ROOT"
+
 # Output file
 CONTEXT_FILE="./ai/CONTEXT_BUNDLE.md"
 
@@ -19,28 +24,28 @@ echo "Generating AI context bundle..."
     echo "3. Only read files from the repository structure that are directly related to those tasks."
     echo "4. Do NOT perform full repository scans unless the task is an architectural audit."
     echo ""
-    
+
     echo "## 1. Authoritative Rules (AGENTS.md)"
-    if [ -f "AGENTS.md" ]; then
-        cat "AGENTS.md"
+    if [ -f "ai/AGENTS.md" ]; then
+        cat "ai/AGENTS.md"
     else
-        echo "Warning: AGENTS.md not found."
+        echo "Warning: ai/AGENTS.md not found."
     fi
     echo ""
 
     echo "## 2. Architecture (ARCHITECTURE.md)"
-    if [ -f "ARCHITECTURE.md" ]; then
-        cat "ARCHITECTURE.md"
+    if [ -f "ai/ARCHITECTURE.md" ]; then
+        cat "ai/ARCHITECTURE.md"
     else
-        echo "Warning: ARCHITECTURE.md not found."
+        echo "Warning: ai/ARCHITECTURE.md not found."
     fi
     echo ""
 
     echo "## 3. Project State (PROJECT_STATE.md)"
-    if [ -f "PROJECT_STATE.md" ]; then
-        cat "PROJECT_STATE.md"
+    if [ -f "ai/PROJECT_STATE.md" ]; then
+        cat "ai/PROJECT_STATE.md"
     else
-        echo "Warning: PROJECT_STATE.md not found."
+        echo "Warning: ai/PROJECT_STATE.md not found."
     fi
     echo ""
 
@@ -55,7 +60,7 @@ echo "Generating AI context bundle..."
     git log -n 5 --oneline || echo "No git history yet."
     echo "\`\`\`"
     echo ""
-    
+
     echo "## 6. Active Diff"
     echo "\`\`\`diff"
     git diff --cached | head -n 100

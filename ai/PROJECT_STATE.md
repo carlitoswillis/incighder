@@ -2,7 +2,7 @@
 
 PURPOSE: High-level summary of the system's current focus and recent changes to prevent agent drift.
 
-## Last Updated: 2026-05-16
+## Last Updated: 2026-06-19
 ## Current Focus: Polish Artist Management & Editing
 
 ## Project Goal
@@ -30,8 +30,6 @@ Build a data application that provides a holistic view of an artist's online tra
 PURPOSE: Tracks active work and backlog. AI agents should update this after completing tasks.
 
 ## Active (Phase C: Frontend)
-- [ ] QA/UX testing for artist editing workflow @qwen
-- [ ] Refine error handling for PATCH submissions @qwen
 - [ ] Integrate YouTube search into the frontend (Future Phase)
 
 ## Backlog
