@@ -1,5 +1,5 @@
 # AI Context Bundle
-Generated: Sat Jun 20 15:09:56 PDT 2026
+Generated: Sat Jun 20 15:27:37 PDT 2026
 
 ## ⚠️ Agent Navigation Guide
 1. Start with the **Current State** below to understand the focus.
@@ -156,6 +156,7 @@ PURPOSE: Tracks active work and backlog. AI agents should update this after comp
 ./incighder/src
 ./data-api
 ./data-api/apply_schema.py
+./data-api/migrations
 ./data-api/spotify_search.py
 ./data-api/requirements.txt
 ./data-api/schema.sql
@@ -168,6 +169,7 @@ PURPOSE: Tracks active work and backlog. AI agents should update this after comp
 ./data-api/wait-for-it.sh
 ./data-api/insert_artist_from_json.py
 ./data-api/app.py
+./data-api/scrapers
 ./data-api/brezzo.json
 ./README.md
 ./package-lock.json
@@ -184,113 +186,113 @@ PURPOSE: Tracks active work and backlog. AI agents should update this after comp
 
 ## 5. Recent Git Changes (Summary)
 ```text
+5239346 docs: add cross-platform scraping plan
 714f66d fix: clean up flagged drift, dead code, and PATCH injection
 ce94169 rm tech debt
 6327c4b update context and agent paradigm
 b2ccc87 add edit flag
-383f307 allow nav to new artist page
 ```
 
 ## 6. Active Diff
 ```diff
 diff --git a/ai/CONTEXT_BUNDLE.md b/ai/CONTEXT_BUNDLE.md
-index 9e5f4ee..0950e23 100644
+index e1fc4fb..43231c9 100644
 --- a/ai/CONTEXT_BUNDLE.md
 +++ b/ai/CONTEXT_BUNDLE.md
 @@ -1,5 +1,5 @@
  # AI Context Bundle
--Generated: Fri Jun 19 23:01:11 PDT 2026
-+Generated: Sat Jun 20 15:09:56 PDT 2026
+-Generated: Sat Jun 20 15:09:56 PDT 2026
++Generated: Sat Jun 20 15:27:37 PDT 2026
  
  ## ⚠️ Agent Navigation Guide
  1. Start with the **Current State** below to understand the focus.
-@@ -82,13 +82,15 @@ This repository uses an AI-assisted engineering substrate located in `ai/`.
- 
- PURPOSE: High-level summary of the system's current focus and recent changes to prevent agent drift.
- 
--## Last Updated: 2026-06-19
--## Current Focus: Polish Artist Management & Editing
-+## Last Updated: 2026-06-20
-+## Current Focus: Cross-Platform Scraping (see `SCRAPING_PLAN.md`)
- 
- ## Project Goal
- Build a data application that provides a holistic view of an artist's online traction and potential, starting with Spotify and expanding to YouTube, SoundCloud, and social media.
- 
- ## Recent Changes
-+- **Scraping Plan**: Authored `SCRAPING_PLAN.md` for cross-platform metric scraping.
-+- **Cleanup**: Fixed substrate drift, removed dead endpoints, guarded PATCH against column-name injection (branch `fix/substrate-and-api-cleanup`).
- - **Artist Editing**: Implemented PATCH request handling for artist info updates.
- - **Form UI**: Updated `src/app/artists/[id]/page.tsx` for full field editing.
- - **Navigation**: Enabled direct navigation to the new artist page.
-@@ -100,21 +102,23 @@ Build a data application that provides a holistic view of an artist's online tra
- - **Blockers**: None
- 
- ## Next Steps
--1. Perform QA/UX testing on the new artist editing workflow.
--2. Refine error handling for artist update submissions.
--3. Plan integration for YouTube data fetching (Future Phase).
-+1. Obtain a free YouTube Data API key (`YOUTUBE_API_KEY` in `.env`).
-+2. Execute `SCRAPING_PLAN.md` Phase 0 (foundations) then Phase 1 (Spotify ML, YouTube, SoundCloud).
-+3. Layer in best-effort socials (IG/TikTok), X manual, then DuckDuckGo discovery.
- 
- 
- # Tasks
- 
- PURPOSE: Tracks active work and backlog. AI agents should update this after completing tasks.
- 
--## Active (Phase C: Frontend)
--- [ ] Integrate YouTube search into the frontend (Future Phase)
-+## Active (Phase D: Scraping) — detailed in `SCRAPING_PLAN.md`
-+- [ ] Phase 0: scraper framework, Playwright in Docker, schema columns
-+- [ ] Phase 1: Spotify monthly listeners + YouTube (API) + SoundCloud scrapers, `/scrape` endpoint, UI panel
- 
- ## Backlog
--- [ ] Implement YouTube data fetching in Python `data-api`
--- [ ] Add SoundCloud integration
-+- [ ] Phase 2: Instagram + TikTok (best-effort), X manual entry
-+- [ ] Phase 3: DuckDuckGo auto-discovery of profile links
-+- [ ] Phase 4: display metrics across card/table/detail; freshness indicators
- - [ ] Implement historical data tracking for followers
- 
- ## Completed
-@@ -138,6 +142,7 @@ PURPOSE: Tracks active work and backlog. AI agents should update this after comp
- ./incighder
- ./incighder/postcss.config.mjs
- ./incighder/Dockerfile
-+./incighder/tsconfig.tsbuildinfo
- ./incighder/node_modules
- ./incighder/next-env.d.ts
- ./incighder/README.md
-@@ -169,6 +174,7 @@ PURPOSE: Tracks active work and backlog. AI agents should update this after comp
- ./ai
- ./ai/ai-context.sh
- ./ai/ARCHITECTURE.md
-+./ai/SCRAPING_PLAN.md
- ./ai/CONTEXT_BUNDLE.md
- ./ai/PROJECT_STATE.md
- ./ai/AGENTS.md
-@@ -178,113 +184,12 @@ PURPOSE: Tracks active work and backlog. AI agents should update this after comp
+@@ -156,6 +156,7 @@ PURPOSE: Tracks active work and backlog. AI agents should update this after comp
+ ./incighder/src
+ ./data-api
+ ./data-api/apply_schema.py
++./data-api/migrations
+ ./data-api/spotify_search.py
+ ./data-api/requirements.txt
+ ./data-api/schema.sql
+@@ -168,6 +169,7 @@ PURPOSE: Tracks active work and backlog. AI agents should update this after comp
+ ./data-api/wait-for-it.sh
+ ./data-api/insert_artist_from_json.py
+ ./data-api/app.py
++./data-api/scrapers
+ ./data-api/brezzo.json
+ ./README.md
+ ./package-lock.json
+@@ -184,113 +186,12 @@ PURPOSE: Tracks active work and backlog. AI agents should update this after comp
  
  ## 5. Recent Git Changes (Summary)
  ```text
-+714f66d fix: clean up flagged drift, dead code, and PATCH injection
++5239346 docs: add cross-platform scraping plan
+ 714f66d fix: clean up flagged drift, dead code, and PATCH injection
  ce94169 rm tech debt
  6327c4b update context and agent paradigm
  b2ccc87 add edit flag
- 383f307 allow nav to new artist page
--e6a2c73 add nav bar
+-383f307 allow nav to new artist page
  ```
  
  ## 6. Active Diff
  ```diff
--diff --git a/ai/ARCHITECTURE.md b/ai/ARCHITECTURE.md
--index d4e1b4d..ec280ef 100644
----- a/ai/ARCHITECTURE.md
--+++ b/ai/ARCHITECTURE.md
--@@ -32,7 +32,7 @@ Incighder is a multi-service data application designed to aggregate and visualiz
-- 3. **Display**: Next.js fetches structured data from the `db` via API routes and renders the dashboard.
+-diff --git a/ai/CONTEXT_BUNDLE.md b/ai/CONTEXT_BUNDLE.md
+-index 9e5f4ee..0950e23 100644
+---- a/ai/CONTEXT_BUNDLE.md
+-+++ b/ai/CONTEXT_BUNDLE.md
+-@@ -1,5 +1,5 @@
+- # AI Context Bundle
+--Generated: Fri Jun 19 23:01:11 PDT 2026
+-+Generated: Sat Jun 20 15:09:56 PDT 2026
 - 
-- ## AI Workspace Substrate
---This repository uses an AI-assisted engineering substrate located in `ai/` and `scripts/`.
--+This repository uses an AI-assisted engineering substrate located in `ai/`.
+- ## ⚠️ Agent Navigation Guide
+- 1. Start with the **Current State** below to understand the focus.
+-@@ -82,13 +82,15 @@ This repository uses an AI-assisted engineering substrate located in `ai/`.
+- 
+- PURPOSE: High-level summary of the system's current focus and recent changes to prevent agent drift.
+- 
+--## Last Updated: 2026-06-19
+--## Current Focus: Polish Artist Management & Editing
+-+## Last Updated: 2026-06-20
+-+## Current Focus: Cross-Platform Scraping (see `SCRAPING_PLAN.md`)
+- 
+- ## Project Goal
+- Build a data application that provides a holistic view of an artist's online traction and potential, starting with Spotify and expanding to YouTube, SoundCloud, and social media.
+- 
+- ## Recent Changes
+-+- **Scraping Plan**: Authored `SCRAPING_PLAN.md` for cross-platform metric scraping.
+-+- **Cleanup**: Fixed substrate drift, removed dead endpoints, guarded PATCH against column-name injection (branch `fix/substrate-and-api-cleanup`).
+- - **Artist Editing**: Implemented PATCH request handling for artist info updates.
+- - **Form UI**: Updated `src/app/artists/[id]/page.tsx` for full field editing.
+- - **Navigation**: Enabled direct navigation to the new artist page.
+-@@ -100,21 +102,23 @@ Build a data application that provides a holistic view of an artist's online tra
+- - **Blockers**: None
+- 
+- ## Next Steps
+--1. Perform QA/UX testing on the new artist editing workflow.
+--2. Refine error handling for artist update submissions.
+--3. Plan integration for YouTube data fetching (Future Phase).
+-+1. Obtain a free YouTube Data API key (`YOUTUBE_API_KEY` in `.env`).
+-+2. Execute `SCRAPING_PLAN.md` Phase 0 (foundations) then Phase 1 (Spotify ML, YouTube, SoundCloud).
+-+3. Layer in best-effort socials (IG/TikTok), X manual, then DuckDuckGo discovery.
+- 
+- 
+- # Tasks
+- 
+- PURPOSE: Tracks active work and backlog. AI agents should update this after completing tasks.
+- 
+--## Active (Phase C: Frontend)
+--- [ ] Integrate YouTube search into the frontend (Future Phase)
+-+## Active (Phase D: Scraping) — detailed in `SCRAPING_PLAN.md`
+-+- [ ] Phase 0: scraper framework, Playwright in Docker, schema columns
+-+- [ ] Phase 1: Spotify monthly listeners + YouTube (API) + SoundCloud scrapers, `/scrape` endpoint, UI panel
+- 
+- ## Backlog
+--- [ ] Implement YouTube data fetching in Python `data-api`
+--- [ ] Add SoundCloud integration
+-+- [ ] Phase 2: Instagram + TikTok (best-effort), X manual entry
+-+- [ ] Phase 3: DuckDuckGo auto-discovery of profile links
+-+- [ ] Phase 4: display metrics across card/table/detail; freshness indicators
+- - [ ] Implement historical data tracking for followers
+- 
 ```

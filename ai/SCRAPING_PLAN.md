@@ -165,15 +165,16 @@ the user confirms before anything is scraped.
 
 ## 10. Phased Implementation
 
-**Phase 0 — Foundations**
-- [ ] Add `playwright`, `beautifulsoup4`, `lxml` to `requirements.txt`; install
-      Chromium in the Dockerfile (`playwright install --with-deps chromium`). Note
-      the image grows by a few hundred MB.
-- [ ] Add new scraper files to Dockerfile `COPY` lines (dev already works via the
+**Phase 0 — Foundations** — code complete (image build validating)
+- [x] Add `playwright`, `beautifulsoup4`, `lxml` to `requirements.txt`; install
+      Chromium in the Dockerfile (`playwright install --with-deps chromium`). Base
+      image bumped to `python:3.11-slim-bookworm` (buster is EOL and breaks apt).
+- [x] Add new scraper files to Dockerfile `COPY` lines (dev already works via the
       `./data-api:/app` volume mount; this is for the prod image).
-- [ ] `scrapers/base.py`: `ScrapeResult`, shared session, throttle/jitter, backoff,
+- [x] `scrapers/base.py`: `ScrapeResult`, shared session, throttle/jitter, backoff,
       Playwright manager, global lock.
-- [ ] Schema: add columns + `social_links`/`scrape_meta` (decide wipe vs `ALTER`).
+- [x] Schema: columns added to `schema.sql` + idempotent
+      `migrations/0001_social_columns.sql` for the data-preserving path.
 
 **Phase 1 — Reliable three (end-to-end MVP)**
 - [ ] `spotify.py` (token → GraphQL, Playwright fallback) + `youtube.py` (Data API)
