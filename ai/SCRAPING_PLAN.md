@@ -185,10 +185,12 @@ the user confirms before anything is scraped.
       `POST /scrape` + Next.js `/api/scrape` proxy.
 - [x] "Sources & Scraping" panel on the artist page; persistence verified end-to-end.
 
-**Phase 2 — Best-effort socials**
-- [ ] `instagram.py` (+ Playwright fallback), `tiktok.py`. Confirm per-platform
-      failure isolation (partial results).
-- [ ] Manual `x_followers` field in the edit form.
+**Phase 2 — Best-effort socials** — done & verified
+- [x] `instagram.py` (web profile JSON → og:description browser fallback) and
+      `tiktok.py` (rehydration JSON via browser). Wired into `/scrape` with
+      per-platform failure isolation; both returned real counts live.
+- [x] Manual `x_followers` field in the edit form (PATCH-allowlisted); the edit
+      form now only sends edited fields so it no longer clobbers scraped values.
 
 **Phase 3 — Discovery**
 - [ ] `discovery.py` (DuckDuckGo) + `POST /discover` + Next.js `/api/discover`.

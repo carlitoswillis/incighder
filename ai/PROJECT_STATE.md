@@ -32,16 +32,14 @@ Build a data application that provides a holistic view of an artist's online tra
 PURPOSE: Tracks active work and backlog. AI agents should update this after completing tasks.
 
 ## Active (Phase D: Scraping) — detailed in `SCRAPING_PLAN.md`
-- [ ] Phase 0: scraper framework, Playwright in Docker, schema columns
-- [ ] Phase 1: Spotify monthly listeners + YouTube (API) + SoundCloud scrapers, `/scrape` endpoint, UI panel
+- [ ] Phase 3: DuckDuckGo auto-discovery of profile links
 
 ## Backlog
-- [ ] Phase 2: Instagram + TikTok (best-effort), X manual entry
-- [ ] Phase 3: DuckDuckGo auto-discovery of profile links
 - [ ] Phase 4: display metrics across card/table/detail; freshness indicators
 - [ ] Implement historical data tracking for followers
 
 ## Completed
+- [x] Scraping Phase 0-2: framework + Spotify/YouTube/SoundCloud/Instagram/TikTok scrapers, `/scrape`, UI panel, manual X (verified live)
 - [x] Implement artist editing functionality (PATCH requests)
 - [x] Enable navigation to new artist page
 - [x] Add navigation bar

@@ -14,7 +14,7 @@ const pool = new Pool({
 const UPDATABLE_COLUMNS = new Set([
   'name', 'followers', 'popularity', 'genres', 'images', 'external_urls',
   'monthly_listeners', 'spotify_id', 'youtube_id',
-  'top_track_id', 'top_track_name', 'top_track_popularity',
+  'top_track_id', 'top_track_name', 'top_track_popularity', 'x_followers',
 ]);
 
 export async function GET(request: Request, context: { params: Promise<{ id: string }> }) {

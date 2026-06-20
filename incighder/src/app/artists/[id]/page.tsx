@@ -35,6 +35,10 @@ interface Artist {
   soundcloud_followers?: number | null;
   soundcloud_top_track?: string | null;
   soundcloud_top_track_plays?: number | null;
+  instagram_followers?: number | null;
+  tiktok_followers?: number | null;
+  tiktok_likes?: number | null;
+  x_followers?: number | null;
   social_links?: { [key: string]: string } | null;
   scrape_meta?: { [key: string]: ScrapeMetaEntry } | null;
 }
@@ -55,11 +59,12 @@ function ArtistDetailComponent() {
     genres: '',
     images: '',
     external_urls: '',
-    monthly_listeners: ''
+    monthly_listeners: '',
+    x_followers: ''
   });
   const [showEditForm, setShowEditForm] = useState(editMode);
   const [message, setMessage] = useState<string | null>(null);
-  const [socialLinks, setSocialLinks] = useState({ spotify: '', youtube: '', soundcloud: '' });
+  const [socialLinks, setSocialLinks] = useState({ spotify: '', youtube: '', soundcloud: '', instagram: '', tiktok: '' });
   const [scraping, setScraping] = useState(false);
   const [forceScrape, setForceScrape] = useState(false);
   const [scrapeStatus, setScrapeStatus] = useState<{ [key: string]: { ok: boolean; error?: string | null; skipped?: string } } | null>(null);
@@ -85,6 +90,8 @@ function ArtistDetailComponent() {
           spotify: links.spotify || data.external_urls?.spotify || (data.spotify_id ? `https://open.spotify.com/artist/${data.spotify_id}` : ''),
           youtube: links.youtube || '',
           soundcloud: links.soundcloud || '',
+          instagram: links.instagram || '',
+          tiktok: links.tiktok || '',
         });
         setFormData({
           name: data.name || '',
@@ -93,7 +100,8 @@ function ArtistDetailComponent() {
           genres: data.genres || '',
           images: Array.isArray(data.images) ? data.images.map((img: Image | string) => (typeof img === 'string' ? img : img.url)).join(', ') : '',
           external_urls: data.external_urls ? JSON.stringify(data.external_urls, null, 2) : '',
-          monthly_listeners: String(data.monthly_listeners || '')
+          monthly_listeners: String(data.monthly_listeners || ''),
+          x_followers: String(data.x_followers || '')
         });
       } catch (e: unknown) {
         setError(e instanceof Error ? e.message : String(e));
@@ -133,7 +141,8 @@ function ArtistDetailComponent() {
 
     try {
       const dataToSend = {
-        ...formData,
+        name: formData.name,
+        x_followers: formData.x_followers,
         genres: formData.genres.split(',').map((s) => s.trim()).filter((s) => s),
         images: formData.images.split(',').map((s) => s.trim()).filter((s) => s).map(url => ({ url })),
         external_urls: parsedUrls,
@@ -215,11 +224,14 @@ function ArtistDetailComponent() {
           <p><strong>Spotify monthly listeners:</strong> {artist.monthly_listeners != null ? artist.monthly_listeners.toLocaleString() : 'N/A'}</p>
           <p><strong>YouTube subscribers:</strong> {artist.youtube_subscribers != null ? artist.youtube_subscribers.toLocaleString() : 'N/A'}{artist.youtube_top_video_title ? ` — top: "${artist.youtube_top_video_title}" (${(artist.youtube_top_video_views ?? 0).toLocaleString()} views)` : ''}</p>
           <p><strong>SoundCloud followers:</strong> {artist.soundcloud_followers != null ? artist.soundcloud_followers.toLocaleString() : 'N/A'}{artist.soundcloud_top_track ? ` — top: "${artist.soundcloud_top_track}" (${(artist.soundcloud_top_track_plays ?? 0).toLocaleString()} plays)` : ''}</p>
+          <p><strong>Instagram followers:</strong> {artist.instagram_followers != null ? artist.instagram_followers.toLocaleString() : 'N/A'}</p>
+          <p><strong>TikTok followers:</strong> {artist.tiktok_followers != null ? artist.tiktok_followers.toLocaleString() : 'N/A'}{artist.tiktok_likes != null ? ` — ${artist.tiktok_likes.toLocaleString()} likes` : ''}</p>
+          <p><strong>X / Twitter followers:</strong> {artist.x_followers != null ? artist.x_followers.toLocaleString() : 'N/A'} <span style={{ fontSize: '0.8em', color: '#888' }}>(manual — set via Edit Data)</span></p>
         </div>
 
         <div style={{ marginTop: '15px', borderTop: '1px solid #eee', paddingTop: '15px' }}>
           <h3 style={{ marginBottom: '8px' }}>Sources &amp; Scraping</h3>
-          {(['spotify', 'youtube', 'soundcloud'] as const).map((platform) => {
+          {(['spotify', 'youtube', 'soundcloud', 'instagram', 'tiktok'] as const).map((platform) => {
             const status = scrapeStatus?.[platform];
             const meta = artist.scrape_meta?.[platform];
             return (
@@ -259,6 +271,7 @@ function ArtistDetailComponent() {
             <input name="genres" value={formData.genres} onChange={handleChange} placeholder="Genres (comma separated)" style={{ width: '100%', marginBottom: '10px' }} />
             <textarea name="images" value={formData.images} onChange={handleChange} placeholder="Images (comma separated URLs)" style={{ width: '100%', marginBottom: '10px' }} />
             <textarea name="external_urls" value={formData.external_urls} onChange={handleChange} placeholder="External URLs (JSON object)" style={{ width: '100%', marginBottom: '10px' }} />
+            <input name="x_followers" value={formData.x_followers} onChange={handleChange} placeholder="X / Twitter followers (manual)" style={{ width: '100%', marginBottom: '10px' }} />
             <button type="submit" style={{ backgroundColor: '#007bff', color: 'white', padding: '10px 15px', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>Save Changes</button>
           </form>
         )}

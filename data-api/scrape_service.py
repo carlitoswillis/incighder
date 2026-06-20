@@ -12,20 +12,23 @@ from datetime import datetime, timedelta, timezone
 
 from scrapeArtistData import get_db_connection
 from scrapers.base import ScrapeResult
+from scrapers.instagram import fetch_instagram
 from scrapers.soundcloud import fetch_soundcloud
 from scrapers.spotify import fetch_spotify
+from scrapers.tiktok import fetch_tiktok
 from scrapers.youtube import fetch_youtube
 
 CACHE_TTL = timedelta(hours=24)
 
-# Platforms implemented in Phase 1 (Instagram/TikTok/X arrive in Phase 2).
-PLATFORMS = ("spotify", "youtube", "soundcloud")
+# Scraped platforms (X is manual-entry only, handled in the UI / edit form).
+PLATFORMS = ("spotify", "youtube", "soundcloud", "instagram", "tiktok")
 
 # artists columns a scraper is allowed to write (guards the UPDATE identifiers).
 ALLOWED_METRIC_COLUMNS = {
     "monthly_listeners",
     "youtube_subscribers", "youtube_top_video_title", "youtube_top_video_views",
     "soundcloud_followers", "soundcloud_top_track", "soundcloud_top_track_plays",
+    "instagram_followers", "tiktok_followers", "tiktok_likes",
 }
 
 
@@ -36,6 +39,10 @@ def _dispatch(platform: str, link, artist: dict) -> ScrapeResult:
         return fetch_youtube(link, os.getenv("YOUTUBE_API_KEY"))
     if platform == "soundcloud":
         return fetch_soundcloud(link)
+    if platform == "instagram":
+        return fetch_instagram(link)
+    if platform == "tiktok":
+        return fetch_tiktok(link)
     return ScrapeResult.failure(platform, "platform not implemented")
 
 
