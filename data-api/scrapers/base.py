@@ -114,32 +114,12 @@ def polite_get(
         return resp
 
 
-# --- Shared headless browser (lazy, reused across scrapes) ---
-_playwright = None
-_browser = None
-_browser_lock = threading.Lock()
-
-
-def get_browser():
-    """Lazily launch a single shared headless Chromium, reused across scrapes.
-
-    Playwright is imported lazily so the HTTP-only scrapers still work in
-    environments where the browser is not installed.
-    """
-    global _playwright, _browser
-    with _browser_lock:
-        if _browser is None:
-            from playwright.sync_api import sync_playwright
-
-            _playwright = sync_playwright().start()
-            _browser = _playwright.chromium.launch(
-                headless=True,
-                args=[
-                    "--no-sandbox",
-                    "--disable-blink-features=AutomationControlled",
-                ],
-            )
-        return _browser
+# --- Headless browser rendering ---
+# Playwright's sync API is bound to the thread that creates it, and Flask's dev
+# server handles each request on a different (often short-lived) thread - sharing
+# one browser across them raises "cannot switch to a different thread". So we run
+# Playwright entirely within each call. At our low volume the per-call launch cost
+# is fine, and it works under any threaded/forked WSGI server.
 
 
 def render_html(
@@ -149,41 +129,45 @@ def render_html(
     wait_text: Optional[str] = None,
     timeout_ms: int = 20000,
 ) -> str:
-    """Return a JS-rendered page's HTML via the shared browser (throttled).
+    """Return a JS-rendered page's HTML (throttled).
 
     wait_selector waits for a CSS selector; wait_text waits until that substring
     appears in the page's visible text (case-insensitive) - useful for SPA values
-    that render after load (e.g. Spotify monthly listeners).
+    that render after load (e.g. Spotify monthly listeners). Playwright is imported
+    lazily so the HTTP-only scrapers work even without the browser installed.
     """
+    from playwright.sync_api import sync_playwright
+
     throttle()
-    context = get_browser().new_context(
-        user_agent=DEFAULT_USER_AGENT,
-        locale="en-US",
-        viewport={"width": 1280, "height": 800},
-    )
-    try:
-        page = context.new_page()
-        page.goto(url, wait_until="domcontentloaded", timeout=timeout_ms)
-        if wait_selector:
-            page.wait_for_selector(wait_selector, timeout=timeout_ms)
-        if wait_text:
-            page.wait_for_function(
-                "t => document.body && document.body.innerText.toLowerCase().includes(t)",
-                arg=wait_text.lower(),
-                timeout=timeout_ms,
+    with sync_playwright() as pw:
+        browser = pw.chromium.launch(
+            headless=True,
+            args=["--no-sandbox", "--disable-blink-features=AutomationControlled"],
+        )
+        try:
+            context = browser.new_context(
+                user_agent=DEFAULT_USER_AGENT,
+                locale="en-US",
+                viewport={"width": 1280, "height": 800},
             )
-        return page.content()
-    finally:
-        context.close()
+            page = context.new_page()
+            page.goto(url, wait_until="domcontentloaded", timeout=timeout_ms)
+            if wait_selector:
+                page.wait_for_selector(wait_selector, timeout=timeout_ms)
+            if wait_text:
+                page.wait_for_function(
+                    "t => document.body && document.body.innerText.toLowerCase().includes(t)",
+                    arg=wait_text.lower(),
+                    timeout=timeout_ms,
+                )
+            return page.content()
+        finally:
+            browser.close()
 
 
 def shutdown() -> None:
-    """Tear down the shared browser/Playwright (call on app shutdown)."""
-    global _playwright, _browser
-    with _browser_lock:
-        if _browser is not None:
-            _browser.close()
-            _browser = None
-        if _playwright is not None:
-            _playwright.stop()
-            _playwright = None
+    """No-op: Playwright is now started and stopped per render call.
+
+    Kept so existing imports / atexit hooks stay valid.
+    """
+    return None
