@@ -13,6 +13,12 @@ interface ExternalUrls {
   [key: string]: string;
 }
 
+interface ScrapeMetaEntry {
+  last_scraped_at?: string;
+  status?: string;
+  error?: string | null;
+}
+
 interface Artist {
   id: string;
   name: string;
@@ -22,6 +28,15 @@ interface Artist {
   images: Image[] | null;
   external_urls: ExternalUrls | null;
   monthly_listeners: number | null;
+  spotify_id?: string | null;
+  youtube_subscribers?: number | null;
+  youtube_top_video_title?: string | null;
+  youtube_top_video_views?: number | null;
+  soundcloud_followers?: number | null;
+  soundcloud_top_track?: string | null;
+  soundcloud_top_track_plays?: number | null;
+  social_links?: { [key: string]: string } | null;
+  scrape_meta?: { [key: string]: ScrapeMetaEntry } | null;
 }
 
 function ArtistDetailComponent() {
@@ -44,6 +59,10 @@ function ArtistDetailComponent() {
   });
   const [showEditForm, setShowEditForm] = useState(editMode);
   const [message, setMessage] = useState<string | null>(null);
+  const [socialLinks, setSocialLinks] = useState({ spotify: '', youtube: '', soundcloud: '' });
+  const [scraping, setScraping] = useState(false);
+  const [forceScrape, setForceScrape] = useState(false);
+  const [scrapeStatus, setScrapeStatus] = useState<{ [key: string]: { ok: boolean; error?: string | null; skipped?: string } } | null>(null);
 
   useEffect(() => {
     setShowEditForm(editMode);
@@ -61,6 +80,12 @@ function ArtistDetailComponent() {
         }
         const data = await response.json();
         setArtist(data);
+        const links = data.social_links || {};
+        setSocialLinks({
+          spotify: links.spotify || data.external_urls?.spotify || (data.spotify_id ? `https://open.spotify.com/artist/${data.spotify_id}` : ''),
+          youtube: links.youtube || '',
+          soundcloud: links.soundcloud || '',
+        });
         setFormData({
           name: data.name || '',
           followers: String(data.followers || ''),
@@ -134,6 +159,34 @@ function ArtistDetailComponent() {
     }
   };
 
+  const handleScrape = async () => {
+    setScraping(true);
+    setScrapeStatus(null);
+    setMessage(null);
+    setError(null);
+    try {
+      const response = await fetch('/api/scrape', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ artist_id: artistId, links: socialLinks, force: forceScrape }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Scrape failed');
+      setArtist(result.artist);
+      const statuses: { [key: string]: { ok: boolean; error?: string | null; skipped?: string } } = {};
+      for (const [platform, r] of Object.entries(result.results || {})) {
+        const res = r as { ok: boolean; error?: string | null; skipped?: string };
+        statuses[platform] = { ok: res.ok, error: res.error, skipped: res.skipped };
+      }
+      setScrapeStatus(statuses);
+      setMessage('Scrape complete.');
+    } catch (e: unknown) {
+      setError(`Scrape failed: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setScraping(false);
+    }
+  };
+
   if (loading) return <div>Loading...</div>;
   if (error) return <div style={{ color: 'red' }}>Error: {error}</div>;
   if (!artist) return <div>Artist not found.</div>;
@@ -156,6 +209,47 @@ function ArtistDetailComponent() {
         <p><strong>Score:</strong> {score}</p>
         <pre style={{ backgroundColor: '#f5f5f5', padding: '10px', borderRadius: '5px', fontSize: '0.9em', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{breakdown}</pre>
         <p><strong>Genres:</strong> {parsedGenres.length > 0 ? parsedGenres.join(', ') : 'N/A'}</p>
+
+        <div style={{ marginTop: '15px', borderTop: '1px solid #eee', paddingTop: '15px' }}>
+          <h3 style={{ marginBottom: '8px' }}>Cross-Platform Metrics</h3>
+          <p><strong>Spotify monthly listeners:</strong> {artist.monthly_listeners != null ? artist.monthly_listeners.toLocaleString() : 'N/A'}</p>
+          <p><strong>YouTube subscribers:</strong> {artist.youtube_subscribers != null ? artist.youtube_subscribers.toLocaleString() : 'N/A'}{artist.youtube_top_video_title ? ` — top: "${artist.youtube_top_video_title}" (${(artist.youtube_top_video_views ?? 0).toLocaleString()} views)` : ''}</p>
+          <p><strong>SoundCloud followers:</strong> {artist.soundcloud_followers != null ? artist.soundcloud_followers.toLocaleString() : 'N/A'}{artist.soundcloud_top_track ? ` — top: "${artist.soundcloud_top_track}" (${(artist.soundcloud_top_track_plays ?? 0).toLocaleString()} plays)` : ''}</p>
+        </div>
+
+        <div style={{ marginTop: '15px', borderTop: '1px solid #eee', paddingTop: '15px' }}>
+          <h3 style={{ marginBottom: '8px' }}>Sources &amp; Scraping</h3>
+          {(['spotify', 'youtube', 'soundcloud'] as const).map((platform) => {
+            const status = scrapeStatus?.[platform];
+            const meta = artist.scrape_meta?.[platform];
+            return (
+              <div key={platform} style={{ marginBottom: '8px' }}>
+                <label style={{ display: 'inline-block', width: '90px', textTransform: 'capitalize' }}>{platform}</label>
+                <input
+                  value={socialLinks[platform]}
+                  onChange={(e) => setSocialLinks({ ...socialLinks, [platform]: e.target.value })}
+                  placeholder={`${platform} profile URL`}
+                  style={{ width: '60%' }}
+                />
+                {status && (
+                  <span style={{ marginLeft: '8px', color: status.ok ? 'green' : 'red' }}>
+                    {status.skipped ? 'cached' : status.ok ? '✓' : `✗ ${status.error || ''}`}
+                  </span>
+                )}
+                {meta?.last_scraped_at ? (
+                  <div style={{ fontSize: '0.8em', color: '#888' }}>updated {new Date(meta.last_scraped_at).toLocaleString()}</div>
+                ) : null}
+              </div>
+            );
+          })}
+          <label style={{ fontSize: '0.9em', display: 'block', marginBottom: '8px' }}>
+            <input type="checkbox" checked={forceScrape} onChange={(e) => setForceScrape(e.target.checked)} /> force refresh (ignore 24h cache)
+          </label>
+          <button onClick={handleScrape} disabled={scraping} style={{ backgroundColor: '#17a2b8', color: 'white', padding: '10px 15px', border: 'none', borderRadius: '4px', cursor: scraping ? 'not-allowed' : 'pointer' }}>
+            {scraping ? 'Scraping…' : 'Scrape now'}
+          </button>
+        </div>
+
         <button onClick={() => setShowEditForm(!showEditForm)} style={{ backgroundColor: '#6c757d', color: 'white', padding: '10px 15px', border: 'none', borderRadius: '4px', cursor: 'pointer', marginBottom: '10px' }}>
           {showEditForm ? 'Hide Edit Form' : 'Edit Data'}
         </button>

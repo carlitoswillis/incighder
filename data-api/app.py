@@ -3,8 +3,14 @@ import subprocess
 import json
 import os
 import sys
+import atexit
+import traceback
+
+from scrape_service import scrape_artist
+from scrapers.base import shutdown as _scraper_shutdown
 
 app = Flask(__name__)
+atexit.register(_scraper_shutdown)
 
 @app.route('/insert_artist', methods=['POST'])
 def insert_artist():
@@ -48,6 +54,26 @@ def spotify_search():
         return jsonify({'error': 'Invalid JSON response from script'}), 500
     except Exception as e:
         print(f"Unexpected error (spotify_search): {e}", file=sys.stderr)
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/scrape', methods=['POST'])
+def scrape():
+    data = request.json or {}
+    artist_id = data.get('artist_id')
+    if not artist_id:
+        return jsonify({'error': 'artist_id is required'}), 400
+    try:
+        result = scrape_artist(
+            artist_id,
+            links=data.get('links') or {},
+            force=bool(data.get('force')),
+        )
+        return jsonify(result), 200
+    except LookupError:
+        return jsonify({'error': 'Artist not found'}), 404
+    except Exception as e:
+        print(f"Scrape error: {e}", file=sys.stderr)
+        traceback.print_exc(file=sys.stderr)
         return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':

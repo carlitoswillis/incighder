@@ -7,24 +7,25 @@ CREATE TABLE artists (
     genres TEXT NULL,
     images JSON NULL,
     external_urls JSON NULL,
-    monthly_listeners INTEGER NULL,
+    monthly_listeners BIGINT NULL,
     spotify_id VARCHAR(255) NULL,
     youtube_id VARCHAR(255) NULL,
     top_track_id VARCHAR(255) NULL,
     top_track_name VARCHAR(255) NULL,
     top_track_popularity INTEGER NULL,
 
-    -- Cross-platform scraping metrics (see ai/SCRAPING_PLAN.md)
-    youtube_subscribers INTEGER NULL,
+    -- Cross-platform scraping metrics (see ai/SCRAPING_PLAN.md).
+    -- Counts are BIGINT: views/plays/likes routinely exceed INTEGER's 2.1B cap.
+    youtube_subscribers BIGINT NULL,
     youtube_top_video_title VARCHAR(255) NULL,
-    youtube_top_video_views INTEGER NULL,
-    soundcloud_followers INTEGER NULL,
+    youtube_top_video_views BIGINT NULL,
+    soundcloud_followers BIGINT NULL,
     soundcloud_top_track VARCHAR(255) NULL,
-    soundcloud_top_track_plays INTEGER NULL,
-    instagram_followers INTEGER NULL,
-    tiktok_followers INTEGER NULL,
-    tiktok_likes INTEGER NULL,
-    x_followers INTEGER NULL,
+    soundcloud_top_track_plays BIGINT NULL,
+    instagram_followers BIGINT NULL,
+    tiktok_followers BIGINT NULL,
+    tiktok_likes BIGINT NULL,
+    x_followers BIGINT NULL,
     social_links JSONB NULL,
     scrape_meta JSONB NULL
 );

@@ -58,7 +58,7 @@ not escalation.
 
 | Platform | Primary method | Fallback | Fields | Reliability | Maintenance risk |
 |---|---|---|---|---|---|
-| **Spotify** | Anonymous token from `open.spotify.com` → internal pathfinder GraphQL `queryArtistOverview` (JSON) | Playwright render of artist page, read "monthly listeners" text | `monthly_listeners` | Medium | Persisted-query hash drifts |
+| **Spotify** | Playwright render of the artist page → read "monthly listeners" text (token→GraphQL deferred: Spotify now TOTP-signs the token endpoint) | — | `monthly_listeners` | Medium | Page markup changes |
 | **YouTube** | Official **Data API v3** (`channels.list` stats; `search.list` order=viewCount for top video) | — | `youtube_subscribers`, `youtube_top_video_{title,views}` | High | None (just quota) |
 | **SoundCloud** | Extract `client_id` from site JS once → `api-v2.soundcloud.com/resolve` + `/users/{id}/tracks` | — | `soundcloud_followers`, `soundcloud_top_track{,_plays}` | Med-High | `client_id` rotates |
 | **Instagram** | `i.instagram.com/api/v1/users/web_profile_info/?username=` w/ `x-ig-app-id` header | Playwright render, parse `og:description` ("X Followers…") | `instagram_followers` | Low | Session-gating / rate limits |
@@ -97,18 +97,19 @@ data-api/
 
 ## 5. Data Model Changes (`schema.sql`, `artists` table)
 
-Headline scalar metrics (first-class so the table view can sort on them):
-- `monthly_listeners INTEGER` *(already exists)*
-- `youtube_subscribers INTEGER`
+Headline scalar metrics (first-class so the table view can sort on them). Counts are
+BIGINT — views/plays/likes routinely exceed INTEGER's 2.1B cap:
+- `monthly_listeners BIGINT` *(widened from INTEGER)*
+- `youtube_subscribers BIGINT`
 - `youtube_top_video_title VARCHAR(255)`
-- `youtube_top_video_views INTEGER`
-- `soundcloud_followers INTEGER`
+- `youtube_top_video_views BIGINT`
+- `soundcloud_followers BIGINT`
 - `soundcloud_top_track VARCHAR(255)`
-- `soundcloud_top_track_plays INTEGER`
-- `instagram_followers INTEGER`
-- `tiktok_followers INTEGER`
-- `tiktok_likes INTEGER`
-- `x_followers INTEGER`  *(manual)*
+- `soundcloud_top_track_plays BIGINT`
+- `instagram_followers BIGINT`
+- `tiktok_followers BIGINT`
+- `tiktok_likes BIGINT`
+- `x_followers BIGINT`  *(manual)*
 
 Flexible JSON (avoids a migration per future field):
 - `social_links JSONB` — input URLs: `{ spotify, youtube, soundcloud, instagram, tiktok, x }`
@@ -176,11 +177,13 @@ the user confirms before anything is scraped.
 - [x] Schema: columns added to `schema.sql` + idempotent
       `migrations/0001_social_columns.sql` for the data-preserving path.
 
-**Phase 1 — Reliable three (end-to-end MVP)**
-- [ ] `spotify.py` (token → GraphQL, Playwright fallback) + `youtube.py` (Data API)
-      + `soundcloud.py` (client_id → api-v2).
-- [ ] `scrape_service.py` + `POST /scrape` + Next.js `/api/scrape` proxy.
-- [ ] Minimal "Sources & Scraping" panel wired to one artist; verify persistence.
+**Phase 1 — Reliable three (end-to-end MVP)** — done & verified
+- [x] `spotify.py` (Playwright render; token/GraphQL deferred — TOTP-signed token
+      endpoint), `youtube.py` (Data API v3), `soundcloud.py` (client_id → api-v2).
+      All three verified against live artists.
+- [x] `scrape_service.py` (24h TTL cache, partial results, BIGINT persist) +
+      `POST /scrape` + Next.js `/api/scrape` proxy.
+- [x] "Sources & Scraping" panel on the artist page; persistence verified end-to-end.
 
 **Phase 2 — Best-effort socials**
 - [ ] `instagram.py` (+ Playwright fallback), `tiktok.py`. Confirm per-platform

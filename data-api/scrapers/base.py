@@ -7,6 +7,7 @@ ScrapeResult; they should not raise to the caller.
 """
 from __future__ import annotations
 
+import os
 import random
 import threading
 import time
@@ -29,8 +30,10 @@ DEFAULT_HEADERS = {
 }
 
 # Spacing between any two external requests (seconds), jittered in this range.
-THROTTLE_MIN_SECONDS = 5.0
-THROTTLE_MAX_SECONDS = 30.0
+# Kept modest because the real anti-ban lever is the 24h cache (low daily volume);
+# override with SCRAPE_THROTTLE_MIN / SCRAPE_THROTTLE_MAX (e.g. 0 in tests).
+THROTTLE_MIN_SECONDS = float(os.getenv("SCRAPE_THROTTLE_MIN", "2.0"))
+THROTTLE_MAX_SECONDS = float(os.getenv("SCRAPE_THROTTLE_MAX", "6.0"))
 
 _throttle_lock = threading.Lock()
 _last_request_at = 0.0
@@ -143,9 +146,15 @@ def render_html(
     url: str,
     *,
     wait_selector: Optional[str] = None,
+    wait_text: Optional[str] = None,
     timeout_ms: int = 20000,
 ) -> str:
-    """Return a JS-rendered page's HTML via the shared browser (throttled)."""
+    """Return a JS-rendered page's HTML via the shared browser (throttled).
+
+    wait_selector waits for a CSS selector; wait_text waits until that substring
+    appears in the page's visible text (case-insensitive) - useful for SPA values
+    that render after load (e.g. Spotify monthly listeners).
+    """
     throttle()
     context = get_browser().new_context(
         user_agent=DEFAULT_USER_AGENT,
@@ -157,6 +166,12 @@ def render_html(
         page.goto(url, wait_until="domcontentloaded", timeout=timeout_ms)
         if wait_selector:
             page.wait_for_selector(wait_selector, timeout=timeout_ms)
+        if wait_text:
+            page.wait_for_function(
+                "t => document.body && document.body.innerText.toLowerCase().includes(t)",
+                arg=wait_text.lower(),
+                timeout=timeout_ms,
+            )
         return page.content()
     finally:
         context.close()
