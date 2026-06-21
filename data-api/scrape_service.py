@@ -31,6 +31,15 @@ ALLOWED_METRIC_COLUMNS = {
     "instagram_followers", "tiktok_followers", "tiktok_likes",
 }
 
+# Columns each platform owns - nulled when its source link is removed.
+PLATFORM_COLUMNS = {
+    "spotify": ["monthly_listeners"],
+    "youtube": ["youtube_subscribers", "youtube_top_video_title", "youtube_top_video_views"],
+    "soundcloud": ["soundcloud_followers", "soundcloud_top_track", "soundcloud_top_track_plays"],
+    "instagram": ["instagram_followers"],
+    "tiktok": ["tiktok_followers", "tiktok_likes"],
+}
+
 
 def _dispatch(platform: str, link, artist: dict) -> ScrapeResult:
     if platform == "spotify":
@@ -83,8 +92,12 @@ def scrape_artist(artist_id: str, links: dict | None = None, force: bool = False
             colnames = [d[0] for d in cur.description]
         artist = dict(zip(colnames, row))
 
-        merged_links = {**_as_dict(artist.get("social_links")),
-                        **{k: v for k, v in links.items() if v}}
+        # Submitted links are authoritative: a provided-but-empty value clears it.
+        merged_links = {
+            k: v
+            for k, v in {**_as_dict(artist.get("social_links")), **links}.items()
+            if v
+        }
         meta = _as_dict(artist.get("scrape_meta"))
 
         results: dict = {}
@@ -118,5 +131,42 @@ def scrape_artist(artist_id: str, links: dict | None = None, force: bool = False
             updated_cols = [d[0] for d in cur.description]
         conn.commit()
         return {"results": results, "artist": dict(zip(updated_cols, updated_row))}
+    finally:
+        conn.close()
+
+
+def clear_platform(artist_id: str, platform: str) -> dict:
+    """Remove a platform's source link, its metrics, and its scrape_meta entry."""
+    conn = get_db_connection()
+    if not conn:
+        raise RuntimeError("database connection failed")
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT social_links, scrape_meta FROM artists WHERE id = %s",
+                (artist_id,),
+            )
+            row = cur.fetchone()
+            if not row:
+                raise LookupError("artist not found")
+
+        links = _as_dict(row[0])
+        links.pop(platform, None)
+        meta = _as_dict(row[1])
+        meta.pop(platform, None)
+
+        cols = PLATFORM_COLUMNS.get(platform, [])
+        set_cols = cols + ["social_links", "scrape_meta"]
+        set_vals = [None] * len(cols) + [json.dumps(links), json.dumps(meta)]
+        assignments = ", ".join(f"{c} = %s" for c in set_cols)
+        with conn.cursor() as cur:
+            cur.execute(
+                f"UPDATE artists SET {assignments} WHERE id = %s RETURNING *",
+                set_vals + [artist_id],
+            )
+            updated_row = cur.fetchone()
+            updated_cols = [d[0] for d in cur.description]
+        conn.commit()
+        return dict(zip(updated_cols, updated_row))
     finally:
         conn.close()

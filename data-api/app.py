@@ -6,7 +6,7 @@ import sys
 import atexit
 import traceback
 
-from scrape_service import scrape_artist
+from scrape_service import scrape_artist, clear_platform
 from scrapers.discovery import discover_links
 from link_preview import link_preview
 from scrapers.base import shutdown as _scraper_shutdown
@@ -102,6 +102,22 @@ def preview():
     except Exception as e:
         print(f"Preview error: {e}", file=sys.stderr)
         return jsonify({}), 200
+
+@app.route('/clear_source', methods=['POST'])
+def clear_source():
+    data = request.json or {}
+    artist_id = data.get('artist_id')
+    platform = data.get('platform')
+    if not artist_id or not platform:
+        return jsonify({'error': 'artist_id and platform are required'}), 400
+    try:
+        return jsonify({'artist': clear_platform(artist_id, platform)}), 200
+    except LookupError:
+        return jsonify({'error': 'Artist not found'}), 404
+    except Exception as e:
+        print(f"Clear source error: {e}", file=sys.stderr)
+        traceback.print_exc(file=sys.stderr)
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
     # Ensure the Flask app is accessible from outside the container

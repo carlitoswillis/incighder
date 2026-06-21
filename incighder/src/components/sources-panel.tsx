@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
-import { Loader2, RefreshCw, Sparkles } from "lucide-react";
+import { Loader2, RefreshCw, Sparkles, X } from "lucide-react";
 
 import type { Artist } from "@/lib/types";
 import { SCRAPED_PLATFORMS } from "@/lib/platforms";
@@ -105,6 +105,29 @@ export function SourcesPanel({
     }
   }
 
+  async function handleRemove(platform: string, label: string) {
+    setLinks((prev) => ({ ...prev, [platform]: "" }));
+    setResults((prev) => {
+      if (!prev) return prev;
+      const next = { ...prev };
+      delete next[platform];
+      return next;
+    });
+    try {
+      const res = await fetch("/api/clear-source", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ artist_id: artist.id, platform }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to remove");
+      onScraped(data.artist);
+      toast.success(`Removed ${label} source`);
+    } catch (e) {
+      toast.error(`Couldn't remove: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+
   return (
     <section className="rounded-xl bg-card p-6 ring-1 ring-foreground/10">
       <h2 className="text-lg font-semibold tracking-tight">Sources &amp; scraping</h2>
@@ -131,7 +154,19 @@ export function SourcesPanel({
                   }
                   placeholder={`${p.label} profile URL`}
                 />
-                {links[p.key] && <LinkPreview url={links[p.key]} />}
+                {links[p.key] && (
+                  <>
+                    <LinkPreview url={links[p.key]} />
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      onClick={() => handleRemove(p.key, p.label)}
+                      aria-label={`Remove ${p.label} source`}
+                    >
+                      <X />
+                    </Button>
+                  </>
+                )}
                 {status && (
                   <span
                     className={cn(
