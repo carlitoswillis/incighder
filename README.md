@@ -1,115 +1,140 @@
 # Incighder
 
-Incighder is an application designed to help recording artists, A&Rs, and music labels understand an artist's online traction and audience reach through data from music APIs, starting with Spotify.
+Incighder is a professional data application designed to help recording artists, A&Rs, and music labels understand an artist's online traction, audience reach, and growth trajectory. By aggregating public metrics from key music and social platforms, Incighder provides a holistic view of artist performance and traction over time.
 
-## Core Functionality (Current State - MVP)
+---
 
-This application currently focuses on Spotify data and provides the following features:
+## Key Features
 
--   **Artist Data Display:** View artist information (followers, popularity, genres, images, external URLs) in both a card-based layout and a detailed table view.
--   **Artist Search & Add:** Search for artists on Spotify and add their data to your local dataset.
--   **Artist Data Editing:** Edit specific artist data points, such as manually adding monthly listeners, on a dedicated artist detail page.
--   **Artist Removal:** Easily remove artists from your dataset via the UI.
--   **Database Integration:** Stores artist data in a PostgreSQL database.
+- **Multi-Platform Metric Harvesting**:
+  - **Spotify**: Collects follower counts, popularity scores, genres, top tracks, and monthly listeners (via a robust scraper).
+  - **YouTube**: Fetches subscriber counts, lifetime video views, video counts, and details of their top-performing video (using the official YouTube Data API v3).
+  - **SoundCloud**: Resolves profile URLs to extract follower counts, total tracks, and top track statistics.
+  - **Instagram**: Retrieves follower counts and verified status.
+  - **TikTok**: Collects follower counts, total likes, and video counts.
+  - **X (Twitter)**: Supports manual input of followers to respect login-wall restrictions.
+- **Anti-Ban Scraping Architecture**:
+  - Implements a strict **24-hour cache TTL** (per platform) to keep traffic minimal.
+  - Throttles requests sequentially with random jitter (delay range configurable).
+  - Employs realistic headers, browser stealth options, and automatic backoffs (`429`/`403`).
+  - Graceful degradation: A failure on one platform never blocks the retrieval of data from other platforms.
+- **Auto-Discovery & AI Verification**:
+  - Automatically searches for and suggests official YouTube channels and SoundCloud profiles.
+  - Generates best-guess candidate handles for Instagram and TikTok.
+  - Uses a **local LLM via Ollama** (`qwen2.5-coder:14b`) to inspect profile metadata and previews, deciding if a guessed link belongs to the artist (`match` / `uncertain` / `mismatch`) before it is scraped.
+- **Historical Growth Analytics**:
+  - Automatically captures account-keyed metric snapshots in the database when new data is pulled.
+  - Renders inline metric sparklines on the dashboard.
+  - Features a dedicated historical section showing growth trends since tracking began.
+- **Modern Sleek Design System**:
+  - A responsive dark slate and cyan visual identity powered by Next.js, Tailwind CSS, and shadcn-inspired components.
+
+---
 
 ## Technical Stack
 
--   **Frontend:** Next.js (React, TypeScript, Tailwind CSS)
--   **Backend (API):** Next.js API Routes (TypeScript) interacting with Python scripts.
--   **Data API:** Python (with `spotipy` for Spotify API interaction and `psycopg2` for PostgreSQL) providing data ingestion and Spotify search functionality.
--   **Database:** PostgreSQL (running via Docker).
+- **Frontend**: Next.js (React 19, TypeScript, Tailwind CSS, Lucide icons, shadcn UI components)
+- **Backend Orchestrator**: Next.js API Routes (proxies requests to the Python service)
+- **Data API Service**: Python (Flask, Playwright for headless browser rendering, BeautifulSoup4, Lxml, Spotipy, and requests)
+- **Database**: PostgreSQL 13 (configured for development with write caching turned off)
+- **Local AI Verification**: Ollama (orchestrated over Docker network bridge to host endpoint)
+
+---
+
+## System Architecture
+
+```mermaid
+graph TD
+    Browser[Client Browser] -->|HTTP / JSON| NextJS[Next.js App Router]
+    NextJS -->|Proxy API Routes| Flask[Flask Data API]
+    Flask -->|psycopg2| DB[(PostgreSQL)]
+    
+    subgraph Scrapers [Python Scrapers]
+        Flask --> Playwright[Playwright Headless Browser]
+        Flask --> Spotipy[Spotify API Client]
+        Flask --> YouTubeAPI[YouTube Data API v3]
+        Flask --> Requests[SoundCloud & Web APIs]
+    end
+    
+    Flask -->|Validate Guess| Ollama[Local Ollama: qwen2.5-coder]
+```
+
+---
 
 ## Setup and Running the Application
 
 ### Prerequisites
 
--   [Docker Desktop](https://www.docker.com/products/docker-desktop) (includes Docker Engine and Docker Compose)
--   Git
+- [Docker Desktop](https://www.docker.com/products/docker-desktop)
+- Git
+- (Optional) [Ollama](https://ollama.com/) running on your host machine if using AI-verified discovery.
 
 ### 1. Clone the Repository
 
 ```bash
 git clone [YOUR_REPOSITORY_URL]
-cd incighder_gemini
+cd incighder
 ```
 
-### 2. Set up Spotify API Credentials
+### 2. Configure Environment Variables
 
-1.  Go to the [Spotify Developer Dashboard](https://developer.spotify.com/dashboard).
-2.  Log in and create a new application to get your `Client ID` and `Client Secret`.
-3.  Create a `.env` file in the root of the `incighder_gemini` directory (next to `docker-compose.yml`) with the following content, replacing the placeholders with your actual credentials:
+Create a `.env` file in the root of the project:
 
-    ```
-    SPOTIFY_CLIENT_ID=your_spotify_client_id
-    SPOTIFY_CLIENT_SECRET=your_spotify_client_secret
-    ```
+```env
+# Spotify API Credentials (Required for search & initial metadata)
+SPOTIFY_CLIENT_ID=your_spotify_client_id
+SPOTIFY_CLIENT_SECRET=your_spotify_client_secret
+
+# YouTube Data API Key (Required for YouTube scraping & channel discovery)
+YOUTUBE_API_KEY=your_youtube_api_key
+
+# Local Ollama URL (Optional; defaults to http://host.docker.internal:11434 for Docker)
+OLLAMA_URL=http://host.docker.internal:11434
+OLLAMA_MODEL=qwen2.5-coder:14b
+
+# Scraping Throttle Configuration (Optional; defaults to 2.0s and 6.0s)
+SCRAPE_THROTTLE_MIN=2.0
+SCRAPE_THROTTLE_MAX=6.0
+```
 
 ### 3. Development Workflow Scripts
 
-To streamline the development process, several helper scripts are provided in the project root:
+We provide several convenience scripts in the root directory:
 
--   **`./start_dev.sh`**: This script performs a full cleanup, rebuilds all services (database, data API, and Next.js development server), applies the latest database schema, and then starts all services. Use this for a fresh start or after significant changes to `docker-compose.yml` or database schema.
+- **`./start_dev.sh`**: Stops all active containers, purges dev database volumes, rebuilds all images (installing Playwright dependencies), applies the SQL schema, and starts all services. **Use this for a fresh installation or schema reset.**
+- **`./start_db.sh`**: Boots only the PostgreSQL database.
+- **`./start_data_api.sh`**: Boots the Flask service (auto-starts the database if not running).
+- **`./start_incighder_dev.sh`**: Boots the Next.js development server in the foreground, streaming logs directly. Auto-starts dependee services.
 
-    ```bash
-    ./start_dev.sh
-    ```
-
--   **`./start_db.sh`**: Starts only the PostgreSQL database service.
-
-    ```bash
-    ./start_db.sh
-    ```
-
--   **`./start_data_api.sh`**: Starts the Python data API service. It will automatically start the `db` service if it's not already running.
-
-    ```bash
-    ./start_data_api.sh
-    ```
-
--   **`./start_incighder_dev.sh`**: Starts the Next.js development server. It will automatically start the `db` and `data-api` services if they are not already running. This script runs in the foreground to stream logs directly to your terminal.
-
-    ```bash
-    ./start_incighder_dev.sh
-    ```
-
-### 4. Initial Setup and Running the Application
-
-For the first-time setup or after significant changes (e.g., to `docker-compose.yml` or `schema.sql`), use the comprehensive `start_dev.sh` script:
-
+To spin up the entire stack, run:
 ```bash
 ./start_dev.sh
 ```
+Once healthy, the frontend is accessible at [http://localhost:3000](http://localhost:3000).
 
-This command will:
--   Stop and remove any existing containers and volumes (ensuring a clean database state).
--   Build and start the Docker images for all services.
--   Apply the latest database schema.
--   Start the Next.js development server, accessible at `http://localhost:3000`.
-
-For subsequent development, you can use the individual `start_*.sh` scripts to start only the services you need to restart, speeding up your workflow.
-
-### 6. Stopping the Services
-
-To stop all running services, navigate to the `incighder_gemini` directory and run:
+### 4. Stopping the services
 
 ```bash
 docker-compose down
 ```
 
-## Usage
+---
 
--   **Home Page (`/`):** Displays artist cards.
--   **Table View (`/table`):** Displays artist data in a spreadsheet-like table.
--   **Search Artists (`/search`):** Search for artists on Spotify and add them to your dataset.
--   **Artist Detail Page (`/artists/[id]`):** Click on an artist's name to view details and manually edit data like monthly listeners.
+## Usage Guide
 
-## Future Enhancements (Roadmap)
-
--   Customizable scoring logic.
--   Multi-platform integration (YouTube, SoundCloud, TikTok, etc.).
--   Historical data tracking.
--   AI-powered insights.
+- **Home Page (`/`)**: Displays card layouts of all tracked artists, showcasing their key indicators (Spotify popularity, followers, top track metrics) and visual sparklines showing metric history.
+- **Table View (`/table`)**: A spreadsheet-style breakdown displaying all platform follower counts side-by-side. Sortable by platform metrics.
+- **Add Artist (`/artists/add`)**: Search for an artist on Spotify and ingest their baseline metrics into the local PostgreSQL database.
+- **Artist Detail (`/artists/[id]`)**:
+  - Displays detailed stats grids and a track summary.
+  - Shows growth metrics and a history panel tracing historical subscriber metrics.
+  - **Sources & Scraping Control Panel**: Paste platform profile URLs, trigger auto-discovery, or invoke a manually-triggered scrape (which obeys the 24h TTL or bypasses it with a "Force Refresh" toggle). Displays the success or error status of the latest scrapers.
 
 ---
 
-*This README was generated and updated by Gemini CLI.*
+## Future Enhancements (Roadmap)
+
+- **Bulk Artist Import**: Ingest a batch of artist names or Spotify IDs in a single operation.
+- **Automated Scraping Scheduler**: Set up recurring cron jobs to pull metrics automatically at night.
+- **Data Exporting**: Export metric sets to CSV or JSON formats for custom analysis.
+- **Weighted Analytics Score**: Combine metrics from all platforms into a single weighted health/traction score.
