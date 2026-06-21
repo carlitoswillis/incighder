@@ -61,6 +61,8 @@ def fetch_instagram(handle_or_url: str) -> ScrapeResult:
             if user:
                 return ScrapeResult.success(platform, {
                     "instagram_followers": user.get("edge_followed_by", {}).get("count"),
+                    "instagram_posts": user.get("edge_owner_to_timeline_media", {}).get("count"),
+                    "instagram_verified": user.get("is_verified"),
                 })
     except Exception:
         pass  # fall through to the browser

@@ -42,6 +42,11 @@ export const PLATFORMS: PlatformMeta[] = [
     scraped: true,
     linkField: "spotify",
     metric: { field: "monthly_listeners", label: "Monthly listeners" },
+    sub: {
+      titleField: "top_track_name",
+      valueField: "top_track_plays",
+      valueLabel: "plays",
+    },
   },
   {
     key: "youtube",
@@ -51,6 +56,7 @@ export const PLATFORMS: PlatformMeta[] = [
     scraped: true,
     linkField: "youtube",
     metric: { field: "youtube_subscribers", label: "Subscribers" },
+    extra: { field: "youtube_video_count", label: "videos" },
     sub: {
       titleField: "youtube_top_video_title",
       valueField: "youtube_top_video_views",
@@ -65,6 +71,7 @@ export const PLATFORMS: PlatformMeta[] = [
     scraped: true,
     linkField: "soundcloud",
     metric: { field: "soundcloud_followers", label: "Followers" },
+    extra: { field: "soundcloud_track_count", label: "tracks" },
     sub: {
       titleField: "soundcloud_top_track",
       valueField: "soundcloud_top_track_plays",
@@ -79,6 +86,7 @@ export const PLATFORMS: PlatformMeta[] = [
     scraped: true,
     linkField: "instagram",
     metric: { field: "instagram_followers", label: "Followers" },
+    extra: { field: "instagram_posts", label: "posts" },
   },
   {
     key: "tiktok",

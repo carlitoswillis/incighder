@@ -72,28 +72,40 @@ def fetch_youtube(url_or_handle: str, api_key: Optional[str]) -> ScrapeResult:
         if not items:
             return ScrapeResult.failure(platform, "channel not found")
         ch = items[0]
+        stats = ch.get("statistics", {})
         data = {
             "youtube_channel_id": ch.get("id"),
             "youtube_channel_title": ch.get("snippet", {}).get("title"),
-            "youtube_subscribers": _to_int(ch.get("statistics", {}).get("subscriberCount")),
+            "youtube_subscribers": _to_int(stats.get("subscriberCount")),
+            "youtube_total_views": _to_int(stats.get("viewCount")),
+            "youtube_video_count": _to_int(stats.get("videoCount")),
         }
 
-        # Top video by view count (best-effort: search 100 units + videos 1 unit).
+        # search.list's viewCount order is approximate, so fetch the top handful and
+        # pick the real most-viewed by actual view count.
         try:
             top = _api_get(session, "search", {
                 "part": "snippet", "type": "video", "order": "viewCount",
-                "channelId": ch["id"], "maxResults": 1,
+                "channelId": ch["id"], "maxResults": 10,
             }, api_key)
-            vitems = top.get("items", [])
-            if vitems:
-                vid = vitems[0]["id"]["videoId"]
+            vids = [
+                it["id"]["videoId"]
+                for it in top.get("items", [])
+                if it.get("id", {}).get("videoId")
+            ]
+            if vids:
                 vresp = _api_get(session, "videos",
-                                 {"part": "snippet,statistics", "id": vid}, api_key)
-                vlist = vresp.get("items", [])
-                if vlist:
-                    data["youtube_top_video_title"] = vlist[0]["snippet"]["title"]
+                                 {"part": "snippet,statistics", "id": ",".join(vids)},
+                                 api_key)
+                best = max(
+                    vresp.get("items", []),
+                    key=lambda v: int(v.get("statistics", {}).get("viewCount") or 0),
+                    default=None,
+                )
+                if best:
+                    data["youtube_top_video_title"] = best["snippet"]["title"]
                     data["youtube_top_video_views"] = _to_int(
-                        vlist[0]["statistics"].get("viewCount"))
+                        best["statistics"].get("viewCount"))
         except Exception:
             pass  # subscriber count already captured; top video is optional
 

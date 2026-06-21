@@ -13,18 +13,25 @@ CREATE TABLE artists (
     top_track_id VARCHAR(255) NULL,
     top_track_name VARCHAR(255) NULL,
     top_track_popularity INTEGER NULL,
+    top_track_plays BIGINT NULL,
 
     -- Cross-platform scraping metrics (see ai/SCRAPING_PLAN.md).
     -- Counts are BIGINT: views/plays/likes routinely exceed INTEGER's 2.1B cap.
     youtube_subscribers BIGINT NULL,
+    youtube_total_views BIGINT NULL,
+    youtube_video_count INTEGER NULL,
     youtube_top_video_title VARCHAR(255) NULL,
     youtube_top_video_views BIGINT NULL,
     soundcloud_followers BIGINT NULL,
+    soundcloud_track_count INTEGER NULL,
     soundcloud_top_track VARCHAR(255) NULL,
     soundcloud_top_track_plays BIGINT NULL,
     instagram_followers BIGINT NULL,
+    instagram_posts INTEGER NULL,
+    instagram_verified BOOLEAN NULL,
     tiktok_followers BIGINT NULL,
     tiktok_likes BIGINT NULL,
+    tiktok_video_count INTEGER NULL,
     x_followers BIGINT NULL,
     social_links JSONB NULL,
     scrape_meta JSONB NULL

@@ -128,6 +128,7 @@ def render_html(
     wait_selector: Optional[str] = None,
     wait_text: Optional[str] = None,
     timeout_ms: int = 20000,
+    text: bool = False,
 ) -> str:
     """Return a JS-rendered page's HTML (throttled).
 
@@ -160,7 +161,7 @@ def render_html(
                     arg=wait_text.lower(),
                     timeout=timeout_ms,
                 )
-            return page.content()
+            return page.inner_text("body") if text else page.content()
         finally:
             browser.close()
 

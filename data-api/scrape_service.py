@@ -25,19 +25,24 @@ PLATFORMS = ("spotify", "youtube", "soundcloud", "instagram", "tiktok")
 
 # artists columns a scraper is allowed to write (guards the UPDATE identifiers).
 ALLOWED_METRIC_COLUMNS = {
-    "monthly_listeners",
-    "youtube_subscribers", "youtube_top_video_title", "youtube_top_video_views",
-    "soundcloud_followers", "soundcloud_top_track", "soundcloud_top_track_plays",
-    "instagram_followers", "tiktok_followers", "tiktok_likes",
+    "monthly_listeners", "top_track_name", "top_track_plays",
+    "youtube_subscribers", "youtube_total_views", "youtube_video_count",
+    "youtube_top_video_title", "youtube_top_video_views",
+    "soundcloud_followers", "soundcloud_track_count",
+    "soundcloud_top_track", "soundcloud_top_track_plays",
+    "instagram_followers", "instagram_posts", "instagram_verified",
+    "tiktok_followers", "tiktok_likes", "tiktok_video_count",
 }
 
 # Columns each platform owns - nulled when its source link is removed.
 PLATFORM_COLUMNS = {
-    "spotify": ["monthly_listeners"],
-    "youtube": ["youtube_subscribers", "youtube_top_video_title", "youtube_top_video_views"],
-    "soundcloud": ["soundcloud_followers", "soundcloud_top_track", "soundcloud_top_track_plays"],
-    "instagram": ["instagram_followers"],
-    "tiktok": ["tiktok_followers", "tiktok_likes"],
+    "spotify": ["monthly_listeners", "top_track_name", "top_track_plays"],
+    "youtube": ["youtube_subscribers", "youtube_total_views", "youtube_video_count",
+                "youtube_top_video_title", "youtube_top_video_views"],
+    "soundcloud": ["soundcloud_followers", "soundcloud_track_count",
+                   "soundcloud_top_track", "soundcloud_top_track_plays"],
+    "instagram": ["instagram_followers", "instagram_posts", "instagram_verified"],
+    "tiktok": ["tiktok_followers", "tiktok_likes", "tiktok_video_count"],
 }
 
 
