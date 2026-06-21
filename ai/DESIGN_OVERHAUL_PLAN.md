@@ -113,10 +113,13 @@ Dark theme values (use Tailwind/shadcn slate + cyan):
 
 - **AppShell/Navbar:** as above; add the missing `/table` link; active route styling
   with the cyan accent.
-- **Home `/`:** `PageHeader` ("Artists" + count). Responsive grid
-  (`grid-cols-1 sm:grid-cols-2 lg:grid-cols-3`) of `ArtistCard`. Loading →
-  `Skeleton` cards. Empty → `EmptyState` (CTA to Search). Delete → `Dialog` +
-  `sonner` toast (replace `window.confirm`/`alert`).
+- **Home `/`:** `PageHeader` ("Artists" + count). A **single-column stack of
+  large, full-width `ArtistCard`s** — one artist per row, each dominating the
+  viewport as you scroll (NOT a dense grid). Mobile-first: big image on top,
+  side-by-side (image left ~40%) at `md+`; large name, genre badges, prominent
+  `ScoreBadge`, and a spacious row of platform `StatTile`s. Loading → `Skeleton`
+  cards. Empty → `EmptyState` (CTA to Search). Delete → `Dialog` + `sonner`
+  toast (replaces `window.confirm`/`alert`).
 - **Artist detail `/artists/[id]`:** hero header (large `Avatar`, name, genre
   badges, `ScoreRing`, Spotify link, Edit/Delete). `MetricGrid` of `StatTile`s for
   all platforms (incl. manual X). `SourcesPanel` for scraping. Edit form → styled
@@ -172,15 +175,15 @@ incighder/src/
 - [ ] `lib/utils.ts`, `lib/format.ts`, `lib/platforms.ts`.
 - [ ] `AppShell`/`Navbar` (+ `/table` link) and `PageHeader`. Build passes.
 
-**Phase B — Core screens**
-- [ ] Home grid: `ArtistCard`, `ScoreBadge`, skeletons, `EmptyState`, delete
-      `Dialog` + toast.
-- [ ] Artist detail: hero, `MetricGrid`/`StatTile`, `SourcesPanel`, restyled edit
-      form. Verify scrape + edit + delete still work.
+**Phase B — Core screens** — done
+- [x] Home → big one-per-row `ArtistCard`s, `ScoreBadge` ring, skeletons,
+      `EmptyState`, delete `Dialog` + toast.
+- [x] Artist detail: hero, `MetricGrid`/`StatTile`, `SourcesPanel`, restyled edit
+      form (scrape + edit + delete preserved).
 
-**Phase C — Remaining pages**
-- [ ] Table (sortable shadcn table + new metric columns).
-- [ ] Search and Add (restyled, toasts).
+**Phase C — Remaining pages** — done
+- [x] Table: shadcn table + new metric columns (click-to-sort deferred to polish).
+- [x] Search and Add (restyled, toasts).
 
 **Phase D — Polish**
 - [ ] Sonner toasts wired app-wide; loading/empty/error states; mobile `Sheet` nav;

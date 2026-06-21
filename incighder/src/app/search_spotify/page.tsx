@@ -1,7 +1,16 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import Image from 'next/image';
+import { useState } from "react";
+import Image from "next/image";
+import { toast } from "sonner";
+import { Search } from "lucide-react";
+import { SiSpotify } from "react-icons/si";
+
+import { PageHeader } from "@/components/page-header";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { formatCompact } from "@/lib/format";
 
 interface SpotifyArtist {
   id: string;
@@ -13,115 +22,109 @@ interface SpotifyArtist {
   external_urls: { spotify: string };
 }
 
-export default function SearchArtists() {
-  const [artistName, setArtistName] = useState('');
-  const [searchResults, setSearchResults] = useState<SpotifyArtist[]>([]);
+export default function SearchPage() {
+  const [q, setQ] = useState("");
+  const [results, setResults] = useState<SpotifyArtist[]>([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
+  const [added, setAdded] = useState<Record<string, boolean>>({});
 
-  const handleSearch = async () => {
+  async function handleSearch(e?: React.FormEvent) {
+    e?.preventDefault();
+    if (!q.trim()) return;
     setLoading(true);
-    setError(null);
-    setMessage(null);
-    setSearchResults([]);
-
     try {
-      const response = await fetch(`/api/spotify-search?q=${encodeURIComponent(artistName)}`);
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      const data = await response.json();
-      setSearchResults(data.artists.items);
-      if (data.artists.items.length === 0) {
-        setMessage('No artists found for your search.');
-      }
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : String(e));
+      const r = await fetch(`/api/spotify-search?q=${encodeURIComponent(q)}`);
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || "Search failed");
+      setResults(d.artists.items);
+      if (!d.artists.items.length) toast.info("No artists found.");
+    } catch (e) {
+      toast.error(`Search failed: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
       setLoading(false);
     }
-  };
+  }
 
-  const handleAddToDataset = async (artist: SpotifyArtist) => {
-    setMessage(null);
+  async function handleAdd(a: SpotifyArtist) {
     try {
-      const response = await fetch('/api/artists', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(artist),
+      const r = await fetch("/api/artists", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(a),
       });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
-      }
-
-      setMessage(`Artist ${artist.name} added to dataset successfully!`);
-    } catch (e: unknown) {
-      setError(`Failed to add artist: ${e instanceof Error ? e.message : String(e)}`);
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || "Add failed");
+      setAdded((p) => ({ ...p, [a.id]: true }));
+      toast.success(`Added ${a.name}`);
+    } catch (e) {
+      toast.error(`Failed to add: ${e instanceof Error ? e.message : String(e)}`);
     }
-  };
+  }
 
   return (
-    <div className="min-h-screen p-8">
-      <h1 className="text-4xl font-bold mb-8 text-center">Search Spotify for Artists</h1>
-      <div className="flex flex-col items-center mb-8">
-        <input
-          type="text"
-          placeholder="Enter artist name"
-          value={artistName}
-          onChange={(e) => setArtistName(e.target.value)}
-          className="p-2 border border-gray-300 rounded-md w-full max-w-md mb-4 text-black"
+    <div>
+      <PageHeader title="Search Spotify" />
+
+      <form onSubmit={handleSearch} className="mb-6 flex max-w-md gap-2">
+        <Input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="Artist name"
+          autoFocus
         />
-        <button
-          onClick={handleSearch}
-          className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded mb-2 w-48"
-          disabled={loading}
-        >
-          {loading ? 'Searching...' : 'Search'}
-        </button>
-      </div>
+        <Button type="submit" disabled={loading}>
+          <Search /> {loading ? "Searching…" : "Search"}
+        </Button>
+      </form>
 
-      {error && <p className="text-red-500 text-center mb-4">Error: {error}</p>}
-      {message && <p className="text-green-500 text-center mb-4">{message}</p>}
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {searchResults.map((artist) => (
-          <div key={artist.id} className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 text-black dark:text-white">
-            <h2 className="text-2xl font-semibold mb-2">{artist.name}</h2>
-            {artist.images && artist.images.length > 0 ? (
-              <Image
-                src={artist.images[0].url}
-                alt={artist.name}
-                width={96}
-                height={96}
-                className="rounded-full mx-auto mb-4"
-              />
-            ) : (
-              <div className="w-24 h-24 rounded-full mx-auto mb-4 bg-gray-300 flex items-center justify-center text-gray-600 font-bold">?</div>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {results.map((a) => (
+          <div
+            key={a.id}
+            className="flex flex-col gap-3 rounded-xl bg-card p-4 ring-1 ring-foreground/10"
+          >
+            <div className="flex items-center gap-3">
+              {a.images?.[0]?.url ? (
+                <Image
+                  src={a.images[0].url}
+                  alt={a.name}
+                  width={56}
+                  height={56}
+                  className="size-14 shrink-0 rounded-lg object-cover"
+                />
+              ) : (
+                <div className="size-14 shrink-0 rounded-lg bg-secondary" />
+              )}
+              <div className="min-w-0">
+                <div className="truncate font-medium">{a.name}</div>
+                <div className="text-xs text-muted-foreground">
+                  {formatCompact(a.followers.total)} followers · pop {a.popularity}
+                </div>
+              </div>
+            </div>
+            {a.genres?.length > 0 && (
+              <div className="flex flex-wrap gap-1">
+                {a.genres.slice(0, 3).map((g) => (
+                  <Badge key={g} variant="secondary">
+                    {g}
+                  </Badge>
+                ))}
+              </div>
             )}
-            <p><strong>Popularity:</strong> {artist.popularity}</p>
-            <p><strong>Followers:</strong> {artist.followers.total.toLocaleString()}</p>
-            <p><strong>Genres:</strong> {artist.genres.join(', ') || 'N/A'}</p>
-            {artist.external_urls?.spotify && (
-              <a
-                href={artist.external_urls.spotify}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-blue-500 hover:underline block mt-2"
-              >
-                View on Spotify
-              </a>
-            )}
-            <button
-              onClick={() => handleAddToDataset(artist)}
-              className="mt-4 bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded w-full"
+            <Button
+              onClick={() => handleAdd(a)}
+              disabled={added[a.id]}
+              variant={added[a.id] ? "secondary" : "default"}
+              className="mt-auto"
             >
-              Add to Dataset
-            </button>
+              {added[a.id] ? (
+                "Added ✓"
+              ) : (
+                <>
+                  <SiSpotify /> Add to dataset
+                </>
+              )}
+            </Button>
           </div>
         ))}
       </div>

@@ -1,287 +1,302 @@
-'use client';
+"use client";
 
-import { useState, useEffect, Suspense } from 'react';
-import { useParams, useSearchParams } from 'next/navigation';
-import Image from 'next/image';
-import { calculateArtistScore } from '../../../utils/score';
+import { Suspense, useEffect, useState } from "react";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
+import Image from "next/image";
+import Link from "next/link";
+import { toast } from "sonner";
+import { SiSpotify } from "react-icons/si";
+import { ArrowLeft, ExternalLink, Pencil, Trash2 } from "lucide-react";
 
-interface Image {
-  url: string;
+import type { Artist } from "@/lib/types";
+import { calculateArtistScore } from "@/utils/score";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton";
+import { ScoreBadge } from "@/components/score-badge";
+import { MetricGrid } from "@/components/metric-grid";
+import { SourcesPanel } from "@/components/sources-panel";
+
+const fieldClass =
+  "flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm outline-none transition-[color,box-shadow] placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50";
+
+function parseGenres(genres: string | null): string[] {
+  if (!genres) return [];
+  const cleaned = genres.replace(/[[\]"']/g, "");
+  return cleaned
+    ? cleaned.split(",").map((s) => s.trim()).filter(Boolean)
+    : [];
 }
 
-interface ExternalUrls {
-  [key: string]: string;
-}
-
-interface ScrapeMetaEntry {
-  last_scraped_at?: string;
-  status?: string;
-  error?: string | null;
-}
-
-interface Artist {
-  id: string;
-  name: string;
-  followers: number;
-  popularity: number;
-  genres: string | null;
-  images: Image[] | null;
-  external_urls: ExternalUrls | null;
-  monthly_listeners: number | null;
-  spotify_id?: string | null;
-  youtube_subscribers?: number | null;
-  youtube_top_video_title?: string | null;
-  youtube_top_video_views?: number | null;
-  soundcloud_followers?: number | null;
-  soundcloud_top_track?: string | null;
-  soundcloud_top_track_plays?: number | null;
-  instagram_followers?: number | null;
-  tiktok_followers?: number | null;
-  tiktok_likes?: number | null;
-  x_followers?: number | null;
-  social_links?: { [key: string]: string } | null;
-  scrape_meta?: { [key: string]: ScrapeMetaEntry } | null;
-}
-
-function ArtistDetailComponent() {
+function ArtistDetail() {
   const params = useParams();
+  const router = useRouter();
   const searchParams = useSearchParams();
   const artistId = params.id as string;
-  const editMode = searchParams.get('edit') === 'true';
 
   const [artist, setArtist] = useState<Artist | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [formData, setFormData] = useState({
-    name: '',
-    followers: '',
-    popularity: '',
-    genres: '',
-    images: '',
-    external_urls: '',
-    monthly_listeners: '',
-    x_followers: ''
+  const [showEdit, setShowEdit] = useState(searchParams.get("edit") === "true");
+  const [form, setForm] = useState({
+    name: "",
+    genres: "",
+    images: "",
+    external_urls: "",
+    x_followers: "",
   });
-  const [showEditForm, setShowEditForm] = useState(editMode);
-  const [message, setMessage] = useState<string | null>(null);
-  const [socialLinks, setSocialLinks] = useState({ spotify: '', youtube: '', soundcloud: '', instagram: '', tiktok: '' });
-  const [scraping, setScraping] = useState(false);
-  const [forceScrape, setForceScrape] = useState(false);
-  const [scrapeStatus, setScrapeStatus] = useState<{ [key: string]: { ok: boolean; error?: string | null; skipped?: string } } | null>(null);
 
   useEffect(() => {
-    setShowEditForm(editMode);
-  }, [editMode]);
-
-  useEffect(() => {
-    async function loadArtist() {
-      if (!artistId) return;
+    async function load() {
       setLoading(true);
-      setError(null);
       try {
-        const response = await fetch(`/api/artists/${artistId}`);
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        const data = await response.json();
+        const r = await fetch(`/api/artists/${artistId}`);
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        const data = await r.json();
         setArtist(data);
-        const links = data.social_links || {};
-        setSocialLinks({
-          spotify: links.spotify || data.external_urls?.spotify || (data.spotify_id ? `https://open.spotify.com/artist/${data.spotify_id}` : ''),
-          youtube: links.youtube || '',
-          soundcloud: links.soundcloud || '',
-          instagram: links.instagram || '',
-          tiktok: links.tiktok || '',
+        setForm({
+          name: data.name || "",
+          genres: data.genres || "",
+          images: Array.isArray(data.images)
+            ? data.images
+                .map((i: { url: string } | string) =>
+                  typeof i === "string" ? i : i.url,
+                )
+                .join(", ")
+            : "",
+          external_urls: data.external_urls
+            ? JSON.stringify(data.external_urls, null, 2)
+            : "",
+          x_followers: data.x_followers != null ? String(data.x_followers) : "",
         });
-        setFormData({
-          name: data.name || '',
-          followers: String(data.followers || ''),
-          popularity: String(data.popularity || ''),
-          genres: data.genres || '',
-          images: Array.isArray(data.images) ? data.images.map((img: Image | string) => (typeof img === 'string' ? img : img.url)).join(', ') : '',
-          external_urls: data.external_urls ? JSON.stringify(data.external_urls, null, 2) : '',
-          monthly_listeners: String(data.monthly_listeners || ''),
-          x_followers: String(data.x_followers || '')
-        });
-      } catch (e: unknown) {
+      } catch (e) {
         setError(e instanceof Error ? e.message : String(e));
       } finally {
         setLoading(false);
       }
     }
-    loadArtist();
+    if (artistId) load();
   }, [artistId]);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    setFormData({ ...formData, [name]: value });
-  };
-
-  const handleSave = async (e: React.FormEvent) => {
+  async function handleSave(e: React.FormEvent) {
     e.preventDefault();
-    setMessage(null);
-    setError(null);
-
-    let parsedUrls = null;
-    if (formData.external_urls) {
+    let parsedUrls: unknown = null;
+    if (form.external_urls.trim()) {
       try {
-        parsedUrls = JSON.parse(formData.external_urls);
+        parsedUrls = JSON.parse(form.external_urls);
       } catch {
         try {
-          const fixedJson = formData.external_urls
-            .replace(/(\w+):/g, '"$1":')
-            .replace(/'/g, '"');
-          parsedUrls = JSON.parse(fixedJson);
+          parsedUrls = JSON.parse(
+            form.external_urls.replace(/(\w+):/g, '"$1":').replace(/'/g, '"'),
+          );
         } catch {
-          setError('External URLs must be a valid JSON object.');
+          toast.error("External URLs must be valid JSON.");
           return;
         }
       }
     }
-
     try {
-      const dataToSend = {
-        name: formData.name,
-        x_followers: formData.x_followers,
-        genres: formData.genres.split(',').map((s) => s.trim()).filter((s) => s),
-        images: formData.images.split(',').map((s) => s.trim()).filter((s) => s).map(url => ({ url })),
-        external_urls: parsedUrls,
-      };
-
-      const response = await fetch(`/api/artists/${artistId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(dataToSend),
+      const r = await fetch(`/api/artists/${artistId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: form.name,
+          x_followers: form.x_followers,
+          genres: form.genres.split(",").map((s) => s.trim()).filter(Boolean),
+          images: form.images
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean)
+            .map((url) => ({ url })),
+          external_urls: parsedUrls,
+        }),
       });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to update artist');
-      }
-
-      setMessage('Artist data updated successfully!');
-      const updatedResponse = await fetch(`/api/artists/${artistId}`);
-      const data = await updatedResponse.json();
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || "Update failed");
       setArtist(data);
-    } catch (e: unknown) {
-      setError(`Failed to update artist: ${e instanceof Error ? e.message : String(e)}`);
+      setShowEdit(false);
+      toast.success("Saved changes");
+    } catch (e) {
+      toast.error(`Save failed: ${e instanceof Error ? e.message : String(e)}`);
     }
-  };
+  }
 
-  const handleScrape = async () => {
-    setScraping(true);
-    setScrapeStatus(null);
-    setMessage(null);
-    setError(null);
+  async function handleDelete() {
+    if (!confirm("Remove this artist and all its metrics?")) return;
     try {
-      const response = await fetch('/api/scrape', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ artist_id: artistId, links: socialLinks, force: forceScrape }),
-      });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error || 'Scrape failed');
-      setArtist(result.artist);
-      const statuses: { [key: string]: { ok: boolean; error?: string | null; skipped?: string } } = {};
-      for (const [platform, r] of Object.entries(result.results || {})) {
-        const res = r as { ok: boolean; error?: string | null; skipped?: string };
-        statuses[platform] = { ok: res.ok, error: res.error, skipped: res.skipped };
-      }
-      setScrapeStatus(statuses);
-      setMessage('Scrape complete.');
-    } catch (e: unknown) {
-      setError(`Scrape failed: ${e instanceof Error ? e.message : String(e)}`);
-    } finally {
-      setScraping(false);
+      const r = await fetch(`/api/artists/${artistId}`, { method: "DELETE" });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      toast.success("Artist removed");
+      router.push("/");
+    } catch (e) {
+      toast.error(`Failed to remove: ${e instanceof Error ? e.message : String(e)}`);
     }
-  };
+  }
 
-  if (loading) return <div>Loading...</div>;
-  if (error) return <div style={{ color: 'red' }}>Error: {error}</div>;
-  if (!artist) return <div>Artist not found.</div>;
+  if (loading)
+    return (
+      <div className="space-y-6">
+        <Skeleton className="h-44 w-full rounded-xl" />
+        <Skeleton className="h-48 w-full rounded-xl" />
+      </div>
+    );
+  if (error) return <p className="text-sm text-destructive">Error: {error}</p>;
+  if (!artist) return <p className="text-muted-foreground">Artist not found.</p>;
 
-  let parsedGenres: string[] = [];
-  try {
-    parsedGenres = artist.genres ? artist.genres.split(',') : [];
-  } catch (e) { }
-
-  const { score, breakdown } = calculateArtistScore(artist);
+  const genres = parseGenres(artist.genres);
+  const image = artist.images?.[0]?.url ?? null;
+  const spotifyUrl = artist.external_urls?.spotify;
+  const { score, breakdown } = calculateArtistScore({
+    followers: artist.followers ?? 0,
+    popularity: artist.popularity ?? 0,
+    monthly_listeners: artist.monthly_listeners ?? null,
+  });
 
   return (
-    <div>
-      <h1 style={{ fontSize: '2em', marginBottom: '20px', textAlign: 'center' }}>{artist.name}</h1>
-      <div style={{ border: '1px solid #ccc', padding: '15px', borderRadius: '8px', maxWidth: '600px', margin: '0 auto', backgroundColor: '#fff' }}>
-        {artist.images && artist.images.length > 0 && (
-          <Image src={artist.images[0].url} alt={artist.name} width={120} height={120} style={{ borderRadius: '50%', display: 'block', margin: '0 auto 15px' }} />
+    <div className="space-y-6">
+      <Link
+        href="/"
+        className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
+      >
+        <ArrowLeft className="size-4" /> Back to artists
+      </Link>
+
+      {/* Hero */}
+      <div className="flex flex-col gap-6 rounded-xl bg-card p-6 ring-1 ring-foreground/10 sm:flex-row sm:items-center">
+        {image && (
+          <Image
+            src={image}
+            alt={artist.name}
+            width={128}
+            height={128}
+            className="size-32 shrink-0 rounded-xl object-cover"
+          />
         )}
-...        <p><strong>ID:</strong> {artist.id}</p>
-        <p><strong>Score:</strong> {score}</p>
-        <pre style={{ backgroundColor: '#f5f5f5', padding: '10px', borderRadius: '5px', fontSize: '0.9em', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{breakdown}</pre>
-        <p><strong>Genres:</strong> {parsedGenres.length > 0 ? parsedGenres.join(', ') : 'N/A'}</p>
-
-        <div style={{ marginTop: '15px', borderTop: '1px solid #eee', paddingTop: '15px' }}>
-          <h3 style={{ marginBottom: '8px' }}>Cross-Platform Metrics</h3>
-          <p><strong>Spotify monthly listeners:</strong> {artist.monthly_listeners != null ? artist.monthly_listeners.toLocaleString() : 'N/A'}</p>
-          <p><strong>YouTube subscribers:</strong> {artist.youtube_subscribers != null ? artist.youtube_subscribers.toLocaleString() : 'N/A'}{artist.youtube_top_video_title ? ` — top: "${artist.youtube_top_video_title}" (${(artist.youtube_top_video_views ?? 0).toLocaleString()} views)` : ''}</p>
-          <p><strong>SoundCloud followers:</strong> {artist.soundcloud_followers != null ? artist.soundcloud_followers.toLocaleString() : 'N/A'}{artist.soundcloud_top_track ? ` — top: "${artist.soundcloud_top_track}" (${(artist.soundcloud_top_track_plays ?? 0).toLocaleString()} plays)` : ''}</p>
-          <p><strong>Instagram followers:</strong> {artist.instagram_followers != null ? artist.instagram_followers.toLocaleString() : 'N/A'}</p>
-          <p><strong>TikTok followers:</strong> {artist.tiktok_followers != null ? artist.tiktok_followers.toLocaleString() : 'N/A'}{artist.tiktok_likes != null ? ` — ${artist.tiktok_likes.toLocaleString()} likes` : ''}</p>
-          <p><strong>X / Twitter followers:</strong> {artist.x_followers != null ? artist.x_followers.toLocaleString() : 'N/A'} <span style={{ fontSize: '0.8em', color: '#888' }}>(manual — set via Edit Data)</span></p>
+        <div className="flex-1 space-y-2">
+          <h1 className="text-3xl font-semibold tracking-tight">{artist.name}</h1>
+          {genres.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {genres.map((g) => (
+                <Badge key={g} variant="secondary">
+                  {g}
+                </Badge>
+              ))}
+            </div>
+          )}
+          {spotifyUrl && (
+            <a
+              href={spotifyUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-primary"
+            >
+              <SiSpotify style={{ color: "#1DB954" }} /> Open in Spotify
+              <ExternalLink className="size-3.5" />
+            </a>
+          )}
         </div>
-
-        <div style={{ marginTop: '15px', borderTop: '1px solid #eee', paddingTop: '15px' }}>
-          <h3 style={{ marginBottom: '8px' }}>Sources &amp; Scraping</h3>
-          {(['spotify', 'youtube', 'soundcloud', 'instagram', 'tiktok'] as const).map((platform) => {
-            const status = scrapeStatus?.[platform];
-            const meta = artist.scrape_meta?.[platform];
-            return (
-              <div key={platform} style={{ marginBottom: '8px' }}>
-                <label style={{ display: 'inline-block', width: '90px', textTransform: 'capitalize' }}>{platform}</label>
-                <input
-                  value={socialLinks[platform]}
-                  onChange={(e) => setSocialLinks({ ...socialLinks, [platform]: e.target.value })}
-                  placeholder={`${platform} profile URL`}
-                  style={{ width: '60%' }}
-                />
-                {status && (
-                  <span style={{ marginLeft: '8px', color: status.ok ? 'green' : 'red' }}>
-                    {status.skipped ? 'cached' : status.ok ? '✓' : `✗ ${status.error || ''}`}
-                  </span>
-                )}
-                {meta?.last_scraped_at ? (
-                  <div style={{ fontSize: '0.8em', color: '#888' }}>updated {new Date(meta.last_scraped_at).toLocaleString()}</div>
-                ) : null}
-              </div>
-            );
-          })}
-          <label style={{ fontSize: '0.9em', display: 'block', marginBottom: '8px' }}>
-            <input type="checkbox" checked={forceScrape} onChange={(e) => setForceScrape(e.target.checked)} /> force refresh (ignore 24h cache)
-          </label>
-          <button onClick={handleScrape} disabled={scraping} style={{ backgroundColor: '#17a2b8', color: 'white', padding: '10px 15px', border: 'none', borderRadius: '4px', cursor: scraping ? 'not-allowed' : 'pointer' }}>
-            {scraping ? 'Scraping…' : 'Scrape now'}
-          </button>
+        <div className="flex items-center gap-3">
+          <ScoreBadge score={score} breakdown={breakdown} size="lg" />
+          <Button variant="outline" onClick={() => setShowEdit((v) => !v)}>
+            <Pencil /> Edit
+          </Button>
+          <Button
+            variant="destructive"
+            size="icon"
+            onClick={handleDelete}
+            aria-label="Remove artist"
+          >
+            <Trash2 />
+          </Button>
         </div>
-
-        <button onClick={() => setShowEditForm(!showEditForm)} style={{ backgroundColor: '#6c757d', color: 'white', padding: '10px 15px', border: 'none', borderRadius: '4px', cursor: 'pointer', marginBottom: '10px' }}>
-          {showEditForm ? 'Hide Edit Form' : 'Edit Data'}
-        </button>
-        {showEditForm && (
-          <form onSubmit={handleSave}>
-            <input name="name" value={formData.name} onChange={handleChange} placeholder="Name" style={{ width: '100%', marginBottom: '10px' }} />
-            <input name="genres" value={formData.genres} onChange={handleChange} placeholder="Genres (comma separated)" style={{ width: '100%', marginBottom: '10px' }} />
-            <textarea name="images" value={formData.images} onChange={handleChange} placeholder="Images (comma separated URLs)" style={{ width: '100%', marginBottom: '10px' }} />
-            <textarea name="external_urls" value={formData.external_urls} onChange={handleChange} placeholder="External URLs (JSON object)" style={{ width: '100%', marginBottom: '10px' }} />
-            <input name="x_followers" value={formData.x_followers} onChange={handleChange} placeholder="X / Twitter followers (manual)" style={{ width: '100%', marginBottom: '10px' }} />
-            <button type="submit" style={{ backgroundColor: '#007bff', color: 'white', padding: '10px 15px', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>Save Changes</button>
-          </form>
-        )}
-        {message && <p style={{ color: 'green' }}>{message}</p>}
-        {error && <p style={{ color: 'red' }}>Error: {error}</p>}
       </div>
+
+      {/* Edit form */}
+      {showEdit && (
+        <form
+          onSubmit={handleSave}
+          className="space-y-4 rounded-xl bg-card p-6 ring-1 ring-foreground/10"
+        >
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="name">Name</Label>
+              <Input
+                id="name"
+                value={form.name}
+                onChange={(e) => setForm({ ...form, name: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="x">X / Twitter followers (manual)</Label>
+              <Input
+                id="x"
+                inputMode="numeric"
+                value={form.x_followers}
+                onChange={(e) =>
+                  setForm({ ...form, x_followers: e.target.value })
+                }
+              />
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="genres">Genres (comma separated)</Label>
+            <Input
+              id="genres"
+              value={form.genres}
+              onChange={(e) => setForm({ ...form, genres: e.target.value })}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="images">Image URLs (comma separated)</Label>
+            <textarea
+              id="images"
+              rows={2}
+              className={fieldClass}
+              value={form.images}
+              onChange={(e) => setForm({ ...form, images: e.target.value })}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="urls">External URLs (JSON)</Label>
+            <textarea
+              id="urls"
+              rows={4}
+              className={`${fieldClass} font-mono text-xs`}
+              value={form.external_urls}
+              onChange={(e) =>
+                setForm({ ...form, external_urls: e.target.value })
+              }
+            />
+          </div>
+          <div className="flex gap-2">
+            <Button type="submit">Save changes</Button>
+            <Button type="button" variant="ghost" onClick={() => setShowEdit(false)}>
+              Cancel
+            </Button>
+          </div>
+        </form>
+      )}
+
+      {/* Metrics */}
+      <div className="space-y-3">
+        <h2 className="text-lg font-semibold tracking-tight">
+          Cross-platform metrics
+        </h2>
+        <MetricGrid artist={artist} />
+      </div>
+
+      {/* Sources */}
+      <SourcesPanel artist={artist} onScraped={setArtist} />
     </div>
   );
 }
 
 export default function ArtistDetailPage() {
-  return <Suspense fallback={<div>Loading...</div>}><ArtistDetailComponent /></Suspense>;
+  return (
+    <Suspense fallback={<Skeleton className="h-44 w-full rounded-xl" />}>
+      <ArtistDetail />
+    </Suspense>
+  );
 }

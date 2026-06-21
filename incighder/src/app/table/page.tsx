@@ -1,103 +1,112 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import type { Artist } from "@/lib/types";
+import { calculateArtistScore } from "@/utils/score";
+import { formatCompact } from "@/lib/format";
+import { PageHeader } from "@/components/page-header";
+import { PlatformIcon } from "@/components/platform-icon";
+import { EmptyState } from "@/components/empty-state";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import type { PlatformKey } from "@/lib/platforms";
 
-interface Artist {
-  id: string;
-  name: string;
-  followers: number;
-  popularity: number;
-  genres: string | null;
-  images: { url: string }[] | null;
-  external_urls: { [key: string]: string } | null;
+function HeadMetric({ platform, label }: { platform: PlatformKey; label: string }) {
+  return (
+    <div className="flex items-center justify-end gap-1.5">
+      <PlatformIcon platform={platform} className="size-3.5" /> {label}
+    </div>
+  );
 }
 
-export default function ArtistsTable() {
-  const [artists, setArtists] = useState<Artist[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+export default function TablePage() {
+  const [artists, setArtists] = useState<Artist[] | null>(null);
 
   useEffect(() => {
-    async function fetchArtists() {
-      try {
-        const response = await fetch('/api/artists');
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        const data: Artist[] = await response.json();
-        setArtists(data);
-      } catch (e: unknown) {
-        setError(e instanceof Error ? e.message : String(e));
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    fetchArtists();
+    fetch("/api/artists")
+      .then((r) => r.json())
+      .then(setArtists)
+      .catch(() => setArtists([]));
   }, []);
 
-  if (loading) {
-    return <div style={{ display: 'flex', minHeight: '100vh', alignItems: 'center', justifyContent: 'center' }}>Loading artists...</div>;
-  }
-
-  if (error) {
-    return <div style={{ display: 'flex', minHeight: '100vh', alignItems: 'center', justifyContent: 'center', color: 'red' }}>Error: {error}</div>;
-  }
-
   return (
-    <div style={{ padding: '20px' }}>
-      <h1 style={{ fontSize: '2em', marginBottom: '20px', textAlign: 'center' }}>Artists Data Table</h1>
-      {artists.length === 0 ? (
-        <p style={{ textAlign: 'center', fontSize: '1.2em' }}>No artists found in the database. Try running the scraper!</p>
-      ) : (
-        <div style={{ overflowX: 'auto' }}>
-          <table className="spreadsheet-table">
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>Followers</th>
-                <th>Popularity</th>
-                <th>Genres</th>
-                <th>Spotify URL</th>
-              </tr>
-            </thead>
-            <tbody>
-              {artists.map((artist) => {
-                let parsedGenres: string[] = [];
-                if (artist.genres) {
-                  const cleaned = artist.genres.replace(/[\[\]"']/g, '');
-                  parsedGenres = cleaned ? cleaned.split(',').map(s => s.trim()) : [];
-                }
-                const spotifyUrl = artist.external_urls?.spotify;
+    <div>
+      <PageHeader title="Table" count={artists?.length} />
 
+      {artists === null ? (
+        <Skeleton className="h-96 w-full rounded-xl" />
+      ) : artists.length === 0 ? (
+        <EmptyState title="No artists yet" description="Add artists to populate the table." />
+      ) : (
+        <div className="overflow-x-auto rounded-xl ring-1 ring-foreground/10">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Artist</TableHead>
+                <TableHead className="text-right">Score</TableHead>
+                <TableHead className="text-right">Followers</TableHead>
+                <TableHead className="text-right">
+                  <HeadMetric platform="spotify" label="Monthly" />
+                </TableHead>
+                <TableHead className="text-right">
+                  <HeadMetric platform="youtube" label="Subs" />
+                </TableHead>
+                <TableHead className="text-right">
+                  <HeadMetric platform="instagram" label="IG" />
+                </TableHead>
+                <TableHead className="text-right">
+                  <HeadMetric platform="tiktok" label="TikTok" />
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {artists.map((a) => {
+                const { score } = calculateArtistScore({
+                  followers: a.followers ?? 0,
+                  popularity: a.popularity ?? 0,
+                  monthly_listeners: a.monthly_listeners ?? null,
+                });
                 return (
-                  <tr key={artist.id}>
-                    <td>
-                      <a href={`/artists/${artist.id}`}>
-                        {artist.name}
-                      </a>
-                    </td>
-                    <td>{artist.followers.toLocaleString()}</td>
-                    <td>{artist.popularity}</td>
-                    <td>{parsedGenres.length > 0 ? parsedGenres.join(', ') : 'N/A'}</td>
-                    <td>
-                      {spotifyUrl ? (
-                        <a
-                          href={spotifyUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          Link
-                        </a>
-                      ) : (
-                        'N/A'
-                      )}
-                    </td>
-                  </tr>
+                  <TableRow key={a.id}>
+                    <TableCell>
+                      <Link
+                        href={`/artists/${a.id}`}
+                        className="font-medium transition-colors hover:text-primary"
+                      >
+                        {a.name}
+                      </Link>
+                    </TableCell>
+                    <TableCell className="text-right font-medium tabular-nums">
+                      {Math.round(score)}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {formatCompact(a.followers)}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {formatCompact(a.monthly_listeners)}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {formatCompact(a.youtube_subscribers)}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {formatCompact(a.instagram_followers)}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {formatCompact(a.tiktok_followers)}
+                    </TableCell>
+                  </TableRow>
                 );
               })}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         </div>
       )}
     </div>
