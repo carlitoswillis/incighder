@@ -199,6 +199,8 @@ Results are *suggestions* — the user confirms before scraping.
       user search + IG/TikTok handle guess; DDG/Bing scraping dropped — both
       bot-block server IPs) + `POST /discover` + Next.js `/api/discover`.
 - [x] "Auto-discover" button fills candidate links for the user to confirm.
+- [x] Source links: click-to-open + hover OG preview (`/preview` endpoint; browser
+      fallback for bot-blocked sites). Works for YT/SC/IG; graceful for SP/TikTok.
 
 **Phase 4 — Display & polish** — done (via the design overhaul)
 - [x] Metrics on home cards (`StatTile`s), sortable table columns, detail

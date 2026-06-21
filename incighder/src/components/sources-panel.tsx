@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { LinkPreview } from "@/components/link-preview";
 
 type ScrapeStatus = { ok: boolean; error?: string | null; skipped?: string };
 
@@ -130,6 +131,7 @@ export function SourcesPanel({
                   }
                   placeholder={`${p.label} profile URL`}
                 />
+                {links[p.key] && <LinkPreview url={links[p.key]} />}
                 {status && (
                   <span
                     className={cn(

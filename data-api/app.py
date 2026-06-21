@@ -8,6 +8,7 @@ import traceback
 
 from scrape_service import scrape_artist
 from scrapers.discovery import discover_links
+from link_preview import link_preview
 from scrapers.base import shutdown as _scraper_shutdown
 
 app = Flask(__name__)
@@ -90,6 +91,17 @@ def discover():
         print(f"Discover error: {e}", file=sys.stderr)
         traceback.print_exc(file=sys.stderr)
         return jsonify({'error': str(e)}), 500
+
+@app.route('/preview', methods=['GET'])
+def preview():
+    url = request.args.get('url')
+    if not url:
+        return jsonify({}), 200
+    try:
+        return jsonify(link_preview(url)), 200
+    except Exception as e:
+        print(f"Preview error: {e}", file=sys.stderr)
+        return jsonify({}), 200
 
 if __name__ == '__main__':
     # Ensure the Flask app is accessible from outside the container

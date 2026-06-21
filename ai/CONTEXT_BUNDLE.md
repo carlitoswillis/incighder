@@ -1,5 +1,5 @@
 # AI Context Bundle
-Generated: Sun Jun 21 14:41:22 PDT 2026
+Generated: Sun Jun 21 14:48:03 PDT 2026
 
 ## ⚠️ Agent Navigation Guide
 1. Start with the **Current State** below to understand the focus.
@@ -161,6 +161,7 @@ PURPOSE: Tracks active work and backlog. AI agents should update this after comp
 ./data-api/scrape_service.py
 ./data-api/requirements.txt
 ./data-api/schema.sql
+./data-api/link_preview.py
 ./data-api/Dockerfile
 ./data-api/followerCounts.py
 ./data-api/scrapeArtistData.py
@@ -188,113 +189,113 @@ PURPOSE: Tracks active work and backlog. AI agents should update this after comp
 
 ## 5. Recent Git Changes (Summary)
 ```text
+a02197c feat(scraping): Phase 3 — auto-discovery of profile links
 994a8a4 feat(ui): design overhaul Phase D — polish
 e988b1c feat(ui): design overhaul Phase B+C — all pages redesigned
 45bcd7e feat(ui): design overhaul Phase A — shadcn + dark slate/cyan system
 240e542 feat(scraping): Phase 2 - Instagram + TikTok scrapers + manual X
-3ee2d5d fix(scraping): Playwright per-call lifecycle + SoundCloud browser fallback
 ```
 
 ## 6. Active Diff
 ```diff
 diff --git a/ai/CONTEXT_BUNDLE.md b/ai/CONTEXT_BUNDLE.md
-index c678ea8..a5fafcc 100644
+index 853a818..831ada5 100644
 --- a/ai/CONTEXT_BUNDLE.md
 +++ b/ai/CONTEXT_BUNDLE.md
 @@ -1,5 +1,5 @@
  # AI Context Bundle
--Generated: Sat Jun 20 16:36:24 PDT 2026
-+Generated: Sun Jun 21 14:41:22 PDT 2026
+-Generated: Sun Jun 21 14:41:22 PDT 2026
++Generated: Sun Jun 21 14:48:03 PDT 2026
  
  ## ⚠️ Agent Navigation Guide
  1. Start with the **Current State** below to understand the focus.
-@@ -83,7 +83,7 @@ This repository uses an AI-assisted engineering substrate located in `ai/`.
- PURPOSE: High-level summary of the system's current focus and recent changes to prevent agent drift.
- 
- ## Last Updated: 2026-06-20
--## Current Focus: Cross-Platform Scraping (see `SCRAPING_PLAN.md`)
-+## Current Focus: Scraping (Phases 0–4) and the design overhaul are both shipped. Backlog: historical tracking, data export.
- 
- ## Project Goal
- Build a data application that provides a holistic view of an artist's online traction and potential, starting with Spotify and expanding to YouTube, SoundCloud, and social media.
-@@ -111,15 +111,16 @@ Build a data application that provides a holistic view of an artist's online tra
- 
- PURPOSE: Tracks active work and backlog. AI agents should update this after completing tasks.
- 
--## Active (Phase D: Scraping) — detailed in `SCRAPING_PLAN.md`
--- [ ] Phase 3: DuckDuckGo auto-discovery of profile links
-+## Active
-+- (nothing in progress — design overhaul shipped; pick next from Backlog)
- 
- ## Backlog
--- [ ] Phase 4: display metrics across card/table/detail; freshness indicators
- - [ ] Implement historical data tracking for followers
-+- [ ] Add export artist data and bulk export artist data
- 
- ## Completed
--- [x] Scraping Phase 0-2: framework + Spotify/YouTube/SoundCloud/Instagram/TikTok scrapers, `/scrape`, UI panel, manual X (verified live)
-+- [x] UI design overhaul (Phases A–D): shadcn dark slate/cyan system, all pages redesigned (`DESIGN_OVERHAUL_PLAN.md`)
-+- [x] Scraping Phase 0-4: scrapers + `/scrape` + auto-discovery (`/discover`) + metrics across the UI (`SCRAPING_PLAN.md`)
- - [x] Implement artist editing functionality (PATCH requests)
- - [x] Enable navigation to new artist page
- - [x] Add navigation bar
-@@ -148,6 +149,7 @@ PURPOSE: Tracks active work and backlog. AI agents should update this after comp
- ./incighder/public
- ./incighder/package-lock.json
- ./incighder/package.json
-+./incighder/components.json
- ./incighder/tsconfig.json
- ./incighder/eslint.config.mjs
- ./incighder/next.config.ts
-@@ -174,6 +176,7 @@ PURPOSE: Tracks active work and backlog. AI agents should update this after comp
- ./package-lock.json
- ./ai
- ./ai/ai-context.sh
-+./ai/DESIGN_OVERHAUL_PLAN.md
- ./ai/ARCHITECTURE.md
- ./ai/SCRAPING_PLAN.md
- ./ai/CONTEXT_BUNDLE.md
-@@ -185,113 +188,12 @@ PURPOSE: Tracks active work and backlog. AI agents should update this after comp
+@@ -161,6 +161,7 @@ PURPOSE: Tracks active work and backlog. AI agents should update this after comp
+ ./data-api/scrape_service.py
+ ./data-api/requirements.txt
+ ./data-api/schema.sql
++./data-api/link_preview.py
+ ./data-api/Dockerfile
+ ./data-api/followerCounts.py
+ ./data-api/scrapeArtistData.py
+@@ -188,113 +189,12 @@ PURPOSE: Tracks active work and backlog. AI agents should update this after comp
  
  ## 5. Recent Git Changes (Summary)
  ```text
-+994a8a4 feat(ui): design overhaul Phase D — polish
-+e988b1c feat(ui): design overhaul Phase B+C — all pages redesigned
-+45bcd7e feat(ui): design overhaul Phase A — shadcn + dark slate/cyan system
-+240e542 feat(scraping): Phase 2 - Instagram + TikTok scrapers + manual X
- 3ee2d5d fix(scraping): Playwright per-call lifecycle + SoundCloud browser fallback
--26513f0 feat(scraping): Phase 1 - Spotify/YouTube/SoundCloud scrapers + /scrape + UI
--927708f feat(scraping): Phase 0 - scraper framework, Playwright image, schema
--5239346 docs: add cross-platform scraping plan
--714f66d fix: clean up flagged drift, dead code, and PATCH injection
++a02197c feat(scraping): Phase 3 — auto-discovery of profile links
+ 994a8a4 feat(ui): design overhaul Phase D — polish
+ e988b1c feat(ui): design overhaul Phase B+C — all pages redesigned
+ 45bcd7e feat(ui): design overhaul Phase A — shadcn + dark slate/cyan system
+ 240e542 feat(scraping): Phase 2 - Instagram + TikTok scrapers + manual X
+-3ee2d5d fix(scraping): Playwright per-call lifecycle + SoundCloud browser fallback
  ```
  
  ## 6. Active Diff
  ```diff
 -diff --git a/ai/CONTEXT_BUNDLE.md b/ai/CONTEXT_BUNDLE.md
--index 3aee487..a2747b7 100644
+-index c678ea8..a5fafcc 100644
 ---- a/ai/CONTEXT_BUNDLE.md
 -+++ b/ai/CONTEXT_BUNDLE.md
 -@@ -1,5 +1,5 @@
 - # AI Context Bundle
---Generated: Sat Jun 20 16:02:50 PDT 2026
--+Generated: Sat Jun 20 16:36:24 PDT 2026
+--Generated: Sat Jun 20 16:36:24 PDT 2026
+-+Generated: Sun Jun 21 14:41:22 PDT 2026
 - 
 - ## ⚠️ Agent Navigation Guide
 - 1. Start with the **Current State** below to understand the focus.
--@@ -112,16 +112,14 @@ Build a data application that provides a holistic view of an artist's online tra
+-@@ -83,7 +83,7 @@ This repository uses an AI-assisted engineering substrate located in `ai/`.
+- PURPOSE: High-level summary of the system's current focus and recent changes to prevent agent drift.
+- 
+- ## Last Updated: 2026-06-20
+--## Current Focus: Cross-Platform Scraping (see `SCRAPING_PLAN.md`)
+-+## Current Focus: Scraping (Phases 0–4) and the design overhaul are both shipped. Backlog: historical tracking, data export.
+- 
+- ## Project Goal
+- Build a data application that provides a holistic view of an artist's online traction and potential, starting with Spotify and expanding to YouTube, SoundCloud, and social media.
+-@@ -111,15 +111,16 @@ Build a data application that provides a holistic view of an artist's online tra
+- 
 - PURPOSE: Tracks active work and backlog. AI agents should update this after completing tasks.
 - 
-- ## Active (Phase D: Scraping) — detailed in `SCRAPING_PLAN.md`
---- [ ] Phase 0: scraper framework, Playwright in Docker, schema columns
---- [ ] Phase 1: Spotify monthly listeners + YouTube (API) + SoundCloud scrapers, `/scrape` endpoint, UI panel
--+- [ ] Phase 3: DuckDuckGo auto-discovery of profile links
+--## Active (Phase D: Scraping) — detailed in `SCRAPING_PLAN.md`
+--- [ ] Phase 3: DuckDuckGo auto-discovery of profile links
+-+## Active
+-+- (nothing in progress — design overhaul shipped; pick next from Backlog)
 - 
 - ## Backlog
---- [ ] Phase 2: Instagram + TikTok (best-effort), X manual entry
---- [ ] Phase 3: DuckDuckGo auto-discovery of profile links
-- - [ ] Phase 4: display metrics across card/table/detail; freshness indicators
+--- [ ] Phase 4: display metrics across card/table/detail; freshness indicators
 - - [ ] Implement historical data tracking for followers
+-+- [ ] Add export artist data and bulk export artist data
 - 
 - ## Completed
+--- [x] Scraping Phase 0-2: framework + Spotify/YouTube/SoundCloud/Instagram/TikTok scrapers, `/scrape`, UI panel, manual X (verified live)
+-+- [x] UI design overhaul (Phases A–D): shadcn dark slate/cyan system, all pages redesigned (`DESIGN_OVERHAUL_PLAN.md`)
+-+- [x] Scraping Phase 0-4: scrapers + `/scrape` + auto-discovery (`/discover`) + metrics across the UI (`SCRAPING_PLAN.md`)
+- - [x] Implement artist editing functionality (PATCH requests)
+- - [x] Enable navigation to new artist page
+- - [x] Add navigation bar
+-@@ -148,6 +149,7 @@ PURPOSE: Tracks active work and backlog. AI agents should update this after comp
+- ./incighder/public
+- ./incighder/package-lock.json
+- ./incighder/package.json
+-+./incighder/components.json
+- ./incighder/tsconfig.json
+- ./incighder/eslint.config.mjs
+- ./incighder/next.config.ts
+-@@ -174,6 +176,7 @@ PURPOSE: Tracks active work and backlog. AI agents should update this after comp
+- ./package-lock.json
+- ./ai
+- ./ai/ai-context.sh
+-+./ai/DESIGN_OVERHAUL_PLAN.md
+- ./ai/ARCHITECTURE.md
+- ./ai/SCRAPING_PLAN.md
+- ./ai/CONTEXT_BUNDLE.md
+-@@ -185,113 +188,12 @@ PURPOSE: Tracks active work and backlog. AI agents should update this after comp
+- 
+- ## 5. Recent Git Changes (Summary)
+- ```text
+-+994a8a4 feat(ui): design overhaul Phase D — polish
+-+e988b1c feat(ui): design overhaul Phase B+C — all pages redesigned
+-+45bcd7e feat(ui): design overhaul Phase A — shadcn + dark slate/cyan system
+-+240e542 feat(scraping): Phase 2 - Instagram + TikTok scrapers + manual X
+- 3ee2d5d fix(scraping): Playwright per-call lifecycle + SoundCloud browser fallback
+--26513f0 feat(scraping): Phase 1 - Spotify/YouTube/SoundCloud scrapers + /scrape + UI
 ```
