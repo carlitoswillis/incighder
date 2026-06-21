@@ -97,26 +97,42 @@ SCRAPE_THROTTLE_MIN=2.0
 SCRAPE_THROTTLE_MAX=6.0
 ```
 
-### 3. Development Workflow Scripts
+### 3. Running the Application
 
-We provide several convenience scripts in the root directory:
+To start the application, simply spin up the Docker services:
 
-- **`./start_dev.sh`**: Stops all active containers, purges dev database volumes, rebuilds all images (installing Playwright dependencies), applies the SQL schema, and starts all services. **Use this for a fresh installation or schema reset.**
-- **`./start_db.sh`**: Boots only the PostgreSQL database.
-- **`./start_data_api.sh`**: Boots the Flask service (auto-starts the database if not running).
-- **`./start_incighder_dev.sh`**: Boots the Next.js development server in the foreground, streaming logs directly. Auto-starts dependee services.
-
-To spin up the entire stack, run:
 ```bash
-./start_dev.sh
+docker compose up --build
 ```
+
 Once healthy, the frontend is accessible at [http://localhost:3000](http://localhost:3000).
 
-### 4. Stopping the services
+#### Database Schema Application (First-time Setup or Reset)
+On your first run, or when you need to wipe and reset the database schema, run:
 
 ```bash
-docker-compose down
+docker compose run --rm data-api python apply_schema.py
 ```
+
+### 4. Stopping the Services
+
+To stop all running services:
+
+```bash
+docker compose down
+```
+
+---
+
+### Alternative Helper Scripts
+
+For more customized development workflows, we also provide several helper scripts in the root directory:
+
+- **`./start_dev.sh`**: A comprehensive script that downs containers, wipes volumes, rebuilds images, applies the schema, and starts the development server.
+- **`./start_db.sh`**: Starts only the PostgreSQL database service.
+- **`./start_data_api.sh`**: Starts only the Python data API service.
+- **`./start_incighder_dev.sh`**: Starts the Next.js development server and streams logs.
+
 
 ---
 
