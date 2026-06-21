@@ -19,6 +19,7 @@ import { ScoreBadge } from "@/components/score-badge";
 import { MetricGrid } from "@/components/metric-grid";
 import { SourcesPanel } from "@/components/sources-panel";
 import { DeleteArtistDialog } from "@/components/delete-artist-dialog";
+import { GrowthSection } from "@/components/growth-section";
 
 const fieldClass =
   "flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm outline-none transition-[color,box-shadow] placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50";
@@ -276,6 +277,12 @@ function ArtistDetail() {
         </h2>
         <MetricGrid artist={artist} />
       </div>
+
+      {/* Growth */}
+      <GrowthSection
+        artistId={artistId}
+        refreshSignal={artist.scrape_meta ? JSON.stringify(artist.scrape_meta) : ""}
+      />
 
       {/* Sources */}
       <SourcesPanel artist={artist} onScraped={setArtist} />

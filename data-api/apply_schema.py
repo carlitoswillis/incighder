@@ -14,7 +14,7 @@ def apply_schema():
 
         with open("schema.sql", "r") as f:
             sql = f.read()
-            cur.execute("DROP TABLE IF EXISTS tracks, albums, artists CASCADE;")
+            cur.execute("DROP TABLE IF EXISTS metric_snapshots, tracks, albums, artists CASCADE;")
             cur.execute(sql)
 
         conn.commit()

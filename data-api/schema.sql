@@ -57,3 +57,16 @@ CREATE TABLE tracks (
     album_id VARCHAR(255) REFERENCES albums(id),
     artist_id VARCHAR(255) REFERENCES artists(id)
 );
+
+-- Per-account metric snapshots for growth-over-time tracking. account_key ties a
+-- data point to the specific linked profile, so switching to a different account
+-- starts a fresh timeline instead of registering a fake jump.
+CREATE TABLE metric_snapshots (
+    id SERIAL PRIMARY KEY,
+    artist_id VARCHAR(255) REFERENCES artists(id) ON DELETE CASCADE,
+    platform VARCHAR(32) NOT NULL,
+    account_key VARCHAR(255),
+    value BIGINT,
+    captured_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_snapshots_lookup ON metric_snapshots (artist_id, platform, captured_at);

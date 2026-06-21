@@ -8,7 +8,10 @@ from __future__ import annotations
 
 import json
 import os
+import re
+from collections import defaultdict
 from datetime import datetime, timedelta, timezone
+from urllib.parse import urlparse
 
 from scrapeArtistData import get_db_connection
 from scrapers.base import ScrapeResult
@@ -43,6 +46,15 @@ PLATFORM_COLUMNS = {
                    "soundcloud_top_track", "soundcloud_top_track_plays"],
     "instagram": ["instagram_followers", "instagram_posts", "instagram_verified"],
     "tiktok": ["tiktok_followers", "tiktok_likes", "tiktok_video_count"],
+}
+
+# The headline follower-type metric per platform, snapshotted for growth tracking.
+PRIMARY_METRIC = {
+    "spotify": "monthly_listeners",
+    "youtube": "youtube_subscribers",
+    "soundcloud": "soundcloud_followers",
+    "instagram": "instagram_followers",
+    "tiktok": "tiktok_followers",
 }
 
 
@@ -134,6 +146,23 @@ def scrape_artist(artist_id: str, links: dict | None = None, force: bool = False
             )
             updated_row = cur.fetchone()
             updated_cols = [d[0] for d in cur.description]
+
+        with conn.cursor() as cur:
+            for platform in PLATFORMS:
+                r = results.get(platform)
+                if not r or not r.get("ok") or r.get("skipped"):
+                    continue
+                metric = PRIMARY_METRIC.get(platform)
+                value = r.get("data", {}).get(metric) if metric else None
+                if value is None:
+                    continue
+                _maybe_snapshot(
+                    cur,
+                    artist_id,
+                    platform,
+                    _account_key(platform, merged_links.get(platform), r.get("data", {}), artist),
+                    value,
+                )
         conn.commit()
         return {"results": results, "artist": dict(zip(updated_cols, updated_row))}
     finally:
@@ -175,3 +204,78 @@ def clear_platform(artist_id: str, platform: str) -> dict:
         return dict(zip(updated_cols, updated_row))
     finally:
         conn.close()
+
+
+def _account_key(platform, link, data, artist):
+    """Stable identity for the specific linked account, so growth is measured within
+    one account's timeline (not across a wrong -> right account switch)."""
+    if platform == "youtube":
+        return data.get("youtube_channel_id")
+    if platform == "soundcloud":
+        uid = data.get("soundcloud_user_id")
+        return f"sc:{uid}" if uid is not None else None
+    if platform == "spotify":
+        m = re.search(r"artist/([A-Za-z0-9]+)", link or "")
+        return m.group(1) if m else (artist.get("spotify_id") or None)
+    if platform in ("instagram", "tiktok"):
+        if not link:
+            return None
+        segs = [s for s in urlparse(link).path.split("/") if s]
+        return f"{platform}:{segs[0].lstrip('@').lower()}" if segs else None
+    return None
+
+
+def _maybe_snapshot(cur, artist_id, platform, account_key, value):
+    cur.execute(
+        "SELECT value FROM metric_snapshots WHERE artist_id = %s AND platform = %s "
+        "AND account_key IS NOT DISTINCT FROM %s ORDER BY captured_at DESC LIMIT 1",
+        (artist_id, platform, account_key),
+    )
+    last = cur.fetchone()
+    if last and last[0] == value:
+        return  # unchanged for this account; skip duplicate point
+    cur.execute(
+        "INSERT INTO metric_snapshots (artist_id, platform, account_key, value) "
+        "VALUES (%s, %s, %s, %s)",
+        (artist_id, platform, account_key, value),
+    )
+
+
+def metric_history(artist_id: str) -> dict:
+    """Per-platform follower time series for the CURRENTLY-linked account only."""
+    conn = get_db_connection()
+    if not conn:
+        raise RuntimeError("database connection failed")
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT platform, account_key, captured_at, value FROM metric_snapshots "
+                "WHERE artist_id = %s ORDER BY captured_at",
+                (artist_id,),
+            )
+            rows = cur.fetchall()
+    finally:
+        conn.close()
+
+    by_platform = defaultdict(list)
+    for platform, account_key, ts, value in rows:
+        by_platform[platform].append((account_key, ts, value))
+
+    out: dict = {}
+    for platform, series in by_platform.items():
+        current_key = series[-1][0]  # most recent account wins
+        pts = [
+            {"t": ts.isoformat(), "v": int(value)}
+            for (account_key, ts, value) in series
+            if account_key == current_key
+        ]
+        if pts:
+            out[platform] = {
+                "account_key": current_key,
+                "points": pts,
+                "current": pts[-1]["v"],
+                "first": pts[0]["v"],
+                "change": pts[-1]["v"] - pts[0]["v"],
+                "since": pts[0]["t"],
+            }
+    return out

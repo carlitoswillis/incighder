@@ -6,7 +6,7 @@ import sys
 import atexit
 import traceback
 
-from scrape_service import scrape_artist, clear_platform
+from scrape_service import scrape_artist, clear_platform, metric_history
 from scrapers.discovery import discover_links
 from link_preview import link_preview
 from scrapers.base import shutdown as _scraper_shutdown
@@ -101,6 +101,18 @@ def preview():
         return jsonify(link_preview(url)), 200
     except Exception as e:
         print(f"Preview error: {e}", file=sys.stderr)
+        return jsonify({}), 200
+
+@app.route('/history', methods=['GET'])
+def history():
+    artist_id = request.args.get('artist_id')
+    if not artist_id:
+        return jsonify({'error': 'artist_id is required'}), 400
+    try:
+        return jsonify(metric_history(artist_id)), 200
+    except Exception as e:
+        print(f"History error: {e}", file=sys.stderr)
+        traceback.print_exc(file=sys.stderr)
         return jsonify({}), 200
 
 @app.route('/clear_source', methods=['POST'])

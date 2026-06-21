@@ -35,12 +35,12 @@ PURPOSE: Tracks active work and backlog. AI agents should update this after comp
 - (nothing in progress — design overhaul shipped; pick next from Backlog)
 
 ## Backlog
-- [ ] Implement historical data tracking for followers
 - [ ] Add export artist data and bulk export artist data
 
 ## Completed
 - [x] UI design overhaul (Phases A–D): shadcn dark slate/cyan system, all pages redesigned (`DESIGN_OVERHAUL_PLAN.md`)
 - [x] Scraping Phase 0-4: scrapers + `/scrape` + auto-discovery (`/discover`) + metrics across the UI (`SCRAPING_PLAN.md`)
+- [x] Growth-over-time: per-account metric snapshots + `/history` + sparklines (account-keyed so re-linking doesn't fake growth)
 - [x] Implement artist editing functionality (PATCH requests)
 - [x] Enable navigation to new artist page
 - [x] Add navigation bar
