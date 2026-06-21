@@ -158,6 +158,11 @@ via its api-v2 user search (same `client_id` the scraper extracts);
 `guess`). **Spotify** is omitted (the UI fills it from the stored `spotify_id`).
 Results are *suggestions* — the user confirms before scraping.
 
+Guessed Instagram/TikTok handles are **AI-verified**: the profile's OG preview is fed
+to a local LLM (Ollama, `qwen2.5-coder:14b`) that judges whether it's really the
+artist, returning a `verdict` (match / uncertain / mismatch). The panel flags
+uncertain/mismatch links so wrong auto-links get caught before scraping.
+
 ## 9. Caching & Freshness
 
 - Per-platform 24h TTL stored in `scrape_meta.<platform>.last_scraped_at`.

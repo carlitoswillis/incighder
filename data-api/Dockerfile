@@ -20,6 +20,7 @@ COPY data-api/spotify_search.py .
 COPY data-api/insert_artist_from_json.py .
 COPY data-api/scrape_service.py .
 COPY data-api/link_preview.py .
+COPY data-api/ai_verify.py .
 COPY data-api/scrapers ./scrapers
 COPY data-api/schema.sql .
 

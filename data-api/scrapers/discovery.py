@@ -64,6 +64,29 @@ def _soundcloud(name: str) -> str | None:
     return None
 
 
+def _verified_guess(name: str, platform: str, url: str) -> dict:
+    """A best-guess handle, AI-verified against the profile's preview when possible."""
+    cand: dict = {"url": url, "guess": True, "verdict": "unknown"}
+    try:
+        from link_preview import link_preview
+        from ai_verify import verify_account
+
+        prev = link_preview(url)
+        text = " | ".join(filter(None, [prev.get("title"), prev.get("description")])) or url
+        v = verify_account(name, platform, text)
+        if v:
+            cand.update(confidence=v["confidence"], match=v["match"], reason=v["reason"])
+            if v["match"] and v["confidence"] >= 0.6:
+                cand["verdict"] = "match"
+            elif not v["match"] and v["confidence"] >= 0.6:
+                cand["verdict"] = "mismatch"
+            else:
+                cand["verdict"] = "uncertain"
+    except Exception:
+        pass
+    return cand
+
+
 def discover_links(name: str, platforms: list[str] | None = None) -> dict:
     name = (name or "").strip()
     if not name:
@@ -75,14 +98,14 @@ def discover_links(name: str, platforms: list[str] | None = None) -> dict:
     if "youtube" in wanted:
         yt = _youtube(name)
         if yt:
-            out["youtube"] = {"url": yt}
+            out["youtube"] = {"url": yt, "verdict": "verified"}
     if "soundcloud" in wanted:
         sc = _soundcloud(name)
         if sc:
-            out["soundcloud"] = {"url": sc}
+            out["soundcloud"] = {"url": sc, "verdict": "verified"}
     if "instagram" in wanted and slug:
-        out["instagram"] = {"url": f"https://www.instagram.com/{slug}", "guess": True}
+        out["instagram"] = _verified_guess(name, "instagram", f"https://www.instagram.com/{slug}")
     if "tiktok" in wanted and slug:
-        out["tiktok"] = {"url": f"https://www.tiktok.com/@{slug}", "guess": True}
+        out["tiktok"] = _verified_guess(name, "tiktok", f"https://www.tiktok.com/@{slug}")
 
     return out

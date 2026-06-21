@@ -16,6 +16,7 @@ Incighder is a multi-service data application designed to aggregate and visualiz
 - **Role**: Specialized service for data ingestion, search, and transformation.
 - **Framework**: Python with Flask/FastAPI (or similar) using `spotipy` for Spotify and `psycopg2` for PostgreSQL.
 - **Isolation**: Handles heavy data lifting and external API interactions to keep the frontend lean.
+- **AI verification (optional dependency)**: auto-discovery cross-checks Instagram/TikTok guesses against the artist with a **local LLM via Ollama** (`OLLAMA_URL`, default `host.docker.internal:11434`; `OLLAMA_MODEL`, default `qwen2.5-coder:14b`). Free, private, best-effort — no paid AI APIs; if Ollama is unreachable, links fall back to unverified guesses. Reaches the host's Ollama via `extra_hosts: host.docker.internal:host-gateway` in `docker-compose.yml`.
 
 ### 3. Database (PostgreSQL)
 - **Role**: The source of truth for all artist metrics and historical data.

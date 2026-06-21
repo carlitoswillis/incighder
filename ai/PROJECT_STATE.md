@@ -35,12 +35,15 @@ PURPOSE: Tracks active work and backlog. AI agents should update this after comp
 - (nothing in progress — design overhaul shipped; pick next from Backlog)
 
 ## Backlog
-- [ ] Add export artist data and bulk export artist data
+- [ ] Add bulk import of artist data (list a few artists, and add them to the data set automatically, scraping the suggest social media sites etc.)
+- [ ] scheduled auto-scrape for growth
+- [ ] Add export artist data and  export artist data
 
 ## Completed
 - [x] UI design overhaul (Phases A–D): shadcn dark slate/cyan system, all pages redesigned (`DESIGN_OVERHAUL_PLAN.md`)
 - [x] Scraping Phase 0-4: scrapers + `/scrape` + auto-discovery (`/discover`) + metrics across the UI (`SCRAPING_PLAN.md`)
 - [x] Growth-over-time: per-account metric snapshots + `/history` + sparklines (account-keyed so re-linking doesn't fake growth)
+- [x] AI-verified discovery: local Ollama (`qwen2.5-coder`) checks auto-found IG/TikTok accounts are actually the artist; panel flags uncertain/mismatch (`ARCHITECTURE.md`)
 - [x] Implement artist editing functionality (PATCH requests)
 - [x] Enable navigation to new artist page
 - [x] Add navigation bar

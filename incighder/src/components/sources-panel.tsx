@@ -2,7 +2,15 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
-import { Loader2, RefreshCw, Sparkles, X } from "lucide-react";
+import {
+  Loader2,
+  RefreshCw,
+  Sparkles,
+  X,
+  BadgeCheck,
+  AlertTriangle,
+  ShieldAlert,
+} from "lucide-react";
 
 import type { Artist } from "@/lib/types";
 import { SCRAPED_PLATFORMS } from "@/lib/platforms";
@@ -14,6 +22,34 @@ import { Label } from "@/components/ui/label";
 import { LinkPreview } from "@/components/link-preview";
 
 type ScrapeStatus = { ok: boolean; error?: string | null; skipped?: string };
+type Verdict = { verdict: string; reason?: string; confidence?: number };
+
+const VERDICT_STYLE: Record<
+  string,
+  { cls: string; Icon: typeof BadgeCheck; label: string }
+> = {
+  match: { cls: "text-emerald-400", Icon: BadgeCheck, label: "AI: looks like the artist" },
+  verified: { cls: "text-emerald-400", Icon: BadgeCheck, label: "verified via official search" },
+  uncertain: { cls: "text-amber-400", Icon: AlertTriangle, label: "AI unsure — verify this" },
+  mismatch: { cls: "text-destructive", Icon: ShieldAlert, label: "AI: likely NOT the artist" },
+};
+
+function VerdictBadge({ v }: { v: Verdict }) {
+  const s = VERDICT_STYLE[v.verdict];
+  if (!s) return null;
+  const Icon = s.Icon;
+  return (
+    <div className={cn("flex items-start gap-1.5 text-xs", s.cls)}>
+      <Icon className="mt-px size-3.5 shrink-0" />
+      <span>
+        {s.label}
+        {v.reason ? (
+          <span className="text-muted-foreground"> — {v.reason}</span>
+        ) : null}
+      </span>
+    </div>
+  );
+}
 
 function initialLinks(artist: Artist): Record<string, string> {
   const links = artist.social_links || {};
@@ -47,6 +83,7 @@ export function SourcesPanel({
     null,
   );
   const [discovering, setDiscovering] = useState(false);
+  const [verdicts, setVerdicts] = useState<Record<string, Verdict>>({});
 
   async function handleDiscover() {
     setDiscovering(true);
@@ -61,18 +98,30 @@ export function SourcesPanel({
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Discovery failed");
-      const candidates: Record<string, { url?: string }> = data.candidates || {};
+      const candidates: Record<
+        string,
+        { url?: string; verdict?: string; reason?: string; confidence?: number }
+      > = data.candidates || {};
       const next = { ...links };
+      const nextVerdicts: Record<string, Verdict> = {};
       let filled = 0;
+      let flagged = 0;
       for (const p of SCRAPED_PLATFORMS) {
-        if (!next[p.key] && candidates[p.key]?.url) {
-          next[p.key] = candidates[p.key].url!;
-          filled++;
+        const c = candidates[p.key];
+        if (!c?.url || next[p.key]) continue; // don't clobber a user-entered link
+        next[p.key] = c.url;
+        filled++;
+        if (c.verdict && c.verdict !== "unknown") {
+          nextVerdicts[p.key] = { verdict: c.verdict, reason: c.reason, confidence: c.confidence };
+          if (c.verdict === "mismatch" || c.verdict === "uncertain") flagged++;
         }
       }
       setLinks(next);
+      setVerdicts((prev) => ({ ...prev, ...nextVerdicts }));
       if (filled)
-        toast.success(`Found ${filled} link${filled === 1 ? "" : "s"} — review, then scrape`);
+        toast.success(
+          `Found ${filled} link${filled === 1 ? "" : "s"}${flagged ? ` · ${flagged} flagged by AI` : ""} — review, then scrape`,
+        );
       else toast.info("No new links found");
     } catch (e) {
       toast.error(`Discovery failed: ${e instanceof Error ? e.message : String(e)}`);
@@ -107,6 +156,11 @@ export function SourcesPanel({
 
   async function handleRemove(platform: string, label: string) {
     setLinks((prev) => ({ ...prev, [platform]: "" }));
+    setVerdicts((prev) => {
+      const n = { ...prev };
+      delete n[platform];
+      return n;
+    });
     setResults((prev) => {
       if (!prev) return prev;
       const next = { ...prev };
@@ -149,9 +203,14 @@ export function SourcesPanel({
               <div className="flex items-center gap-2">
                 <Input
                   value={links[p.key] ?? ""}
-                  onChange={(e) =>
-                    setLinks({ ...links, [p.key]: e.target.value })
-                  }
+                  onChange={(e) => {
+                    setLinks({ ...links, [p.key]: e.target.value });
+                    setVerdicts((prev) => {
+                      const n = { ...prev };
+                      delete n[p.key];
+                      return n;
+                    });
+                  }}
                   placeholder={`${p.label} profile URL`}
                 />
                 {links[p.key] && (
@@ -185,6 +244,7 @@ export function SourcesPanel({
                     : `updated ${formatRelativeTime(meta.last_scraped_at)}`}
                 </span>
               )}
+              {verdicts[p.key] && <VerdictBadge v={verdicts[p.key]} />}
             </div>
           );
         })}
