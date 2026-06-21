@@ -3,7 +3,6 @@
 import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { toast } from "sonner";
 import { MoreHorizontal, Trash2, SquareArrowOutUpRight, Pencil } from "lucide-react";
 import { SiSpotify } from "react-icons/si";
 
@@ -20,15 +19,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-  DialogClose,
-} from "@/components/ui/dialog";
+import { DeleteArtistDialog } from "@/components/delete-artist-dialog";
 
 function parseGenres(genres: string | null): string[] {
   if (!genres) return [];
@@ -46,7 +37,6 @@ export function ArtistCard({
   onDeleted: (id: string) => void;
 }) {
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const [deleting, setDeleting] = useState(false);
 
   const genres = parseGenres(artist.genres);
   const image = artist.images?.[0]?.url ?? null;
@@ -56,20 +46,6 @@ export function ArtistCard({
     popularity: artist.popularity ?? 0,
     monthly_listeners: artist.monthly_listeners ?? null,
   });
-
-  async function handleDelete() {
-    setDeleting(true);
-    try {
-      const res = await fetch(`/api/artists/${artist.id}`, { method: "DELETE" });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      toast.success(`Removed ${artist.name}`);
-      onDeleted(artist.id);
-    } catch {
-      toast.error(`Failed to remove ${artist.name}`);
-      setDeleting(false);
-      setConfirmOpen(false);
-    }
-  }
 
   return (
     <>
@@ -177,27 +153,13 @@ export function ArtistCard({
         </div>
       </div>
 
-      <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Remove {artist.name}?</DialogTitle>
-            <DialogDescription>
-              This deletes the artist and all scraped metrics from your dataset.
-              This can&apos;t be undone.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <DialogClose render={<Button variant="outline" />}>Cancel</DialogClose>
-            <Button
-              variant="destructive"
-              onClick={handleDelete}
-              disabled={deleting}
-            >
-              {deleting ? "Removing…" : "Remove"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <DeleteArtistDialog
+        open={confirmOpen}
+        onOpenChange={setConfirmOpen}
+        artistId={artist.id}
+        artistName={artist.name}
+        onDeleted={() => onDeleted(artist.id)}
+      />
     </>
   );
 }

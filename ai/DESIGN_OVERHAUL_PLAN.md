@@ -185,9 +185,10 @@ incighder/src/
 - [x] Table: shadcn table + new metric columns (click-to-sort deferred to polish).
 - [x] Search and Add (restyled, toasts).
 
-**Phase D — Polish**
-- [ ] Sonner toasts wired app-wide; loading/empty/error states; mobile `Sheet` nav;
-      a11y + focus pass; confirm no inline styles remain.
+**Phase D — Polish** — done
+- [x] Mobile `Sheet` nav drawer; click-to-sort table columns; shared
+      `DeleteArtistDialog` (card + detail, no more `window.confirm`); toasts
+      app-wide; skeleton/empty states; token-driven focus rings.
 
 ## 11. Constraints & Non-Goals
 

@@ -18,6 +18,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ScoreBadge } from "@/components/score-badge";
 import { MetricGrid } from "@/components/metric-grid";
 import { SourcesPanel } from "@/components/sources-panel";
+import { DeleteArtistDialog } from "@/components/delete-artist-dialog";
 
 const fieldClass =
   "flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm outline-none transition-[color,box-shadow] placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50";
@@ -40,6 +41,7 @@ function ArtistDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showEdit, setShowEdit] = useState(searchParams.get("edit") === "true");
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const [form, setForm] = useState({
     name: "",
     genres: "",
@@ -123,18 +125,6 @@ function ArtistDetail() {
     }
   }
 
-  async function handleDelete() {
-    if (!confirm("Remove this artist and all its metrics?")) return;
-    try {
-      const r = await fetch(`/api/artists/${artistId}`, { method: "DELETE" });
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      toast.success("Artist removed");
-      router.push("/");
-    } catch (e) {
-      toast.error(`Failed to remove: ${e instanceof Error ? e.message : String(e)}`);
-    }
-  }
-
   if (loading)
     return (
       <div className="space-y-6">
@@ -205,7 +195,7 @@ function ArtistDetail() {
           <Button
             variant="destructive"
             size="icon"
-            onClick={handleDelete}
+            onClick={() => setDeleteOpen(true)}
             aria-label="Remove artist"
           >
             <Trash2 />
@@ -289,6 +279,14 @@ function ArtistDetail() {
 
       {/* Sources */}
       <SourcesPanel artist={artist} onScraped={setArtist} />
+
+      <DeleteArtistDialog
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        artistId={artistId}
+        artistName={artist.name}
+        onDeleted={() => router.push("/")}
+      />
     </div>
   );
 }
