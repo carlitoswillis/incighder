@@ -148,13 +148,15 @@ Surface the new metrics on the home cards (`/`), the table (`/table`, new sortab
 columns), and the detail page. Keep `score.ts` as-is for now; a later pass can fold
 the new signals into the score.
 
-## 8. Discovery Flow (DuckDuckGo, free)
+## 8. Discovery Flow (free, no paid search API)
 
-`discovery.py` queries `https://html.duckduckgo.com/html/?q=...` with a normal UA,
-e.g. `"<artist>" site:instagram.com` per platform. Parse result anchors, decode the
-`uddg=` redirect to the real URL, filter by platform domain, return the top
-candidate per platform. Same throttle/jitter rules apply. Results are *suggestions* —
-the user confirms before anything is scraped.
+DuckDuckGo and Bing both bot-challenge server IPs (202 interstitials / shifting
+markup), so search-scraping was dropped. `discovery.py` instead uses a reliable path
+per platform: **YouTube** via the official Data API channel search; **SoundCloud**
+via its api-v2 user search (same `client_id` the scraper extracts);
+**Instagram/TikTok** via a best-guess handle from the artist name (flagged
+`guess`). **Spotify** is omitted (the UI fills it from the stored `spotify_id`).
+Results are *suggestions* — the user confirms before scraping.
 
 ## 9. Caching & Freshness
 
@@ -192,13 +194,16 @@ the user confirms before anything is scraped.
 - [x] Manual `x_followers` field in the edit form (PATCH-allowlisted); the edit
       form now only sends edited fields so it no longer clobbers scraped values.
 
-**Phase 3 — Discovery**
-- [ ] `discovery.py` (DuckDuckGo) + `POST /discover` + Next.js `/api/discover`.
-- [ ] Auto-discover button → candidate links → user confirm flow.
+**Phase 3 — Discovery** — done
+- [x] `discovery.py` (hybrid: YouTube Data API channel search + SoundCloud api-v2
+      user search + IG/TikTok handle guess; DDG/Bing scraping dropped — both
+      bot-block server IPs) + `POST /discover` + Next.js `/api/discover`.
+- [x] "Auto-discover" button fills candidate links for the user to confirm.
 
-**Phase 4 — Display & polish**
-- [ ] New metrics on cards, table (sortable), detail page; freshness indicators.
-- [ ] (Optional) fold signals into `score.ts`; (optional) scheduled refresh.
+**Phase 4 — Display & polish** — done (via the design overhaul)
+- [x] Metrics on home cards (`StatTile`s), sortable table columns, detail
+      `MetricGrid`; freshness ("updated Xh ago") in the `SourcesPanel`.
+- [ ] (Optional, deferred) fold signals into `score.ts`; scheduled refresh.
 
 ## 11. Prerequisites
 

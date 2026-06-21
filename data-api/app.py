@@ -7,6 +7,7 @@ import atexit
 import traceback
 
 from scrape_service import scrape_artist
+from scrapers.discovery import discover_links
 from scrapers.base import shutdown as _scraper_shutdown
 
 app = Flask(__name__)
@@ -73,6 +74,20 @@ def scrape():
         return jsonify({'error': 'Artist not found'}), 404
     except Exception as e:
         print(f"Scrape error: {e}", file=sys.stderr)
+        traceback.print_exc(file=sys.stderr)
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/discover', methods=['POST'])
+def discover():
+    data = request.json or {}
+    name = data.get('name')
+    if not name:
+        return jsonify({'error': 'name is required'}), 400
+    try:
+        candidates = discover_links(name, data.get('platforms'))
+        return jsonify({'candidates': candidates}), 200
+    except Exception as e:
+        print(f"Discover error: {e}", file=sys.stderr)
         traceback.print_exc(file=sys.stderr)
         return jsonify({'error': str(e)}), 500
 

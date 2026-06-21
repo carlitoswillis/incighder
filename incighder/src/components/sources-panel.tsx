@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
-import { Loader2, RefreshCw } from "lucide-react";
+import { Loader2, RefreshCw, Sparkles } from "lucide-react";
 
 import type { Artist } from "@/lib/types";
 import { SCRAPED_PLATFORMS } from "@/lib/platforms";
@@ -45,6 +45,40 @@ export function SourcesPanel({
   const [results, setResults] = useState<Record<string, ScrapeStatus> | null>(
     null,
   );
+  const [discovering, setDiscovering] = useState(false);
+
+  async function handleDiscover() {
+    setDiscovering(true);
+    try {
+      const res = await fetch("/api/discover", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: artist.name,
+          platforms: SCRAPED_PLATFORMS.map((p) => p.key),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Discovery failed");
+      const candidates: Record<string, { url?: string }> = data.candidates || {};
+      const next = { ...links };
+      let filled = 0;
+      for (const p of SCRAPED_PLATFORMS) {
+        if (!next[p.key] && candidates[p.key]?.url) {
+          next[p.key] = candidates[p.key].url!;
+          filled++;
+        }
+      }
+      setLinks(next);
+      if (filled)
+        toast.success(`Found ${filled} link${filled === 1 ? "" : "s"} — review, then scrape`);
+      else toast.info("No new links found");
+    } catch (e) {
+      toast.error(`Discovery failed: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setDiscovering(false);
+    }
+  }
 
   async function handleScrape() {
     setScraping(true);
@@ -119,7 +153,22 @@ export function SourcesPanel({
         })}
       </div>
 
-      <div className="mt-5 flex items-center gap-4">
+      <div className="mt-5 flex flex-wrap items-center gap-3">
+        <Button
+          variant="outline"
+          onClick={handleDiscover}
+          disabled={discovering || scraping}
+        >
+          {discovering ? (
+            <>
+              <Loader2 className="animate-spin" /> Finding…
+            </>
+          ) : (
+            <>
+              <Sparkles /> Auto-discover
+            </>
+          )}
+        </Button>
         <Button onClick={handleScrape} disabled={scraping}>
           {scraping ? (
             <>
