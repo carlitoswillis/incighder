@@ -3,7 +3,7 @@
 PURPOSE: High-level summary of the system's current focus and recent changes to prevent agent drift.
 
 ## Last Updated: 2026-06-20
-## Current Focus: Cross-Platform Scraping (see `SCRAPING_PLAN.md`)
+## Current Focus: UI Design Overhaul (see `DESIGN_OVERHAUL_PLAN.md`) — scraping paused at Phase 2
 
 ## Project Goal
 Build a data application that provides a holistic view of an artist's online traction and potential, starting with Spotify and expanding to YouTube, SoundCloud, and social media.
@@ -31,11 +31,12 @@ Build a data application that provides a holistic view of an artist's online tra
 
 PURPOSE: Tracks active work and backlog. AI agents should update this after completing tasks.
 
-## Active (Phase D: Scraping) — detailed in `SCRAPING_PLAN.md`
-- [ ] Phase 3: DuckDuckGo auto-discovery of profile links
+## Active
+- [ ] UI design overhaul — full plan in `DESIGN_OVERHAUL_PLAN.md` (handed to another agent)
 
-## Backlog
-- [ ] Phase 4: display metrics across card/table/detail; freshness indicators
+## Paused / Backlog
+- [ ] Scraping Phase 3: DuckDuckGo auto-discovery of profile links (`SCRAPING_PLAN.md`)
+- [ ] Scraping Phase 4: metrics on cards/table + freshness indicators (`SCRAPING_PLAN.md`)
 - [ ] Implement historical data tracking for followers
 
 ## Completed
