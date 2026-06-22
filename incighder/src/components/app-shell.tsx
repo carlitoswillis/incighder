@@ -18,6 +18,7 @@ import {
 const NAV = [
   { href: "/", label: "Artists" },
   { href: "/table", label: "Table" },
+  { href: "/discover", label: "Discover" },
   { href: "/search_spotify", label: "Search" },
 ];
 

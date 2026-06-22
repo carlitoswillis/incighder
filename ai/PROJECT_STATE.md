@@ -2,13 +2,14 @@
 
 PURPOSE: High-level summary of the system's current focus and recent changes to prevent agent drift.
 
-## Last Updated: 2026-06-20
-## Current Focus: Scraping (Phases 0–4) and the design overhaul are both shipped. Backlog: historical tracking, data export.
+## Last Updated: 2026-06-21
+## Current Focus: Artist discovery (seed -> similar artists) just shipped. Backlog: scheduled auto-scrape, data export.
 
 ## Project Goal
 Build a data application that provides a holistic view of an artist's online traction and potential, starting with Spotify and expanding to YouTube, SoundCloud, and social media.
 
 ## Recent Changes
+- **Artist Discovery**: New `/discover` page — seed artist → Last.fm `getSimilar` → Spotify-enriched grid (followers/popularity + Last.fm listeners/playcount/tags), one-click "Track" reuses the insert pipeline; already-tracked artists are marked. Backend `similar_artists.py` + `/similar_artists` route; uses `LAST_FM_API_KEY`.
 - **Scraping Plan**: Authored `SCRAPING_PLAN.md` for cross-platform metric scraping.
 - **Cleanup**: Fixed substrate drift, removed dead endpoints, guarded PATCH against column-name injection (branch `fix/substrate-and-api-cleanup`).
 - **Artist Editing**: Implemented PATCH request handling for artist info updates.
@@ -38,8 +39,10 @@ PURPOSE: Tracks active work and backlog. AI agents should update this after comp
 - [ ] Add bulk import of artist data (list a few artists, and add them to the data set automatically, scraping the suggest social media sites etc.)
 - [ ] scheduled auto-scrape for growth
 - [ ] Add export artist data and  export artist data
+- [x] Deploy with ngrok or cloudflared
 
 ## Completed
+- [x] Artist discovery: `/discover` page (seed → Last.fm similar → Spotify-enriched grid → one-click Track)
 - [x] UI design overhaul (Phases A–D): shadcn dark slate/cyan system, all pages redesigned (`DESIGN_OVERHAUL_PLAN.md`)
 - [x] Scraping Phase 0-4: scrapers + `/scrape` + auto-discovery (`/discover`) + metrics across the UI (`SCRAPING_PLAN.md`)
 - [x] Growth-over-time: per-account metric snapshots + `/history` + sparklines (account-keyed so re-linking doesn't fake growth)

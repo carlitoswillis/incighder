@@ -18,6 +18,10 @@ Incighder is a professional data application designed to help recording artists,
   - Throttles requests sequentially with random jitter (delay range configurable).
   - Employs realistic headers, browser stealth options, and automatic backoffs (`429`/`403`).
   - Graceful degradation: A failure on one platform never blocks the retrieval of data from other platforms.
+- **Artist Discovery** (`/discover`):
+  - Enter a seed artist and get a grid of **similar artists** to scout, powered by the free **Last.fm `getSimilar`** graph (Spotify's related-artists API was retired in late 2024).
+  - Each result is enriched with Spotify metrics (followers, popularity, top track) plus Last.fm global listeners, playcount, and tags, and shows a similarity match score.
+  - **One-click "Track"** ingests any similar artist into the dataset via the existing insert pipeline; artists you already track are marked so you only add what's new.
 - **Auto-Discovery & AI Verification**:
   - Automatically searches for and suggests official YouTube channels and SoundCloud profiles.
   - Generates best-guess candidate handles for Instagram and TikTok.
@@ -88,6 +92,9 @@ SPOTIFY_CLIENT_SECRET=your_spotify_client_secret
 # YouTube Data API Key (Required for YouTube scraping & channel discovery)
 YOUTUBE_API_KEY=your_youtube_api_key
 
+# Last.fm API Key (Required for the /discover similar-artists feature)
+LAST_FM_API_KEY=your_lastfm_api_key
+
 # Local Ollama URL (Optional; defaults to http://host.docker.internal:11434 for Docker)
 OLLAMA_URL=http://host.docker.internal:11434
 OLLAMA_MODEL=qwen2.5-coder:14b
@@ -140,6 +147,7 @@ For more customized development workflows, we also provide several helper script
 
 - **Home Page (`/`)**: Displays card layouts of all tracked artists, showcasing their key indicators (Spotify popularity, followers, top track metrics) and visual sparklines showing metric history.
 - **Table View (`/table`)**: A spreadsheet-style breakdown displaying all platform follower counts side-by-side. Sortable by platform metrics.
+- **Discover (`/discover`)**: Enter a seed artist to surface similar artists (Last.fm) enriched with Spotify and Last.fm metrics; one-click "Track" adds any of them to the dataset, with already-tracked artists marked.
 - **Add Artist (`/artists/add`)**: Search for an artist on Spotify and ingest their baseline metrics into the local PostgreSQL database.
 - **Artist Detail (`/artists/[id]`)**:
   - Displays detailed stats grids and a track summary.

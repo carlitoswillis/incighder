@@ -58,6 +58,28 @@ def spotify_search():
         print(f"Unexpected error (spotify_search): {e}", file=sys.stderr)
         return jsonify({'error': str(e)}), 500
 
+@app.route('/similar_artists', methods=['GET'])
+def similar_artists_route():
+    query = request.args.get('q')
+    if not query:
+        return jsonify({'error': 'Missing seed artist name'}), 400
+
+    try:
+        process = subprocess.run(
+            ['python', 'similar_artists.py'],
+            input=query, text=True, capture_output=True, check=True
+        )
+        return jsonify(json.loads(process.stdout)), 200
+    except subprocess.CalledProcessError as e:
+        print(f"Subprocess error (similar_artists): STDOUT: {e.stdout}, STDERR: {e.stderr}", file=sys.stderr)
+        return jsonify({'error': e.stderr.strip() if e.stderr else 'Unknown subprocess error'}), 500
+    except json.JSONDecodeError as json_e:
+        print(f"JSON decode error (similar_artists): {json_e}. Raw stdout: {process.stdout}, Raw stderr: {process.stderr}", file=sys.stderr)
+        return jsonify({'error': 'Invalid JSON response from script'}), 500
+    except Exception as e:
+        print(f"Unexpected error (similar_artists): {e}", file=sys.stderr)
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/scrape', methods=['POST'])
 def scrape():
     data = request.json or {}
