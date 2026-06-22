@@ -1,5 +1,5 @@
 # AI Context Bundle
-Generated: Sun Jun 21 14:48:03 PDT 2026
+Generated: Sun Jun 21 20:00:39 PDT 2026
 
 ## ⚠️ Agent Navigation Guide
 1. Start with the **Current State** below to understand the focus.
@@ -56,6 +56,8 @@ Incighder is a multi-service data application designed to aggregate and visualiz
 - **Role**: Specialized service for data ingestion, search, and transformation.
 - **Framework**: Python with Flask/FastAPI (or similar) using `spotipy` for Spotify and `psycopg2` for PostgreSQL.
 - **Isolation**: Handles heavy data lifting and external API interactions to keep the frontend lean.
+- **Artist discovery (similar artists)**: `/discover` seeds on an artist name and uses the free **Last.fm `artist.getSimilar`** graph (Spotify's related-artists API was retired in late 2024) for similarity, then enriches each result via the existing Spotify search and Last.fm `artist.getInfo`. Backed by `similar_artists.py` + the `/similar_artists` route; requires `LAST_FM_API_KEY`. "Track" reuses the standard `/insert_artist` pipeline.
+- **AI verification (optional dependency)**: auto-discovery cross-checks Instagram/TikTok guesses against the artist with a **local LLM via Ollama** (`OLLAMA_URL`, default `host.docker.internal:11434`; `OLLAMA_MODEL`, default `qwen2.5-coder:14b`). Free, private, best-effort — no paid AI APIs; if Ollama is unreachable, links fall back to unverified guesses. Reaches the host's Ollama via `extra_hosts: host.docker.internal:host-gateway` in `docker-compose.yml`.
 
 ### 3. Database (PostgreSQL)
 - **Role**: The source of truth for all artist metrics and historical data.
@@ -68,6 +70,7 @@ Incighder is a multi-service data application designed to aggregate and visualiz
 
 ## Data Flow
 1. **Search**: User triggers search in Next.js -> API Route -> `data-api` (Python) -> Spotify/YouTube APIs.
+1b. **Discover**: Seed name -> API Route -> `data-api` -> Last.fm `getSimilar` -> Spotify/Last.fm enrichment -> similar-artist grid; "Track" feeds the ingestion path below.
 2. **Ingestion**: `data-api` transforms raw API data and inserts it into PostgreSQL.
 3. **Display**: Next.js fetches structured data from the `db` via API routes and renders the dashboard.
 
@@ -82,13 +85,14 @@ This repository uses an AI-assisted engineering substrate located in `ai/`.
 
 PURPOSE: High-level summary of the system's current focus and recent changes to prevent agent drift.
 
-## Last Updated: 2026-06-20
-## Current Focus: Scraping (Phases 0–4) and the design overhaul are both shipped. Backlog: historical tracking, data export.
+## Last Updated: 2026-06-21
+## Current Focus: Artist discovery (seed -> similar artists) just shipped. Backlog: scheduled auto-scrape, data export.
 
 ## Project Goal
 Build a data application that provides a holistic view of an artist's online traction and potential, starting with Spotify and expanding to YouTube, SoundCloud, and social media.
 
 ## Recent Changes
+- **Artist Discovery**: New `/discover` page — seed artist → Last.fm `getSimilar` → Spotify-enriched grid (followers/popularity + Last.fm listeners/playcount/tags), one-click "Track" reuses the insert pipeline; already-tracked artists are marked. Backend `similar_artists.py` + `/similar_artists` route; uses `LAST_FM_API_KEY`.
 - **Scraping Plan**: Authored `SCRAPING_PLAN.md` for cross-platform metric scraping.
 - **Cleanup**: Fixed substrate drift, removed dead endpoints, guarded PATCH against column-name injection (branch `fix/substrate-and-api-cleanup`).
 - **Artist Editing**: Implemented PATCH request handling for artist info updates.
@@ -115,12 +119,17 @@ PURPOSE: Tracks active work and backlog. AI agents should update this after comp
 - (nothing in progress — design overhaul shipped; pick next from Backlog)
 
 ## Backlog
-- [ ] Implement historical data tracking for followers
-- [ ] Add export artist data and bulk export artist data
+- [ ] Add bulk import of artist data (list a few artists, and add them to the data set automatically, scraping the suggest social media sites etc.)
+- [ ] scheduled auto-scrape for growth
+- [ ] Add export artist data and  export artist data
+- [x] Deploy with ngrok or cloudflared
 
 ## Completed
+- [x] Artist discovery: `/discover` page (seed → Last.fm similar → Spotify-enriched grid → one-click Track)
 - [x] UI design overhaul (Phases A–D): shadcn dark slate/cyan system, all pages redesigned (`DESIGN_OVERHAUL_PLAN.md`)
 - [x] Scraping Phase 0-4: scrapers + `/scrape` + auto-discovery (`/discover`) + metrics across the UI (`SCRAPING_PLAN.md`)
+- [x] Growth-over-time: per-account metric snapshots + `/history` + sparklines (account-keyed so re-linking doesn't fake growth)
+- [x] AI-verified discovery: local Ollama (`qwen2.5-coder`) checks auto-found IG/TikTok accounts are actually the artist; panel flags uncertain/mismatch (`ARCHITECTURE.md`)
 - [x] Implement artist editing functionality (PATCH requests)
 - [x] Enable navigation to new artist page
 - [x] Add navigation bar
@@ -163,11 +172,13 @@ PURPOSE: Tracks active work and backlog. AI agents should update this after comp
 ./data-api/schema.sql
 ./data-api/link_preview.py
 ./data-api/Dockerfile
+./data-api/ai_verify.py
 ./data-api/followerCounts.py
 ./data-api/scrapeArtistData.py
 ./data-api/__pycache__
 ./data-api/artistSoundCloudScrape.py
 ./data-api/flush_db.py
+./data-api/similar_artists.py
 ./data-api/wait-for-it.sh
 ./data-api/insert_artist_from_json.py
 ./data-api/app.py
@@ -189,113 +200,113 @@ PURPOSE: Tracks active work and backlog. AI agents should update this after comp
 
 ## 5. Recent Git Changes (Summary)
 ```text
-a02197c feat(scraping): Phase 3 — auto-discovery of profile links
-994a8a4 feat(ui): design overhaul Phase D — polish
-e988b1c feat(ui): design overhaul Phase B+C — all pages redesigned
-45bcd7e feat(ui): design overhaul Phase A — shadcn + dark slate/cyan system
-240e542 feat(scraping): Phase 2 - Instagram + TikTok scrapers + manual X
+77ff62f feat(discovery): /discover page — seed artist → similar artists
+a3798b0 docs: prioritize docker compose up over bash wrapper scripts in README
+7563006 docs: update README to reflect cross-platform scrapers, Ollama verification, and growth history; rename package-lock project name
+8ca877b feat(discovery): AI-verify auto-found accounts via local Ollama
+930c784 feat(scraping): growth-over-time tracking (account-keyed)
 ```
 
 ## 6. Active Diff
 ```diff
+diff --git a/ai/ARCHITECTURE.md b/ai/ARCHITECTURE.md
+index 353a9ab..3f8d445 100644
+--- a/ai/ARCHITECTURE.md
++++ b/ai/ARCHITECTURE.md
+@@ -16,6 +16,7 @@ Incighder is a multi-service data application designed to aggregate and visualiz
+ - **Role**: Specialized service for data ingestion, search, and transformation.
+ - **Framework**: Python with Flask/FastAPI (or similar) using `spotipy` for Spotify and `psycopg2` for PostgreSQL.
+ - **Isolation**: Handles heavy data lifting and external API interactions to keep the frontend lean.
++- **Artist discovery (similar artists)**: `/discover` seeds on an artist name and uses the free **Last.fm `artist.getSimilar`** graph (Spotify's related-artists API was retired in late 2024) for similarity, then enriches each result via the existing Spotify search and Last.fm `artist.getInfo`. Backed by `similar_artists.py` + the `/similar_artists` route; requires `LAST_FM_API_KEY`. "Track" reuses the standard `/insert_artist` pipeline.
+ - **AI verification (optional dependency)**: auto-discovery cross-checks Instagram/TikTok guesses against the artist with a **local LLM via Ollama** (`OLLAMA_URL`, default `host.docker.internal:11434`; `OLLAMA_MODEL`, default `qwen2.5-coder:14b`). Free, private, best-effort — no paid AI APIs; if Ollama is unreachable, links fall back to unverified guesses. Reaches the host's Ollama via `extra_hosts: host.docker.internal:host-gateway` in `docker-compose.yml`.
+ 
+ ### 3. Database (PostgreSQL)
+@@ -29,6 +30,7 @@ Incighder is a multi-service data application designed to aggregate and visualiz
+ 
+ ## Data Flow
+ 1. **Search**: User triggers search in Next.js -> API Route -> `data-api` (Python) -> Spotify/YouTube APIs.
++1b. **Discover**: Seed name -> API Route -> `data-api` -> Last.fm `getSimilar` -> Spotify/Last.fm enrichment -> similar-artist grid; "Track" feeds the ingestion path below.
+ 2. **Ingestion**: `data-api` transforms raw API data and inserts it into PostgreSQL.
+ 3. **Display**: Next.js fetches structured data from the `db` via API routes and renders the dashboard.
+ 
 diff --git a/ai/CONTEXT_BUNDLE.md b/ai/CONTEXT_BUNDLE.md
-index 853a818..831ada5 100644
+index 6ae5b20..dbab740 100644
 --- a/ai/CONTEXT_BUNDLE.md
 +++ b/ai/CONTEXT_BUNDLE.md
 @@ -1,5 +1,5 @@
  # AI Context Bundle
--Generated: Sun Jun 21 14:41:22 PDT 2026
-+Generated: Sun Jun 21 14:48:03 PDT 2026
+-Generated: Sun Jun 21 14:48:03 PDT 2026
++Generated: Sun Jun 21 20:00:39 PDT 2026
  
  ## ⚠️ Agent Navigation Guide
  1. Start with the **Current State** below to understand the focus.
-@@ -161,6 +161,7 @@ PURPOSE: Tracks active work and backlog. AI agents should update this after comp
- ./data-api/scrape_service.py
- ./data-api/requirements.txt
+@@ -56,6 +56,8 @@ Incighder is a multi-service data application designed to aggregate and visualiz
+ - **Role**: Specialized service for data ingestion, search, and transformation.
+ - **Framework**: Python with Flask/FastAPI (or similar) using `spotipy` for Spotify and `psycopg2` for PostgreSQL.
+ - **Isolation**: Handles heavy data lifting and external API interactions to keep the frontend lean.
++- **Artist discovery (similar artists)**: `/discover` seeds on an artist name and uses the free **Last.fm `artist.getSimilar`** graph (Spotify's related-artists API was retired in late 2024) for similarity, then enriches each result via the existing Spotify search and Last.fm `artist.getInfo`. Backed by `similar_artists.py` + the `/similar_artists` route; requires `LAST_FM_API_KEY`. "Track" reuses the standard `/insert_artist` pipeline.
++- **AI verification (optional dependency)**: auto-discovery cross-checks Instagram/TikTok guesses against the artist with a **local LLM via Ollama** (`OLLAMA_URL`, default `host.docker.internal:11434`; `OLLAMA_MODEL`, default `qwen2.5-coder:14b`). Free, private, best-effort — no paid AI APIs; if Ollama is unreachable, links fall back to unverified guesses. Reaches the host's Ollama via `extra_hosts: host.docker.internal:host-gateway` in `docker-compose.yml`.
+ 
+ ### 3. Database (PostgreSQL)
+ - **Role**: The source of truth for all artist metrics and historical data.
+@@ -68,6 +70,7 @@ Incighder is a multi-service data application designed to aggregate and visualiz
+ 
+ ## Data Flow
+ 1. **Search**: User triggers search in Next.js -> API Route -> `data-api` (Python) -> Spotify/YouTube APIs.
++1b. **Discover**: Seed name -> API Route -> `data-api` -> Last.fm `getSimilar` -> Spotify/Last.fm enrichment -> similar-artist grid; "Track" feeds the ingestion path below.
+ 2. **Ingestion**: `data-api` transforms raw API data and inserts it into PostgreSQL.
+ 3. **Display**: Next.js fetches structured data from the `db` via API routes and renders the dashboard.
+ 
+@@ -82,13 +85,14 @@ This repository uses an AI-assisted engineering substrate located in `ai/`.
+ 
+ PURPOSE: High-level summary of the system's current focus and recent changes to prevent agent drift.
+ 
+-## Last Updated: 2026-06-20
+-## Current Focus: Scraping (Phases 0–4) and the design overhaul are both shipped. Backlog: historical tracking, data export.
++## Last Updated: 2026-06-21
++## Current Focus: Artist discovery (seed -> similar artists) just shipped. Backlog: scheduled auto-scrape, data export.
+ 
+ ## Project Goal
+ Build a data application that provides a holistic view of an artist's online traction and potential, starting with Spotify and expanding to YouTube, SoundCloud, and social media.
+ 
+ ## Recent Changes
++- **Artist Discovery**: New `/discover` page — seed artist → Last.fm `getSimilar` → Spotify-enriched grid (followers/popularity + Last.fm listeners/playcount/tags), one-click "Track" reuses the insert pipeline; already-tracked artists are marked. Backend `similar_artists.py` + `/similar_artists` route; uses `LAST_FM_API_KEY`.
+ - **Scraping Plan**: Authored `SCRAPING_PLAN.md` for cross-platform metric scraping.
+ - **Cleanup**: Fixed substrate drift, removed dead endpoints, guarded PATCH against column-name injection (branch `fix/substrate-and-api-cleanup`).
+ - **Artist Editing**: Implemented PATCH request handling for artist info updates.
+@@ -115,12 +119,17 @@ PURPOSE: Tracks active work and backlog. AI agents should update this after comp
+ - (nothing in progress — design overhaul shipped; pick next from Backlog)
+ 
+ ## Backlog
+-- [ ] Implement historical data tracking for followers
+-- [ ] Add export artist data and bulk export artist data
++- [ ] Add bulk import of artist data (list a few artists, and add them to the data set automatically, scraping the suggest social media sites etc.)
++- [ ] scheduled auto-scrape for growth
++- [ ] Add export artist data and  export artist data
++- [x] Deploy with ngrok or cloudflared
+ 
+ ## Completed
++- [x] Artist discovery: `/discover` page (seed → Last.fm similar → Spotify-enriched grid → one-click Track)
+ - [x] UI design overhaul (Phases A–D): shadcn dark slate/cyan system, all pages redesigned (`DESIGN_OVERHAUL_PLAN.md`)
+ - [x] Scraping Phase 0-4: scrapers + `/scrape` + auto-discovery (`/discover`) + metrics across the UI (`SCRAPING_PLAN.md`)
++- [x] Growth-over-time: per-account metric snapshots + `/history` + sparklines (account-keyed so re-linking doesn't fake growth)
++- [x] AI-verified discovery: local Ollama (`qwen2.5-coder`) checks auto-found IG/TikTok accounts are actually the artist; panel flags uncertain/mismatch (`ARCHITECTURE.md`)
+ - [x] Implement artist editing functionality (PATCH requests)
+ - [x] Enable navigation to new artist page
+ - [x] Add navigation bar
+@@ -163,11 +172,13 @@ PURPOSE: Tracks active work and backlog. AI agents should update this after comp
  ./data-api/schema.sql
-+./data-api/link_preview.py
+ ./data-api/link_preview.py
  ./data-api/Dockerfile
++./data-api/ai_verify.py
  ./data-api/followerCounts.py
  ./data-api/scrapeArtistData.py
-@@ -188,113 +189,12 @@ PURPOSE: Tracks active work and backlog. AI agents should update this after comp
- 
- ## 5. Recent Git Changes (Summary)
- ```text
-+a02197c feat(scraping): Phase 3 — auto-discovery of profile links
- 994a8a4 feat(ui): design overhaul Phase D — polish
- e988b1c feat(ui): design overhaul Phase B+C — all pages redesigned
- 45bcd7e feat(ui): design overhaul Phase A — shadcn + dark slate/cyan system
- 240e542 feat(scraping): Phase 2 - Instagram + TikTok scrapers + manual X
--3ee2d5d fix(scraping): Playwright per-call lifecycle + SoundCloud browser fallback
- ```
- 
- ## 6. Active Diff
- ```diff
--diff --git a/ai/CONTEXT_BUNDLE.md b/ai/CONTEXT_BUNDLE.md
--index c678ea8..a5fafcc 100644
----- a/ai/CONTEXT_BUNDLE.md
--+++ b/ai/CONTEXT_BUNDLE.md
--@@ -1,5 +1,5 @@
-- # AI Context Bundle
---Generated: Sat Jun 20 16:36:24 PDT 2026
--+Generated: Sun Jun 21 14:41:22 PDT 2026
-- 
-- ## ⚠️ Agent Navigation Guide
-- 1. Start with the **Current State** below to understand the focus.
--@@ -83,7 +83,7 @@ This repository uses an AI-assisted engineering substrate located in `ai/`.
-- PURPOSE: High-level summary of the system's current focus and recent changes to prevent agent drift.
-- 
-- ## Last Updated: 2026-06-20
---## Current Focus: Cross-Platform Scraping (see `SCRAPING_PLAN.md`)
--+## Current Focus: Scraping (Phases 0–4) and the design overhaul are both shipped. Backlog: historical tracking, data export.
-- 
-- ## Project Goal
-- Build a data application that provides a holistic view of an artist's online traction and potential, starting with Spotify and expanding to YouTube, SoundCloud, and social media.
--@@ -111,15 +111,16 @@ Build a data application that provides a holistic view of an artist's online tra
-- 
-- PURPOSE: Tracks active work and backlog. AI agents should update this after completing tasks.
-- 
---## Active (Phase D: Scraping) — detailed in `SCRAPING_PLAN.md`
---- [ ] Phase 3: DuckDuckGo auto-discovery of profile links
--+## Active
--+- (nothing in progress — design overhaul shipped; pick next from Backlog)
-- 
-- ## Backlog
---- [ ] Phase 4: display metrics across card/table/detail; freshness indicators
-- - [ ] Implement historical data tracking for followers
--+- [ ] Add export artist data and bulk export artist data
-- 
-- ## Completed
---- [x] Scraping Phase 0-2: framework + Spotify/YouTube/SoundCloud/Instagram/TikTok scrapers, `/scrape`, UI panel, manual X (verified live)
--+- [x] UI design overhaul (Phases A–D): shadcn dark slate/cyan system, all pages redesigned (`DESIGN_OVERHAUL_PLAN.md`)
--+- [x] Scraping Phase 0-4: scrapers + `/scrape` + auto-discovery (`/discover`) + metrics across the UI (`SCRAPING_PLAN.md`)
-- - [x] Implement artist editing functionality (PATCH requests)
-- - [x] Enable navigation to new artist page
-- - [x] Add navigation bar
--@@ -148,6 +149,7 @@ PURPOSE: Tracks active work and backlog. AI agents should update this after comp
-- ./incighder/public
-- ./incighder/package-lock.json
-- ./incighder/package.json
--+./incighder/components.json
-- ./incighder/tsconfig.json
-- ./incighder/eslint.config.mjs
-- ./incighder/next.config.ts
--@@ -174,6 +176,7 @@ PURPOSE: Tracks active work and backlog. AI agents should update this after comp
-- ./package-lock.json
-- ./ai
-- ./ai/ai-context.sh
--+./ai/DESIGN_OVERHAUL_PLAN.md
-- ./ai/ARCHITECTURE.md
-- ./ai/SCRAPING_PLAN.md
-- ./ai/CONTEXT_BUNDLE.md
--@@ -185,113 +188,12 @@ PURPOSE: Tracks active work and backlog. AI agents should update this after comp
-- 
-- ## 5. Recent Git Changes (Summary)
-- ```text
--+994a8a4 feat(ui): design overhaul Phase D — polish
--+e988b1c feat(ui): design overhaul Phase B+C — all pages redesigned
--+45bcd7e feat(ui): design overhaul Phase A — shadcn + dark slate/cyan system
--+240e542 feat(scraping): Phase 2 - Instagram + TikTok scrapers + manual X
-- 3ee2d5d fix(scraping): Playwright per-call lifecycle + SoundCloud browser fallback
---26513f0 feat(scraping): Phase 1 - Spotify/YouTube/SoundCloud scrapers + /scrape + UI
+ ./data-api/__pycache__
+ ./data-api/artistSoundCloudScrape.py
+ ./data-api/flush_db.py
++./data-api/similar_artists.py
+ ./data-api/wait-for-it.sh
+ ./data-api/insert_artist_from_json.py
+ ./data-api/app.py
+@@ -189,113 +200,12 @@ PURPOSE: Tracks active work and backlog. AI agents should update this after comp
 ```
