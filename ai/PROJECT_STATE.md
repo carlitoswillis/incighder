@@ -3,7 +3,7 @@
 PURPOSE: High-level summary of the system's current focus, the product vision, and recent changes — the single place an agent reads first to avoid drift. (Absorbs the former `GOALS.md`.)
 
 ## Last Updated: 2026-06-25
-## Current Focus: Scheduled auto-scrape (`scheduler` container) shipped. Backlog: bulk import, data export, change alerts.
+## Current Focus: Artist discovery (seed → similar artists) shipped. Backlog: scheduled auto-scrape, bulk import, data export.
 
 ## Project Goal
 Build a data application that gives A&Rs, labels, and artists a **holistic view of an artist's online traction and growth potential** by aggregating public metrics across music and social platforms — Spotify, YouTube, SoundCloud, Instagram, TikTok, and X — and tracking how they move over time.
@@ -72,14 +72,15 @@ PURPOSE: Tracks active work and backlog. AI agents should update this after comp
 - (nothing in progress — pick next from Backlog)
 
 ## Backlog
+- [ ] Scheduled auto-scrape for growth (recurring metric pulls)
 - [ ] Bulk import: paste several artist names → auto-add + auto-discover socials
 - [ ] Update / re-scrape multiple artists in one action
 - [ ] Export artist data (CSV / JSON)
 - [ ] Discovery seeded from an already-tracked artist (in-app, not just the `/discover` search box)
 - [ ] Weighted cross-platform traction score
 - [ ] Robust history charts (currently sparse — often only 2 points until more scans accrue)
-- [ ] Change/threshold alerts (notify when a metric jumps X%) — `metric_snapshots` is the foundation; pairs with scheduled auto-scrape. Closes a gap vs competitors (see `COMPETITORS.md`)
-- [ ] Playlist / chart-placement tracking — competitor table-stakes we lack (see `COMPETITORS.md`)
+- [ ] Remove Spotify logos from the design
+- [ ] Bug: manual artist add has no follower/etc. data even after adding Spotify as a source and scraping — works when added via search / Spotify-search instead
 
 ## Completed
 - [x] Artist discovery: `/discover` page (seed → Last.fm similar → Spotify-enriched grid → one-click Track)
@@ -87,9 +88,6 @@ PURPOSE: Tracks active work and backlog. AI agents should update this after comp
 - [x] Scraping Phase 0-4: scrapers + `/scrape` + auto-discovery + metrics across the UI (`SCRAPING_PLAN.md`)
 - [x] Growth-over-time: account-keyed metric snapshots + `/history` + sparklines (re-linking doesn't fake growth)
 - [x] AI-verified discovery: local Ollama (`qwen2.5-coder`) checks auto-found IG/TikTok accounts; panel flags uncertain/mismatch (`ARCHITECTURE.md`)
-- [x] Scheduled auto-scrape for growth: `scheduler` container runs a recurring sweep (`scrape_all`, TTL-respected, default 24h via `AUTO_SCRAPE_INTERVAL_HOURS`) appending growth snapshots (`scheduler.py`, `ARCHITECTURE.md`)
-- [x] UI: removed misplaced Spotify logos from Incighder actions (Discover "Track", Spotify-search "Add to dataset" → neutral Plus); kept logos that genuinely open Spotify
-- [x] Bug fix: Spotify scrape now backfills the Web API baseline (followers, popularity, genres, spotify_id, top track, images, external_urls) so manually-added artists get full data once their Spotify source is scraped
 - [x] Artist editing (PATCH) + delete + manual insert (`/insert_artist_manual`)
 - [x] Navigation bar; decoupled schema (spotify_id nullable); consolidated `schema.sql` to `data-api/`
 - [x] Deploy with ngrok / cloudflared
