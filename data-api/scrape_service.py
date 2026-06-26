@@ -29,7 +29,7 @@ PLATFORMS = ("spotify", "youtube", "soundcloud", "instagram", "tiktok")
 # artists columns a scraper is allowed to write (guards the UPDATE identifiers).
 ALLOWED_METRIC_COLUMNS = {
     # Spotify Web API baseline backfilled on scrape (so manually-added artists get it).
-    "followers", "popularity", "genres", "spotify_id",
+    "followers", "popularity", "genres", "spotify_id", "images", "external_urls",
     "top_track_id", "top_track_popularity",
     "monthly_listeners", "top_track_name", "top_track_plays",
     "youtube_subscribers", "youtube_total_views", "youtube_video_count",
@@ -44,7 +44,7 @@ ALLOWED_METRIC_COLUMNS = {
 # kept so the Web API fallback still resolves the artist after a link is cleared.)
 PLATFORM_COLUMNS = {
     "spotify": ["monthly_listeners", "top_track_name", "top_track_plays",
-                "followers", "popularity", "genres",
+                "followers", "popularity", "genres", "images", "external_urls",
                 "top_track_id", "top_track_popularity"],
     "youtube": ["youtube_subscribers", "youtube_total_views", "youtube_video_count",
                 "youtube_top_video_title", "youtube_top_video_views"],
