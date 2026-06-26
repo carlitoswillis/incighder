@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import sys
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urlparse
@@ -173,6 +174,60 @@ def scrape_artist(artist_id: str, links: dict | None = None, force: bool = False
         return {"results": results, "artist": dict(zip(updated_cols, updated_row))}
     finally:
         conn.close()
+
+
+# Platforms whose profile links can be auto-discovered (spotify resolves via spotify_id).
+DISCOVERABLE_PLATFORMS = ("youtube", "soundcloud", "instagram", "tiktok")
+
+# Verdicts confident enough to auto-link in a bulk refresh without manual review.
+# Uncertain / mismatch / unknown guesses are dropped so we never write a wrong link.
+AUTO_ACCEPT_VERDICTS = {"verified", "match"}
+
+
+def _artist_name_and_links(artist_id: str) -> tuple[str, dict]:
+    conn = get_db_connection()
+    if not conn:
+        raise RuntimeError("database connection failed")
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT name, social_links FROM artists WHERE id = %s", (artist_id,))
+            row = cur.fetchone()
+            if not row:
+                raise LookupError("artist not found")
+            return row[0], _as_dict(row[1])
+    finally:
+        conn.close()
+
+
+def refresh_artist(artist_id: str, force: bool = False) -> dict:
+    """Auto-discover socials for any platform an artist isn't linked on yet
+    (accepting only confident matches), then scrape every linked platform.
+
+    Discovery is best-effort: if it fails or finds nothing, we still scrape the
+    artist's existing links. Returns the scrape result plus the links we added.
+    """
+    name, social_links = _artist_name_and_links(artist_id)
+    missing = [p for p in DISCOVERABLE_PLATFORMS if not social_links.get(p)]
+
+    discovered: dict = {}
+    if missing and name:
+        try:
+            from scrapers.discovery import discover_links
+            for platform, cand in discover_links(name, missing).items():
+                url = (cand or {}).get("url")
+                if url and cand.get("verdict") in AUTO_ACCEPT_VERDICTS:
+                    discovered[platform] = url
+        except Exception as e:
+            print(f"Refresh discover error for {artist_id}: {e}", file=sys.stderr)
+
+    result = scrape_artist(artist_id, links=discovered or None, force=force)
+    return {
+        "artist_id": artist_id,
+        "name": name,
+        "discovered": discovered,
+        "results": result["results"],
+        "artist": result["artist"],
+    }
 
 
 def all_artist_ids() -> list:
