@@ -23,6 +23,7 @@ import { LinkPreview } from "@/components/link-preview";
 
 type ScrapeStatus = { ok: boolean; error?: string | null; skipped?: string };
 type Verdict = { verdict: string; reason?: string; confidence?: number };
+type Candidate = { url: string; verdict?: string; reason?: string; confidence?: number };
 
 const VERDICT_STYLE: Record<
   string,
@@ -84,6 +85,26 @@ export function SourcesPanel({
   );
   const [discovering, setDiscovering] = useState(false);
   const [verdicts, setVerdicts] = useState<Record<string, Verdict>>({});
+  const [alternates, setAlternates] = useState<Record<string, Candidate[]>>({});
+
+  // Swap a flagged auto-pick for one of the other search results; the displaced
+  // pick goes back into the alternates list so the user can switch back.
+  function applyAlternate(platform: string, alt: Candidate) {
+    const prevUrl = links[platform];
+    const prevVerdict = verdicts[platform];
+    setLinks((prev) => ({ ...prev, [platform]: alt.url }));
+    setVerdicts((prev) => {
+      const n = { ...prev };
+      if (alt.verdict) n[platform] = { verdict: alt.verdict, reason: alt.reason, confidence: alt.confidence };
+      else delete n[platform];
+      return n;
+    });
+    setAlternates((prev) => {
+      const rest = (prev[platform] || []).filter((c) => c.url !== alt.url);
+      if (prevUrl) rest.push({ url: prevUrl, ...prevVerdict });
+      return { ...prev, [platform]: rest };
+    });
+  }
 
   async function handleDiscover() {
     setDiscovering(true);
