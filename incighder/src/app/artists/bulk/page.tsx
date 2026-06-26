@@ -48,6 +48,30 @@ function parseNames(raw: string): string[] {
   return out;
 }
 
+// Spotify-API-backed steps; a handful of in-flight requests is plenty and avoids
+// hammering the data-api. Insert is lighter than search, so it gets a smaller pool.
+const RESOLVE_CONCURRENCY = 5;
+const ADD_CONCURRENCY = 4;
+
+/** Run `fn` over `items` with at most `limit` in flight; results stay in order. */
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  limit: number,
+  fn: (item: T, index: number) => Promise<R>,
+): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  let next = 0;
+  async function worker() {
+    while (next < items.length) {
+      const i = next++;
+      results[i] = await fn(items[i], i);
+    }
+  }
+  const workers = Array.from({ length: Math.min(limit, items.length) }, worker);
+  await Promise.all(workers);
+  return results;
+}
+
 export default function BulkImportPage() {
   const [raw, setRaw] = useState("");
   const [rows, setRows] = useState<ReviewRow[]>([]);
@@ -83,8 +107,10 @@ export default function BulkImportPage() {
       // Non-fatal: worst case we don't pre-flag tracked artists.
     }
 
-    const resolved: ReviewRow[] = [];
-    for (const query of names) {
+    // These hit the Spotify Web API (not the throttled scrapers), so resolve them
+    // with bounded concurrency rather than one-at-a-time. Results stay positionally
+    // ordered; progress ticks as each finishes.
+    async function resolveOne(query: string): Promise<ReviewRow> {
       let candidates: SpotifyArtist[] = [];
       try {
         const r = await fetch(`/api/spotify-search?q=${encodeURIComponent(query)}`);
@@ -101,17 +127,12 @@ export default function BulkImportPage() {
         : trackedIds.has(top.id)
           ? "tracked"
           : "matched";
-      resolved.push({
-        query,
-        candidates,
-        selected: 0,
-        status,
-        skip: status !== "matched",
-        added: false,
-      });
       setProgress((p) => ({ ...p, done: p.done + 1 }));
-      setRows([...resolved]);
+      return { query, candidates, selected: 0, status, skip: status !== "matched", added: false };
     }
+
+    const resolved = await mapWithConcurrency(names, RESOLVE_CONCURRENCY, resolveOne);
+    setRows(resolved);
     setResolving(false);
   }
 
@@ -135,7 +156,7 @@ export default function BulkImportPage() {
     setAdding(true);
     let ok = 0;
     let failed = 0;
-    for (const { r, i } of targets) {
+    await mapWithConcurrency(targets, ADD_CONCURRENCY, async ({ r, i }) => {
       const artist = r.candidates[r.selected];
       try {
         const res = await fetch("/api/artists", {
@@ -149,7 +170,7 @@ export default function BulkImportPage() {
       } catch {
         failed += 1;
       }
-    }
+    });
     setAdding(false);
     if (ok) toast.success(`Added ${ok} artist${ok === 1 ? "" : "s"}.`);
     if (failed) toast.error(`${failed} failed to add.`);

@@ -49,7 +49,7 @@ def fetch_instagram(handle_or_url: str) -> ScrapeResult:
 
     # Primary: web profile JSON endpoint.
     try:
-        throttle()
+        throttle("i.instagram.com")
         resp = get_session().get(
             "https://i.instagram.com/api/v1/users/web_profile_info/",
             params={"username": handle},

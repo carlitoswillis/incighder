@@ -3,6 +3,7 @@ requests
 python-dotenv
 spotipy
 flask
+gunicorn
 playwright
 beautifulsoup4
 lxml

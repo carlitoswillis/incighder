@@ -44,7 +44,7 @@ def _client_id_via_browser() -> Optional[str]:
     except Exception:
         return None
     holder: dict = {}
-    throttle()
+    throttle("soundcloud.com")
     with sync_playwright() as pw:
         browser = pw.chromium.launch(
             headless=True,

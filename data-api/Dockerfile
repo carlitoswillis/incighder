@@ -25,4 +25,8 @@ COPY data-api/ai_verify.py .
 COPY data-api/scrapers ./scrapers
 COPY data-api/schema.sql .
 
-CMD ["python", "app.py"]
+# Threaded gunicorn (single worker process keeps the per-host scrape throttle and
+# requests Session shared; threads handle concurrent requests). Compose overrides
+# this for the scheduler service. Long timeout: a scrape/refresh can be slow.
+CMD ["gunicorn", "--workers", "1", "--threads", "8", "--worker-class", "gthread", \
+     "--timeout", "180", "--bind", "0.0.0.0:5000", "app:app"]

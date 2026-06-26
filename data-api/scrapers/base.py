@@ -11,9 +11,11 @@ import os
 import random
 import threading
 import time
+from collections import defaultdict
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from typing import Optional
+from urllib.parse import urlparse
 
 import requests
 
@@ -35,8 +37,17 @@ DEFAULT_HEADERS = {
 THROTTLE_MIN_SECONDS = float(os.getenv("SCRAPE_THROTTLE_MIN", "2.0"))
 THROTTLE_MAX_SECONDS = float(os.getenv("SCRAPE_THROTTLE_MAX", "6.0"))
 
-_throttle_lock = threading.Lock()
-_last_request_at = 0.0
+# Throttling is per-host: requests to the *same* host are serialized with the
+# jittered gap (the anti-ban invariant), while different hosts run free. This lets
+# us scrape an artist's platforms concurrently without ever bursting one site.
+_registry_lock = threading.Lock()
+_host_locks: dict[str, threading.Lock] = defaultdict(threading.Lock)
+_last_request_at: dict[str, float] = defaultdict(float)
+
+
+def _host_key(host: Optional[str]) -> str:
+    h = (host or "").lower()
+    return h[4:] if h.startswith("www.") else (h or "default")
 
 
 @dataclass
@@ -63,19 +74,24 @@ class ScrapeResult:
         return asdict(self)
 
 
-def throttle() -> None:
-    """Block until it is polite to make the next external request.
+def throttle(host: Optional[str] = None) -> None:
+    """Block until it is polite to make the next external request to ``host``.
 
-    Holds a global lock for the wait so all callers are serialized - we never
-    burst-parallel a platform.
+    Holds that host's lock for the wait so calls to the same host are serialized
+    (we never burst-parallel one site), while different hosts proceed in parallel.
+    Pass the request's hostname; a URL is also accepted and its host extracted.
     """
-    global _last_request_at
-    with _throttle_lock:
+    if host and "://" in host:
+        host = urlparse(host).hostname
+    key = _host_key(host)
+    with _registry_lock:
+        lock = _host_locks[key]
+    with lock:
         wait = random.uniform(THROTTLE_MIN_SECONDS, THROTTLE_MAX_SECONDS)
-        elapsed = time.monotonic() - _last_request_at
+        elapsed = time.monotonic() - _last_request_at[key]
         if elapsed < wait:
             time.sleep(wait - elapsed)
-        _last_request_at = time.monotonic()
+        _last_request_at[key] = time.monotonic()
 
 
 _session: Optional[requests.Session] = None
@@ -102,9 +118,10 @@ def polite_get(
 ) -> requests.Response:
     """Throttled GET with jittered backoff on 429/403. Raises on final failure."""
     session = get_session()
+    host = urlparse(url).hostname
     attempt = 0
     while True:
-        throttle()
+        throttle(host)
         resp = session.get(url, headers=headers, params=params, timeout=timeout)
         if resp.status_code in (429, 403) and attempt < max_retries:
             time.sleep((2 ** attempt) * random.uniform(5, 15))
@@ -139,7 +156,7 @@ def render_html(
     """
     from playwright.sync_api import sync_playwright
 
-    throttle()
+    throttle(urlparse(url).hostname)
     with sync_playwright() as pw:
         browser = pw.chromium.launch(
             headless=True,

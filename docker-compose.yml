@@ -60,7 +60,11 @@ services:
       OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen2.5-coder:14b}
     env_file:
       - ./.env
-    command: python app.py
+    # gunicorn with threads (not extra worker processes): one process keeps the
+    # per-host scrape throttle and requests Session shared, preserving the anti-ban
+    # invariant, while threads let independent requests run concurrently. Long
+    # timeout because a scrape/refresh can legitimately take a while.
+    command: gunicorn --workers 1 --threads 8 --worker-class gthread --timeout 180 --bind 0.0.0.0:5000 app:app
     healthcheck:
       test: ["CMD-SHELL", "python -c 'import socket; s = socket.socket(socket.AF_INET, socket.SOCK_STREAM); s.connect((\"localhost\", 5000)); s.close()'"]
       interval: 10s

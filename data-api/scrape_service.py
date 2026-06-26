@@ -10,6 +10,7 @@ import json
 import os
 import re
 from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urlparse
 
@@ -125,6 +126,12 @@ def scrape_artist(artist_id: str, links: dict | None = None, force: bool = False
 
         results: dict = {}
         updates: dict = {}
+
+        # Decide what to fetch (honouring the per-platform cache), then dispatch
+        # those platforms concurrently. They hit different hosts, and the per-host
+        # throttle keeps us from ever bursting a single site. DB writes stay on
+        # this thread, below, so the connection is never shared across threads.
+        to_scrape: list[tuple[str, object]] = []
         for platform in PLATFORMS:
             link = merged_links.get(platform)
             if not link and not (platform == "spotify" and artist.get("spotify_id")):
@@ -133,7 +140,22 @@ def scrape_artist(artist_id: str, links: dict | None = None, force: bool = False
                 results[platform] = {"ok": True, "skipped": "cached",
                                      "scraped_at": meta[platform]["last_scraped_at"]}
                 continue
-            res = _dispatch(platform, link, artist)
+            to_scrape.append((platform, link))
+
+        dispatched: dict = {}
+        if to_scrape:
+            with ThreadPoolExecutor(max_workers=len(to_scrape)) as pool:
+                futures = {pool.submit(_dispatch, p, link, artist): p
+                           for p, link in to_scrape}
+                for fut in as_completed(futures):
+                    platform = futures[fut]
+                    try:
+                        dispatched[platform] = fut.result()
+                    except Exception as e:  # a scraper should never raise, but isolate it
+                        dispatched[platform] = ScrapeResult.failure(platform, str(e))
+
+        for platform, _link in to_scrape:
+            res = dispatched[platform]
             results[platform] = res.to_dict()
             if res.ok:
                 updates.update({k: v for k, v in res.data.items()
