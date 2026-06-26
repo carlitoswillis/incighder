@@ -3,8 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Image from "next/image";
 import { toast } from "sonner";
-import { Search, Sparkles } from "lucide-react";
-import { SiSpotify } from "react-icons/si";
+import { Plus, Search, Sparkles } from "lucide-react";
 
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
@@ -210,7 +209,7 @@ export default function DiscoverPage() {
                   "Tracked ✓"
                 ) : (
                   <>
-                    <SiSpotify /> Track
+                    <Plus /> Track
                   </>
                 )}
               </Button>

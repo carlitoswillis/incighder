@@ -3,8 +3,7 @@
 import { useState } from "react";
 import Image from "next/image";
 import { toast } from "sonner";
-import { Search } from "lucide-react";
-import { SiSpotify } from "react-icons/si";
+import { Plus, Search } from "lucide-react";
 
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
@@ -121,7 +120,7 @@ export default function SearchPage() {
                 "Added ✓"
               ) : (
                 <>
-                  <SiSpotify /> Add to dataset
+                  <Plus /> Add to dataset
                 </>
               )}
             </Button>
