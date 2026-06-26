@@ -24,8 +24,8 @@ Incighder is a professional data application designed to help recording artists,
   - **One-click "Track"** ingests any similar artist into the dataset via the existing insert pipeline; artists you already track are marked so you only add what's new.
 - **Auto-Discovery & AI Verification**:
   - Automatically searches for and suggests official YouTube channels and SoundCloud profiles.
-  - Generates best-guess candidate handles for Instagram and TikTok.
-  - Uses a **local LLM via Ollama** (`qwen2.5-coder:14b`) to inspect profile metadata and previews, deciding if a guessed link belongs to the artist (`match` / `uncertain` / `mismatch`) before it is scraped.
+  - For Instagram and TikTok, runs a free **web search** (Google Programmable Search) for the artist on that platform and collects real candidate profiles — so it finds accounts even when the handle differs from the artist's name (a preferred handle was taken, stage vs. legal name, etc.), which a blind name-guess never could.
+  - Uses a **local LLM via Ollama** (`qwen2.5-coder:14b`) to inspect each candidate's profile metadata/preview and decide whether it belongs to the artist (`match` / `uncertain` / `mismatch`); the best match is auto-filled and the runners-up are offered as **alternates** you can switch to in one click.
 - **Historical Growth Analytics**:
   - Automatically captures account-keyed metric snapshots in the database when new data is pulled.
   - A background **auto-scrape scheduler** sweeps all tracked artists on a recurring interval (default 24h, TTL-respected), so growth history accrues without manual scraping.
@@ -95,6 +95,13 @@ YOUTUBE_API_KEY=your_youtube_api_key
 
 # Last.fm API Key (Required for the /discover similar-artists feature)
 LAST_FM_API_KEY=your_lastfm_api_key
+
+# Google Programmable Search (Optional; powers search-backed Instagram/TikTok
+# auto-discovery — free 100 queries/day. Without it, discovery falls back to a
+# name-slug guess.) GOOGLE_CSE_KEY is a Cloud API key; GOOGLE_CSE_ID is the
+# Programmable Search Engine "cx" id, set to search the entire web.
+GOOGLE_CSE_KEY=your_google_api_key
+GOOGLE_CSE_ID=your_cse_cx_id
 
 # Local Ollama URL (Optional; defaults to http://host.docker.internal:11434 for Docker)
 OLLAMA_URL=http://host.docker.internal:11434

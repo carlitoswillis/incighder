@@ -52,6 +52,45 @@ function VerdictBadge({ v }: { v: Verdict }) {
   );
 }
 
+function handleFromUrl(url: string): string {
+  try {
+    const path = new URL(url).pathname.split("/").filter(Boolean);
+    return path.length ? path[path.length - 1] : url;
+  } catch {
+    return url;
+  }
+}
+
+function AlternatesList({
+  items,
+  onPick,
+}: {
+  items: Candidate[];
+  onPick: (c: Candidate) => void;
+}) {
+  if (!items.length) return null;
+  return (
+    <div className="flex flex-wrap items-center gap-1.5 text-xs">
+      <span className="text-muted-foreground">Other matches:</span>
+      {items.map((c) => {
+        const s = c.verdict ? VERDICT_STYLE[c.verdict] : undefined;
+        return (
+          <button
+            key={c.url}
+            type="button"
+            onClick={() => onPick(c)}
+            className="rounded-md bg-muted px-2 py-0.5 font-mono text-muted-foreground ring-1 ring-foreground/10 hover:text-foreground hover:ring-foreground/20"
+            title={`Use this account${c.verdict ? ` — ${s?.label ?? c.verdict}` : ""}`}
+          >
+            {s ? <s.Icon className={cn("mr-1 inline size-3", s.cls)} /> : null}
+            {handleFromUrl(c.url)}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 function initialLinks(artist: Artist): Record<string, string> {
   const links = artist.social_links || {};
   const out: Record<string, string> = {};
@@ -121,10 +160,11 @@ export function SourcesPanel({
       if (!res.ok) throw new Error(data.error || "Discovery failed");
       const candidates: Record<
         string,
-        { url?: string; verdict?: string; reason?: string; confidence?: number }
+        { url?: string; verdict?: string; reason?: string; confidence?: number; alternates?: Candidate[] }
       > = data.candidates || {};
       const next = { ...links };
       const nextVerdicts: Record<string, Verdict> = {};
+      const nextAlternates: Record<string, Candidate[]> = {};
       let filled = 0;
       let flagged = 0;
       for (const p of SCRAPED_PLATFORMS) {
@@ -136,9 +176,11 @@ export function SourcesPanel({
           nextVerdicts[p.key] = { verdict: c.verdict, reason: c.reason, confidence: c.confidence };
           if (c.verdict === "mismatch" || c.verdict === "uncertain") flagged++;
         }
+        if (c.alternates?.length) nextAlternates[p.key] = c.alternates;
       }
       setLinks(next);
       setVerdicts((prev) => ({ ...prev, ...nextVerdicts }));
+      setAlternates((prev) => ({ ...prev, ...nextAlternates }));
       if (filled)
         toast.success(
           `Found ${filled} link${filled === 1 ? "" : "s"}${flagged ? ` · ${flagged} flagged by AI` : ""} — review, then scrape`,
@@ -178,6 +220,11 @@ export function SourcesPanel({
   async function handleRemove(platform: string, label: string) {
     setLinks((prev) => ({ ...prev, [platform]: "" }));
     setVerdicts((prev) => {
+      const n = { ...prev };
+      delete n[platform];
+      return n;
+    });
+    setAlternates((prev) => {
       const n = { ...prev };
       delete n[platform];
       return n;
@@ -231,6 +278,11 @@ export function SourcesPanel({
                       delete n[p.key];
                       return n;
                     });
+                    setAlternates((prev) => {
+                      const n = { ...prev };
+                      delete n[p.key];
+                      return n;
+                    });
                   }}
                   placeholder={`${p.label} profile URL`}
                 />
@@ -266,6 +318,12 @@ export function SourcesPanel({
                 </span>
               )}
               {verdicts[p.key] && <VerdictBadge v={verdicts[p.key]} />}
+              {alternates[p.key]?.length ? (
+                <AlternatesList
+                  items={alternates[p.key]}
+                  onPick={(c) => applyAlternate(p.key, c)}
+                />
+              ) : null}
             </div>
           );
         })}
