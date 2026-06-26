@@ -80,6 +80,8 @@ PURPOSE: Tracks active work and backlog. AI agents should update this after comp
 - [ ] Weighted cross-platform traction score
 - [ ] Robust history charts (currently sparse — often only 2 points until more scans accrue)
 - [ ] Remove Spotify logos from the design
+- [ ] Change/threshold alerts (notify when a metric jumps X%) — `metric_snapshots` is the foundation; pairs with scheduled auto-scrape. Closes a gap vs competitors (see `COMPETITORS.md`)
+- [ ] Playlist / chart-placement tracking — competitor table-stakes we lack (see `COMPETITORS.md`)
 
 ## Completed
 - [x] Artist discovery: `/discover` page (seed → Last.fm similar → Spotify-enriched grid → one-click Track)
