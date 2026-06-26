@@ -20,6 +20,7 @@ const NAV = [
   { href: "/table", label: "Table" },
   { href: "/discover", label: "Discover" },
   { href: "/search_spotify", label: "Search" },
+  { href: "/artists/bulk", label: "Bulk" },
 ];
 
 function isActive(pathname: string, href: string) {

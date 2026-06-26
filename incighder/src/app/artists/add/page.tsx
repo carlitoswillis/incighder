@@ -60,7 +60,11 @@ export default function AddArtistPage() {
           <Link href="/search_spotify" className="text-primary hover:underline">
             search Spotify
           </Link>{" "}
-          to pull in full data automatically.
+          to pull in full data automatically, or{" "}
+          <Link href="/artists/bulk" className="text-primary hover:underline">
+            bulk import
+          </Link>{" "}
+          a list of names.
         </p>
       </form>
     </div>
