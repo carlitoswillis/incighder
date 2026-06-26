@@ -1,5 +1,5 @@
 # AI Context Bundle
-Generated: Thu Jun 25 18:20:34 PDT 2026
+Generated: Thu Jun 25 18:25:53 PDT 2026
 
 ## ⚠️ Agent Navigation Guide
 1. Start with the **Current State** below to understand the focus.
@@ -176,7 +176,6 @@ PURPOSE: Tracks active work and backlog. AI agents should update this after comp
 - [ ] Discovery seeded from an already-tracked artist (in-app, not just the `/discover` search box)
 - [ ] Weighted cross-platform traction score
 - [ ] Robust history charts (currently sparse — often only 2 points until more scans accrue)
-- [ ] Remove Spotify logos from the design
 - [ ] Change/threshold alerts (notify when a metric jumps X%) — `metric_snapshots` is the foundation; pairs with scheduled auto-scrape. Closes a gap vs competitors (see `COMPETITORS.md`)
 - [ ] Playlist / chart-placement tracking — competitor table-stakes we lack (see `COMPETITORS.md`)
 
@@ -186,7 +185,8 @@ PURPOSE: Tracks active work and backlog. AI agents should update this after comp
 - [x] Scraping Phase 0-4: scrapers + `/scrape` + auto-discovery + metrics across the UI (`SCRAPING_PLAN.md`)
 - [x] Growth-over-time: account-keyed metric snapshots + `/history` + sparklines (re-linking doesn't fake growth)
 - [x] AI-verified discovery: local Ollama (`qwen2.5-coder`) checks auto-found IG/TikTok accounts; panel flags uncertain/mismatch (`ARCHITECTURE.md`)
-- [x] Bug fix: Spotify scrape now backfills the Web API baseline (followers, popularity, genres, spotify_id, top track) so manually-added artists get full data once their Spotify source is scraped
+- [x] UI: removed misplaced Spotify logos from Incighder actions (Discover "Track", Spotify-search "Add to dataset" → neutral Plus); kept logos that genuinely open Spotify
+- [x] Bug fix: Spotify scrape now backfills the Web API baseline (followers, popularity, genres, spotify_id, top track, images, external_urls) so manually-added artists get full data once their Spotify source is scraped
 - [x] Artist editing (PATCH) + delete + manual insert (`/insert_artist_manual`)
 - [x] Navigation bar; decoupled schema (spotify_id nullable); consolidated `schema.sql` to `data-api/`
 - [x] Deploy with ngrok / cloudflared
@@ -252,113 +252,113 @@ PURPOSE: Tracks active work and backlog. AI agents should update this after comp
 
 ## 5. Recent Git Changes (Summary)
 ```text
+ba79ee3 ui: drop misplaced Spotify logo from Incighder actions
+6c0dd86 docs: add competitive landscape (Songstats et al.) + roadmap gaps
 3090aa8 fix(scrape): also backfill Spotify images + external_urls on scrape
 4d3961e fix(scrape): Spotify scrape backfills Web API baseline for manual artists
 581aabd docs: fuse GOALS into PROJECT_STATE; align ai/ docs + README with code
-bce4b5d add more goals
-e35414e docs: note artist discovery (Last.fm) in ARCHITECTURE; regen context bundle
 ```
 
 ## 6. Active Diff
 ```diff
 diff --git a/ai/CONTEXT_BUNDLE.md b/ai/CONTEXT_BUNDLE.md
-index 9664871..a7b0697 100644
+index a5ab0e1..2c1ed9e 100644
 --- a/ai/CONTEXT_BUNDLE.md
 +++ b/ai/CONTEXT_BUNDLE.md
 @@ -1,5 +1,5 @@
  # AI Context Bundle
--Generated: Thu Jun 25 18:16:32 PDT 2026
-+Generated: Thu Jun 25 18:20:34 PDT 2026
+-Generated: Thu Jun 25 18:20:34 PDT 2026
++Generated: Thu Jun 25 18:25:53 PDT 2026
  
  ## ⚠️ Agent Navigation Guide
  1. Start with the **Current State** below to understand the focus.
-@@ -177,6 +177,8 @@ PURPOSE: Tracks active work and backlog. AI agents should update this after comp
+@@ -176,7 +176,6 @@ PURPOSE: Tracks active work and backlog. AI agents should update this after comp
+ - [ ] Discovery seeded from an already-tracked artist (in-app, not just the `/discover` search box)
  - [ ] Weighted cross-platform traction score
  - [ ] Robust history charts (currently sparse — often only 2 points until more scans accrue)
- - [ ] Remove Spotify logos from the design
-+- [ ] Change/threshold alerts (notify when a metric jumps X%) — `metric_snapshots` is the foundation; pairs with scheduled auto-scrape. Closes a gap vs competitors (see `COMPETITORS.md`)
-+- [ ] Playlist / chart-placement tracking — competitor table-stakes we lack (see `COMPETITORS.md`)
+-- [ ] Remove Spotify logos from the design
+ - [ ] Change/threshold alerts (notify when a metric jumps X%) — `metric_snapshots` is the foundation; pairs with scheduled auto-scrape. Closes a gap vs competitors (see `COMPETITORS.md`)
+ - [ ] Playlist / chart-placement tracking — competitor table-stakes we lack (see `COMPETITORS.md`)
  
- ## Completed
- - [x] Artist discovery: `/discover` page (seed → Last.fm similar → Spotify-enriched grid → one-click Track)
-@@ -239,6 +241,7 @@ PURPOSE: Tracks active work and backlog. AI agents should update this after comp
- ./ai/ai-context.sh
- ./ai/DESIGN_OVERHAUL_PLAN.md
- ./ai/ARCHITECTURE.md
-+./ai/COMPETITORS.md
- ./ai/SCRAPING_PLAN.md
- ./ai/CONTEXT_BUNDLE.md
- ./ai/PROJECT_STATE.md
-@@ -248,113 +251,12 @@ PURPOSE: Tracks active work and backlog. AI agents should update this after comp
+@@ -186,7 +185,8 @@ PURPOSE: Tracks active work and backlog. AI agents should update this after comp
+ - [x] Scraping Phase 0-4: scrapers + `/scrape` + auto-discovery + metrics across the UI (`SCRAPING_PLAN.md`)
+ - [x] Growth-over-time: account-keyed metric snapshots + `/history` + sparklines (re-linking doesn't fake growth)
+ - [x] AI-verified discovery: local Ollama (`qwen2.5-coder`) checks auto-found IG/TikTok accounts; panel flags uncertain/mismatch (`ARCHITECTURE.md`)
+-- [x] Bug fix: Spotify scrape now backfills the Web API baseline (followers, popularity, genres, spotify_id, top track) so manually-added artists get full data once their Spotify source is scraped
++- [x] UI: removed misplaced Spotify logos from Incighder actions (Discover "Track", Spotify-search "Add to dataset" → neutral Plus); kept logos that genuinely open Spotify
++- [x] Bug fix: Spotify scrape now backfills the Web API baseline (followers, popularity, genres, spotify_id, top track, images, external_urls) so manually-added artists get full data once their Spotify source is scraped
+ - [x] Artist editing (PATCH) + delete + manual insert (`/insert_artist_manual`)
+ - [x] Navigation bar; decoupled schema (spotify_id nullable); consolidated `schema.sql` to `data-api/`
+ - [x] Deploy with ngrok / cloudflared
+@@ -251,113 +251,12 @@ PURPOSE: Tracks active work and backlog. AI agents should update this after comp
  
  ## 5. Recent Git Changes (Summary)
  ```text
-+3090aa8 fix(scrape): also backfill Spotify images + external_urls on scrape
++ba79ee3 ui: drop misplaced Spotify logo from Incighder actions
++6c0dd86 docs: add competitive landscape (Songstats et al.) + roadmap gaps
+ 3090aa8 fix(scrape): also backfill Spotify images + external_urls on scrape
  4d3961e fix(scrape): Spotify scrape backfills Web API baseline for manual artists
  581aabd docs: fuse GOALS into PROJECT_STATE; align ai/ docs + README with code
- bce4b5d add more goals
- e35414e docs: note artist discovery (Last.fm) in ARCHITECTURE; regen context bundle
--77ff62f feat(discovery): /discover page — seed artist → similar artists
+-bce4b5d add more goals
+-e35414e docs: note artist discovery (Last.fm) in ARCHITECTURE; regen context bundle
  ```
  
  ## 6. Active Diff
  ```diff
 -diff --git a/ai/CONTEXT_BUNDLE.md b/ai/CONTEXT_BUNDLE.md
--index 074d0cc..4d2c355 100644
+-index 9664871..a7b0697 100644
 ---- a/ai/CONTEXT_BUNDLE.md
 -+++ b/ai/CONTEXT_BUNDLE.md
 -@@ -1,5 +1,5 @@
 - # AI Context Bundle
---Generated: Thu Jun 25 17:50:10 PDT 2026
--+Generated: Thu Jun 25 18:16:32 PDT 2026
+--Generated: Thu Jun 25 18:16:32 PDT 2026
+-+Generated: Thu Jun 25 18:20:34 PDT 2026
 - 
 - ## ⚠️ Agent Navigation Guide
 - 1. Start with the **Current State** below to understand the focus.
--@@ -248,113 +248,12 @@ PURPOSE: Tracks active work and backlog. AI agents should update this after comp
+-@@ -177,6 +177,8 @@ PURPOSE: Tracks active work and backlog. AI agents should update this after comp
+- - [ ] Weighted cross-platform traction score
+- - [ ] Robust history charts (currently sparse — often only 2 points until more scans accrue)
+- - [ ] Remove Spotify logos from the design
+-+- [ ] Change/threshold alerts (notify when a metric jumps X%) — `metric_snapshots` is the foundation; pairs with scheduled auto-scrape. Closes a gap vs competitors (see `COMPETITORS.md`)
+-+- [ ] Playlist / chart-placement tracking — competitor table-stakes we lack (see `COMPETITORS.md`)
+- 
+- ## Completed
+- - [x] Artist discovery: `/discover` page (seed → Last.fm similar → Spotify-enriched grid → one-click Track)
+-@@ -239,6 +241,7 @@ PURPOSE: Tracks active work and backlog. AI agents should update this after comp
+- ./ai/ai-context.sh
+- ./ai/DESIGN_OVERHAUL_PLAN.md
+- ./ai/ARCHITECTURE.md
+-+./ai/COMPETITORS.md
+- ./ai/SCRAPING_PLAN.md
+- ./ai/CONTEXT_BUNDLE.md
+- ./ai/PROJECT_STATE.md
+-@@ -248,113 +251,12 @@ PURPOSE: Tracks active work and backlog. AI agents should update this after comp
 - 
 - ## 5. Recent Git Changes (Summary)
 - ```text
--+4d3961e fix(scrape): Spotify scrape backfills Web API baseline for manual artists
+-+3090aa8 fix(scrape): also backfill Spotify images + external_urls on scrape
+- 4d3961e fix(scrape): Spotify scrape backfills Web API baseline for manual artists
 - 581aabd docs: fuse GOALS into PROJECT_STATE; align ai/ docs + README with code
 - bce4b5d add more goals
 - e35414e docs: note artist discovery (Last.fm) in ARCHITECTURE; regen context bundle
-- 77ff62f feat(discovery): /discover page — seed artist → similar artists
---a3798b0 docs: prioritize docker compose up over bash wrapper scripts in README
+--77ff62f feat(discovery): /discover page — seed artist → similar artists
 - ```
 - 
 - ## 6. Active Diff
 - ```diff
 --diff --git a/ai/CONTEXT_BUNDLE.md b/ai/CONTEXT_BUNDLE.md
---index 9e07faf..11232f3 100644
+--index 074d0cc..4d2c355 100644
 ----- a/ai/CONTEXT_BUNDLE.md
 --+++ b/ai/CONTEXT_BUNDLE.md
 --@@ -1,5 +1,5 @@
 -- # AI Context Bundle
----Generated: Thu Jun 25 17:42:50 PDT 2026
---+Generated: Thu Jun 25 17:50:10 PDT 2026
+---Generated: Thu Jun 25 17:50:10 PDT 2026
+--+Generated: Thu Jun 25 18:16:32 PDT 2026
 -- 
 -- ## ⚠️ Agent Navigation Guide
 -- 1. Start with the **Current State** below to understand the focus.
---@@ -177,7 +177,6 @@ PURPOSE: Tracks active work and backlog. AI agents should update this after comp
--- - [ ] Weighted cross-platform traction score
--- - [ ] Robust history charts (currently sparse — often only 2 points until more scans accrue)
--- - [ ] Remove Spotify logos from the design
----- [ ] Bug: manual artist add has no follower/etc. data even after adding Spotify as a source and scraping — works when added via search / Spotify-search instead
--- 
--- ## Completed
--- - [x] Artist discovery: `/discover` page (seed → Last.fm similar → Spotify-enriched grid → one-click Track)
---@@ -185,6 +184,7 @@ PURPOSE: Tracks active work and backlog. AI agents should update this after comp
--- - [x] Scraping Phase 0-4: scrapers + `/scrape` + auto-discovery + metrics across the UI (`SCRAPING_PLAN.md`)
--- - [x] Growth-over-time: account-keyed metric snapshots + `/history` + sparklines (re-linking doesn't fake growth)
--- - [x] AI-verified discovery: local Ollama (`qwen2.5-coder`) checks auto-found IG/TikTok accounts; panel flags uncertain/mismatch (`ARCHITECTURE.md`)
---+- [x] Bug fix: Spotify scrape now backfills the Web API baseline (followers, popularity, genres, spotify_id, top track) so manually-added artists get full data once their Spotify source is scraped
--- - [x] Artist editing (PATCH) + delete + manual insert (`/insert_artist_manual`)
--- - [x] Navigation bar; decoupled schema (spotify_id nullable); consolidated `schema.sql` to `data-api/`
--- - [x] Deploy with ngrok / cloudflared
---@@ -248,213 +248,12 @@ PURPOSE: Tracks active work and backlog. AI agents should update this after comp
+--@@ -248,113 +248,12 @@ PURPOSE: Tracks active work and backlog. AI agents should update this after comp
 -- 
 -- ## 5. Recent Git Changes (Summary)
--- ```text
---+581aabd docs: fuse GOALS into PROJECT_STATE; align ai/ docs + README with code
--- bce4b5d add more goals
 ```
