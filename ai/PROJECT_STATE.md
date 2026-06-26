@@ -36,9 +36,14 @@ PURPOSE: Tracks active work and backlog. AI agents should update this after comp
 - (nothing in progress — design overhaul shipped; pick next from Backlog)
 
 ## Backlog
-- [ ] Add bulk import of artist data (list a few artists, and add them to the data set automatically, scraping the suggest social media sites etc.)
+- [ ] Add Update / scrape for multiple artists etc
 - [ ] scheduled auto-scrape for growth
 - [ ] Add export artist data and  export artist data
+- [ ] Robust data display! currently it looks like 2 points creating a line usually, as opposed to more than that. maybe its because ive only scanned twice.
+- [ ] Add bulk import of artist data (list a few artists, and add them to the data set automatically, scraping the suggest social media sites etc.)
+- [ ] discovery based on an already tracked artist
+- [ ] remove spotify logos from design
+- [ ] bug: when adding an artist manually, there is no follower count, etc data is missing even when spotify is added as a source and scraped vs when adding on via search / spotify search option.
 - [x] Deploy with ngrok or cloudflared
 
 ## Completed
