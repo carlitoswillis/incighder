@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Plus, Search, Check, X, ChevronRight } from "lucide-react";
 
 import { PageHeader } from "@/components/page-header";
+import { BulkTabs } from "@/components/bulk-tabs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { formatCompact } from "@/lib/format";
@@ -178,7 +179,8 @@ export default function BulkImportPage() {
 
   return (
     <div>
-      <PageHeader title="Bulk import" />
+      <PageHeader title="Bulk tools" />
+      <BulkTabs />
 
       <div className="space-y-3 rounded-xl bg-card p-5 ring-1 ring-foreground/10">
         <label htmlFor="names" className="text-sm font-medium">

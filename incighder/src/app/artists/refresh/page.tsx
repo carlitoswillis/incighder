@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { RefreshCw, Check, X, Loader2 } from "lucide-react";
 
 import { PageHeader } from "@/components/page-header";
+import { BulkTabs } from "@/components/bulk-tabs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
@@ -24,25 +25,30 @@ interface RowResult {
   discovered: string[];
   /** Platforms scraped successfully this run (excludes cached/skipped). */
   scraped: string[];
-  failed: string[];
+  /** Platforms left untouched because their cached data is still fresh (<24h). */
+  cached: string[];
+  /** Per-platform failures with the reason the scraper reported. */
+  failed: { platform: string; error: string }[];
   error?: string;
 }
 
 interface RefreshResponse {
   discovered?: Record<string, string>;
-  results?: Record<string, { ok?: boolean; skipped?: string }>;
+  results?: Record<string, { ok?: boolean; skipped?: string; error?: string }>;
   error?: string;
 }
 
 function summarize(d: RefreshResponse): Omit<RowResult, "state"> {
   const discovered = Object.keys(d.discovered ?? {});
   const scraped: string[] = [];
-  const failed: string[] = [];
+  const cached: string[] = [];
+  const failed: { platform: string; error: string }[] = [];
   for (const [platform, r] of Object.entries(d.results ?? {})) {
-    if (r.skipped) continue;
-    (r.ok ? scraped : failed).push(platform);
+    if (r.skipped) cached.push(platform);
+    else if (r.ok) scraped.push(platform);
+    else failed.push({ platform, error: r.error || "failed" });
   }
-  return { discovered, scraped, failed };
+  return { discovered, scraped, cached, failed };
 }
 
 export default function RefreshPage() {
@@ -94,7 +100,7 @@ export default function RefreshPage() {
       Object.fromEntries(
         targets.map((a) => [
           a.id,
-          { state: "running" as RowState, discovered: [], scraped: [], failed: [] },
+          { state: "running" as RowState, discovered: [], scraped: [], cached: [], failed: [] },
         ]),
       ),
     );
@@ -105,7 +111,7 @@ export default function RefreshPage() {
         const res = await fetch("/api/refresh", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ artist_id: a.id, force: true }),
+          body: JSON.stringify({ artist_id: a.id, force: false }),
         });
         const d: RefreshResponse = await res.json();
         if (!res.ok) throw new Error(d.error || "Refresh failed");
@@ -118,6 +124,7 @@ export default function RefreshPage() {
             state: "error",
             discovered: [],
             scraped: [],
+            cached: [],
             failed: [],
             error: e instanceof Error ? e.message : String(e),
           },
@@ -133,13 +140,15 @@ export default function RefreshPage() {
 
   return (
     <div>
-      <PageHeader title="Bulk refresh" />
+      <PageHeader title="Bulk tools" />
+      <BulkTabs />
 
       <div className="mb-4 rounded-xl bg-card p-4 ring-1 ring-foreground/10">
         <p className="text-sm text-muted-foreground">
           Auto-discovers socials for platforms an artist isn&apos;t linked on yet
-          (confident matches only), then re-scrapes every linked platform to
-          capture fresh metrics and growth snapshots.
+          (confident matches only), then scrapes any linked platform whose cached
+          data is stale (&gt;24h) to capture fresh metrics and growth snapshots.
+          Platforms with fresh cache are skipped.
         </p>
         <div className="mt-3 flex items-center justify-between gap-3">
           <label className="flex items-center gap-2 text-sm">
@@ -215,25 +224,48 @@ function RowSummary({ r }: { r: RowResult }) {
       </span>
     );
 
+  const empty =
+    !r.discovered.length &&
+    !r.scraped.length &&
+    !r.failed.length &&
+    !r.cached.length;
+
   return (
-    <div className="flex flex-wrap items-center justify-end gap-1.5 text-xs">
-      {r.discovered.map((p) => (
-        <Badge key={`d-${p}`} variant="secondary">
-          +{p}
-        </Badge>
-      ))}
-      {r.scraped.length > 0 && (
-        <span className="flex items-center gap-1 text-muted-foreground">
-          <Check className="size-3.5 text-primary" />
-          {r.scraped.length} scraped
+    <div className="flex flex-col items-end gap-1 text-xs">
+      <div className="flex flex-wrap items-center justify-end gap-1.5">
+        {r.discovered.map((p) => (
+          <Badge key={`d-${p}`} variant="secondary">
+            +{p}
+          </Badge>
+        ))}
+        {r.scraped.length > 0 && (
+          <span className="flex items-center gap-1 text-muted-foreground">
+            <Check className="size-3.5 text-primary" />
+            {r.scraped.length} scraped
+          </span>
+        )}
+        {r.cached.length > 0 && (
+          <span className="text-muted-foreground">
+            · {r.cached.length} cached
+          </span>
+        )}
+        {r.failed.length > 0 && (
+          <span className="text-destructive">· {r.failed.length} failed</span>
+        )}
+        {empty && <span className="text-muted-foreground">no change</span>}
+      </div>
+      {r.failed.map((f) => (
+        <span
+          key={`f-${f.platform}`}
+          className="flex items-center gap-1 text-destructive"
+          title={f.error}
+        >
+          <X className="size-3 shrink-0" />
+          <span className="max-w-[18rem] truncate">
+            {f.platform}: {f.error}
+          </span>
         </span>
-      )}
-      {r.failed.length > 0 && (
-        <span className="text-muted-foreground">· {r.failed.length} failed</span>
-      )}
-      {!r.discovered.length && !r.scraped.length && !r.failed.length && (
-        <span className="text-muted-foreground">no change</span>
-      )}
+      ))}
     </div>
   );
 }

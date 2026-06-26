@@ -10,7 +10,10 @@ const geistSans = Geist({ subsets: ["latin"], variable: "--font-geist-sans" });
 const geistMono = Geist_Mono({ subsets: ["latin"], variable: "--font-geist-mono" });
 
 export const metadata: Metadata = {
-  title: "Incighder — Artist Traction Insights",
+  title: {
+    default: "Incighder — Artist Traction Insights",
+    template: "%s · Incighder",
+  },
   description:
     "Track an artist's audience traction across Spotify, YouTube, SoundCloud, and social platforms.",
 };

@@ -19,9 +19,8 @@ const NAV = [
   { href: "/", label: "Artists" },
   { href: "/table", label: "Table" },
   { href: "/discover", label: "Discover" },
-  { href: "/search_spotify", label: "Search" },
+  { href: "/artists/add", label: "Manual" },
   { href: "/artists/bulk", label: "Bulk" },
-  { href: "/artists/refresh", label: "Refresh" },
 ];
 
 function isActive(pathname: string, href: string) {
@@ -102,7 +101,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </nav>
 
           <Button
-            render={<Link href="/artists/add" />}
+            render={<Link href="/search_spotify" />}
             size="sm"
             className="ml-auto"
           >
