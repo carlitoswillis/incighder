@@ -21,6 +21,7 @@ const NAV = [
   { href: "/discover", label: "Discover" },
   { href: "/search_spotify", label: "Search" },
   { href: "/artists/bulk", label: "Bulk" },
+  { href: "/artists/refresh", label: "Refresh" },
 ];
 
 function isActive(pathname: string, href: string) {

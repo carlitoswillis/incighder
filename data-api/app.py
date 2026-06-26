@@ -6,7 +6,7 @@ import sys
 import atexit
 import traceback
 
-from scrape_service import scrape_artist, clear_platform, metric_history
+from scrape_service import scrape_artist, refresh_artist, clear_platform, metric_history
 from scrapers.discovery import discover_links
 from link_preview import link_preview
 from scrapers.base import shutdown as _scraper_shutdown
@@ -97,6 +97,21 @@ def scrape():
         return jsonify({'error': 'Artist not found'}), 404
     except Exception as e:
         print(f"Scrape error: {e}", file=sys.stderr)
+        traceback.print_exc(file=sys.stderr)
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/refresh_artist', methods=['POST'])
+def refresh_artist_route():
+    data = request.json or {}
+    artist_id = data.get('artist_id')
+    if not artist_id:
+        return jsonify({'error': 'artist_id is required'}), 400
+    try:
+        return jsonify(refresh_artist(artist_id, force=bool(data.get('force')))), 200
+    except LookupError:
+        return jsonify({'error': 'Artist not found'}), 404
+    except Exception as e:
+        print(f"Refresh error: {e}", file=sys.stderr)
         traceback.print_exc(file=sys.stderr)
         return jsonify({'error': str(e)}), 500
 
