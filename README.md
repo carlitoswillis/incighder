@@ -148,9 +148,9 @@ For more customized development workflows, we also provide several helper script
 - **Home Page (`/`)**: Displays card layouts of all tracked artists, showcasing their key indicators (Spotify popularity, followers, top track metrics) and visual sparklines showing metric history.
 - **Table View (`/table`)**: A spreadsheet-style breakdown displaying all platform follower counts side-by-side. Sortable by platform metrics.
 - **Discover (`/discover`)**: Enter a seed artist to surface similar artists (Last.fm) enriched with Spotify and Last.fm metrics; one-click "Track" adds any of them to the dataset, with already-tracked artists marked.
-- **Add Artist (`/artists/add`)**: Search for an artist on Spotify and ingest their baseline metrics into the local PostgreSQL database.
+- **Add Artist (`/artists/add`)**: Search for an artist on Spotify and ingest their baseline metrics into the local PostgreSQL database, or add an artist manually when they aren't on Spotify.
 - **Artist Detail (`/artists/[id]`)**:
-  - Displays detailed stats grids and a track summary.
+  - Displays detailed stats grids and a track summary, with inline editing of artist fields and the option to remove a tracked artist.
   - Shows growth metrics and a history panel tracing historical subscriber metrics.
   - **Sources & Scraping Control Panel**: Paste platform profile URLs, trigger auto-discovery, or invoke a manually-triggered scrape (which obeys the 24h TTL or bypasses it with a "Force Refresh" toggle). Displays the success or error status of the latest scrapers.
 
