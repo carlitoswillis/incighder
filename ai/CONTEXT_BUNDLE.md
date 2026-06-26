@@ -1,5 +1,5 @@
 # AI Context Bundle
-Generated: Thu Jun 25 18:40:29 PDT 2026
+Generated: Thu Jun 25 19:12:14 PDT 2026
 
 ## ⚠️ Agent Navigation Guide
 1. Start with the **Current State** below to understand the focus.
@@ -65,7 +65,7 @@ Incighder is a multi-service data application that aggregates and visualizes art
 - **Subprocess pattern**: insert/search/similar shell out to standalone scripts (`insert_artist_from_json.py`, `spotify_search.py`, `similar_artists.py`) so each is runnable and testable in isolation; `app.py` marshals JSON in/out. Scrape/discover/history call modules in-process (`scrape_service`, `scrapers.discovery`, `link_preview`).
 - **Scrape orchestration (`scrape_service.py`)**: owns the DB read/write and the **24h cache TTL**; fans out to per-platform scrapers in `scrapers/` (`spotify`, `youtube`, `soundcloud`, `instagram`, `tiktok`) which stay pure (`link in → ScrapeResult out`). Returns **partial results** — one platform failing never blocks the others. X is manual-entry only. Writes are guarded by an `ALLOWED_METRIC_COLUMNS` allowlist (no column-name injection); `PLATFORM_COLUMNS` defines what each source owns and is nulled on unlink.
 - **Artist discovery (similar artists)**: `/discover` seeds on an artist name and uses the free **Last.fm `artist.getSimilar`** graph (Spotify's related-artists API was retired in late 2024), then enriches each result via Spotify search + Last.fm `artist.getInfo`. Backed by `similar_artists.py`; requires `LAST_FM_API_KEY`. "Track" reuses the standard `/insert_artist` pipeline.
-- **Auto-discovery of links (`scrapers/discovery.py`)**: best-guesses official YouTube/SoundCloud/IG/TikTok profiles for an artist name.
+- **Auto-discovery of links (`scrapers/discovery.py`)**: finds official profiles for an artist name. YouTube/SoundCloud use their native search APIs. IG/TikTok use a free **web search** (`web_search.py` → Google Programmable Search, `GOOGLE_CSE_KEY`/`GOOGLE_CSE_ID`): it queries `{name} site:<platform>`, normalizes hits to profile roots (rejecting `/p/`, `/reel/`, `/video/`, reserved paths), AI-verifies each candidate, and returns the best match plus ranked `alternates`. This recovers accounts whose handle differs from the artist's name. The old name-slug guess remains a fallback candidate, so discovery still works with no search key configured.
 - **AI verification (`ai_verify.py`, optional)**: cross-checks discovered IG/TikTok profiles against the artist with a **local LLM via Ollama** (`OLLAMA_URL`, default `host.docker.internal:11434`; `OLLAMA_MODEL`, default `qwen2.5-coder:14b`). Returns `{match, confidence, reason}`. Free, private, best-effort — **no paid AI APIs**; if Ollama is unreachable the guess is kept as unverified. Reaches the host's Ollama via `extra_hosts: host.docker.internal:host-gateway` in `docker-compose.yml`.
 
 ### 3. Database (PostgreSQL)
@@ -105,7 +105,7 @@ This repo uses an AI-assisted engineering substrate in `ai/`.
 PURPOSE: High-level summary of the system's current focus, the product vision, and recent changes — the single place an agent reads first to avoid drift. (Absorbs the former `GOALS.md`.)
 
 ## Last Updated: 2026-06-25
-## Current Focus: Scheduled auto-scrape (`scheduler` container) shipped. Backlog: bulk import, data export, change alerts.
+## Current Focus: Bulk artist import shipped (`/artists/bulk` — paste names → verify Spotify match per row → batch insert). Backlog: data export, change alerts.
 
 ## Project Goal
 Build a data application that gives A&Rs, labels, and artists a **holistic view of an artist's online traction and growth potential** by aggregating public metrics across music and social platforms — Spotify, YouTube, SoundCloud, Instagram, TikTok, and X — and tracking how they move over time.
@@ -149,6 +149,7 @@ The long-term aim is a single dashboard that scores artist traction from many si
 ---
 
 ## Recent Changes
+- **Search-backed social discovery**: IG/TikTok auto-discovery now runs a free web search (Google Programmable Search, `web_search.py`) for the artist on each platform instead of blind name-slug guessing, so it finds handles that differ from the artist's name. Candidates are normalized to profile roots, AI-verified, ranked; the best is auto-filled and `alternates` are one-click switchable in the sources panel. Falls back to the name-slug guess when no search key is set. Needs `GOOGLE_CSE_KEY`/`GOOGLE_CSE_ID`.
 - **Artist Discovery**: New `/discover` page — seed artist → Last.fm `getSimilar` → Spotify-enriched grid (followers/popularity + Last.fm listeners/playcount/tags), one-click "Track" reuses the insert pipeline; already-tracked artists are marked. Backend `similar_artists.py` + `/similar_artists` route; uses `LAST_FM_API_KEY`.
 - **Scraping Plan**: Authored `SCRAPING_PLAN.md` for cross-platform metric scraping (the live engineering plan; supersedes the old GOALS phases).
 - **Cleanup**: Fixed substrate drift, removed dead endpoints, guarded PATCH/scrape writes against column-name injection.
@@ -163,7 +164,7 @@ The long-term aim is a single dashboard that scores artist traction from many si
 ## Next Steps
 1. Execute `SCRAPING_PLAN.md` follow-ups; keep `YOUTUBE_API_KEY` / `LAST_FM_API_KEY` provisioned in `.env`.
 2. Scheduled auto-scrape for growth (cron/worker pulling metrics on a cadence).
-3. Bulk artist import and data export (CSV/JSON).
+3. Data export (CSV/JSON); optional bulk re-scrape / social auto-discovery for bulk-imported artists.
 
 
 # Tasks
@@ -174,8 +175,7 @@ PURPOSE: Tracks active work and backlog. AI agents should update this after comp
 - (nothing in progress — pick next from Backlog)
 
 ## Backlog
-- [ ] Bulk import: paste several artist names → auto-add + auto-discover socials
-- [ ] Update / re-scrape multiple artists in one action
+- [ ] Update / re-scrape multiple artists in one action (incl. social auto-discovery for bulk-imported artists)
 - [ ] Export artist data (CSV / JSON)
 - [ ] Discovery seeded from an already-tracked artist (in-app, not just the `/discover` search box)
 - [ ] Weighted cross-platform traction score
@@ -184,6 +184,8 @@ PURPOSE: Tracks active work and backlog. AI agents should update this after comp
 - [ ] Playlist / chart-placement tracking — competitor table-stakes we lack (see `COMPETITORS.md`)
 
 ## Completed
+- [x] Bulk artist import: `/artists/bulk` — paste names → each auto-resolved to its top Spotify match → confirm/swap/skip per row (flags already-tracked & no-match) → batch insert via the existing `/api/spotify-search` + `/api/artists` (`insert_artist`) path; no backend changes (`artists/bulk/page.tsx`)
+- [x] Search-backed IG/TikTok auto-discovery: free web search (Google Programmable Search) → normalized profile candidates → AI-verified + ranked → best auto-filled with one-click `alternates`; name-slug fallback when no key (`scrapers/web_search.py`, `scrapers/discovery.py`, `sources-panel.tsx`)
 - [x] Artist discovery: `/discover` page (seed → Last.fm similar → Spotify-enriched grid → one-click Track)
 - [x] UI design overhaul (Phases A–D): shadcn dark slate/cyan system, all pages redesigned (`DESIGN_OVERHAUL_PLAN.md`)
 - [x] Scraping Phase 0-4: scrapers + `/scrape` + auto-discovery + metrics across the UI (`SCRAPING_PLAN.md`)
@@ -257,113 +259,113 @@ PURPOSE: Tracks active work and backlog. AI agents should update this after comp
 
 ## 5. Recent Git Changes (Summary)
 ```text
+83a5109 feat(ui): bulk artist import with verify-before-commit
+ad1f2e3 feat(scheduler): recurring auto-scrape worker for growth tracking
 db24d8d docs: mark Spotify-logo cleanup done; note images in scrape backfill
 ba79ee3 ui: drop misplaced Spotify logo from Incighder actions
 6c0dd86 docs: add competitive landscape (Songstats et al.) + roadmap gaps
-3090aa8 fix(scrape): also backfill Spotify images + external_urls on scrape
-4d3961e fix(scrape): Spotify scrape backfills Web API baseline for manual artists
 ```
 
 ## 6. Active Diff
 ```diff
 diff --git a/README.md b/README.md
-index c165ebe..a2e9e57 100644
+index a2e9e57..9c3118a 100644
 --- a/README.md
 +++ b/README.md
-@@ -28,6 +28,7 @@ Incighder is a professional data application designed to help recording artists,
-   - Uses a **local LLM via Ollama** (`qwen2.5-coder:14b`) to inspect profile metadata and previews, deciding if a guessed link belongs to the artist (`match` / `uncertain` / `mismatch`) before it is scraped.
+@@ -24,8 +24,8 @@ Incighder is a professional data application designed to help recording artists,
+   - **One-click "Track"** ingests any similar artist into the dataset via the existing insert pipeline; artists you already track are marked so you only add what's new.
+ - **Auto-Discovery & AI Verification**:
+   - Automatically searches for and suggests official YouTube channels and SoundCloud profiles.
+-  - Generates best-guess candidate handles for Instagram and TikTok.
+-  - Uses a **local LLM via Ollama** (`qwen2.5-coder:14b`) to inspect profile metadata and previews, deciding if a guessed link belongs to the artist (`match` / `uncertain` / `mismatch`) before it is scraped.
++  - For Instagram and TikTok, runs a free **web search** (Google Programmable Search) for the artist on that platform and collects real candidate profiles — so it finds accounts even when the handle differs from the artist's name (a preferred handle was taken, stage vs. legal name, etc.), which a blind name-guess never could.
++  - Uses a **local LLM via Ollama** (`qwen2.5-coder:14b`) to inspect each candidate's profile metadata/preview and decide whether it belongs to the artist (`match` / `uncertain` / `mismatch`); the best match is auto-filled and the runners-up are offered as **alternates** you can switch to in one click.
  - **Historical Growth Analytics**:
    - Automatically captures account-keyed metric snapshots in the database when new data is pulled.
-+  - A background **auto-scrape scheduler** sweeps all tracked artists on a recurring interval (default 24h, TTL-respected), so growth history accrues without manual scraping.
-   - Renders inline metric sparklines on the dashboard.
-   - Features a dedicated historical section showing growth trends since tracking began.
- - **Modern Sleek Design System**:
-@@ -102,6 +103,9 @@ OLLAMA_MODEL=qwen2.5-coder:14b
- # Scraping Throttle Configuration (Optional; defaults to 2.0s and 6.0s)
- SCRAPE_THROTTLE_MIN=2.0
- SCRAPE_THROTTLE_MAX=6.0
+   - A background **auto-scrape scheduler** sweeps all tracked artists on a recurring interval (default 24h, TTL-respected), so growth history accrues without manual scraping.
+@@ -96,6 +96,13 @@ YOUTUBE_API_KEY=your_youtube_api_key
+ # Last.fm API Key (Required for the /discover similar-artists feature)
+ LAST_FM_API_KEY=your_lastfm_api_key
+ 
++# Google Programmable Search (Optional; powers search-backed Instagram/TikTok
++# auto-discovery — free 100 queries/day. Without it, discovery falls back to a
++# name-slug guess.) GOOGLE_CSE_KEY is a Cloud API key; GOOGLE_CSE_ID is the
++# Programmable Search Engine "cx" id, set to search the entire web.
++GOOGLE_CSE_KEY=your_google_api_key
++GOOGLE_CSE_ID=your_cse_cx_id
 +
-+# Auto-scrape scheduler (Optional; defaults to a 24h sweep interval)
-+AUTO_SCRAPE_INTERVAL_HOURS=24
- ```
- 
- ### 3. Running the Application
-@@ -159,6 +163,5 @@ For more customized development workflows, we also provide several helper script
- ## Future Enhancements (Roadmap)
- 
- - **Bulk Artist Import**: Ingest a batch of artist names or Spotify IDs in a single operation.
--- **Automated Scraping Scheduler**: Set up recurring cron jobs to pull metrics automatically at night.
- - **Data Exporting**: Export metric sets to CSV or JSON formats for custom analysis.
- - **Weighted Analytics Score**: Combine metrics from all platforms into a single weighted health/traction score.
-\ No newline at end of file
+ # Local Ollama URL (Optional; defaults to http://host.docker.internal:11434 for Docker)
+ OLLAMA_URL=http://host.docker.internal:11434
+ OLLAMA_MODEL=qwen2.5-coder:14b
 diff --git a/ai/ARCHITECTURE.md b/ai/ARCHITECTURE.md
-index 2092a3c..161d83f 100644
+index 161d83f..8152ed1 100644
 --- a/ai/ARCHITECTURE.md
 +++ b/ai/ARCHITECTURE.md
-@@ -34,15 +34,20 @@ Incighder is a multi-service data application that aggregates and visualizes art
- - **Applying schema**: `docker compose run --rm data-api python apply_schema.py` (first run / reset).
+@@ -23,7 +23,7 @@ Incighder is a multi-service data application that aggregates and visualizes art
+ - **Subprocess pattern**: insert/search/similar shell out to standalone scripts (`insert_artist_from_json.py`, `spotify_search.py`, `similar_artists.py`) so each is runnable and testable in isolation; `app.py` marshals JSON in/out. Scrape/discover/history call modules in-process (`scrape_service`, `scrapers.discovery`, `link_preview`).
+ - **Scrape orchestration (`scrape_service.py`)**: owns the DB read/write and the **24h cache TTL**; fans out to per-platform scrapers in `scrapers/` (`spotify`, `youtube`, `soundcloud`, `instagram`, `tiktok`) which stay pure (`link in → ScrapeResult out`). Returns **partial results** — one platform failing never blocks the others. X is manual-entry only. Writes are guarded by an `ALLOWED_METRIC_COLUMNS` allowlist (no column-name injection); `PLATFORM_COLUMNS` defines what each source owns and is nulled on unlink.
+ - **Artist discovery (similar artists)**: `/discover` seeds on an artist name and uses the free **Last.fm `artist.getSimilar`** graph (Spotify's related-artists API was retired in late 2024), then enriches each result via Spotify search + Last.fm `artist.getInfo`. Backed by `similar_artists.py`; requires `LAST_FM_API_KEY`. "Track" reuses the standard `/insert_artist` pipeline.
+-- **Auto-discovery of links (`scrapers/discovery.py`)**: best-guesses official YouTube/SoundCloud/IG/TikTok profiles for an artist name.
++- **Auto-discovery of links (`scrapers/discovery.py`)**: finds official profiles for an artist name. YouTube/SoundCloud use their native search APIs. IG/TikTok use a free **web search** (`web_search.py` → Google Programmable Search, `GOOGLE_CSE_KEY`/`GOOGLE_CSE_ID`): it queries `{name} site:<platform>`, normalizes hits to profile roots (rejecting `/p/`, `/reel/`, `/video/`, reserved paths), AI-verifies each candidate, and returns the best match plus ranked `alternates`. This recovers accounts whose handle differs from the artist's name. The old name-slug guess remains a fallback candidate, so discovery still works with no search key configured.
+ - **AI verification (`ai_verify.py`, optional)**: cross-checks discovered IG/TikTok profiles against the artist with a **local LLM via Ollama** (`OLLAMA_URL`, default `host.docker.internal:11434`; `OLLAMA_MODEL`, default `qwen2.5-coder:14b`). Returns `{match, confidence, reason}`. Free, private, best-effort — **no paid AI APIs**; if Ollama is unreachable the guess is kept as unverified. Reaches the host's Ollama via `extra_hosts: host.docker.internal:host-gateway` in `docker-compose.yml`.
  
- ### 4. Infrastructure (Docker)
--- **Services** (`docker-compose.yml`): `db`, `data-api`, `incighder-dev` (Next.js). `extra_hosts` bridges the data-api to the host's Ollama.
-+- **Services** (`docker-compose.yml`): `db`, `data-api`, `incighder-dev` (Next.js), and `scheduler`. `extra_hosts` bridges the data-api/scheduler to the host's Ollama.
- - **Run**: `docker compose up --build` → frontend at `http://localhost:3000`.
- 
-+### 5. Scheduler (auto-scrape worker — `data-api/scheduler.py`)
-+- **Role**: recurring metric pulls so growth history accrues without manual scraping.
-+- **How**: reuses the `data-api` image but runs `python scheduler.py` instead of Flask — a sleep/sweep loop that every `AUTO_SCRAPE_INTERVAL_HOURS` (default 24) calls `scrape_service.scrape_all(force=False)`. The 24h cache TTL means only stale platforms actually refetch; each sweep appends `metric_snapshots` through the normal scrape path. One artist failing never aborts the sweep. `AUTO_SCRAPE_STARTUP_DELAY` (default 60s) delays the first sweep on boot.
-+
- ## Data Flow
- 1. **Search**: Next.js → `/api/spotify-search` → `data-api /spotify_search` → Spotify.
- 2. **Discover**: seed name → `/api/discover|similar` → `data-api` → Last.fm `getSimilar` + Spotify/Last.fm enrichment → grid; "Track" feeds ingestion.
- 3. **Ingestion**: `data-api` transforms API data → inserts into PostgreSQL.
- 4. **Scrape**: `/api/scrape` → `scrape_service` → per-platform scrapers (TTL-cached) → updates `artists` + appends `metric_snapshots`.
- 5. **Display**: Next.js reads structured data (via API routes / `pg`) and renders dashboard, table, detail, sparklines, and history.
-+6. **Scheduled sweep**: the `scheduler` worker periodically runs `scrape_all` over every artist (TTL-respected), feeding the same update + snapshot path as a manual scrape.
- 
- ## AI Workspace Substrate
- This repo uses an AI-assisted engineering substrate in `ai/`.
+ ### 3. Database (PostgreSQL)
 diff --git a/ai/CONTEXT_BUNDLE.md b/ai/CONTEXT_BUNDLE.md
-index 5327b3d..754a14f 100644
+index 5415a83..00f9e7c 100644
 --- a/ai/CONTEXT_BUNDLE.md
 +++ b/ai/CONTEXT_BUNDLE.md
 @@ -1,5 +1,5 @@
  # AI Context Bundle
--Generated: Thu Jun 25 18:25:53 PDT 2026
-+Generated: Thu Jun 25 18:40:29 PDT 2026
+-Generated: Thu Jun 25 18:40:29 PDT 2026
++Generated: Thu Jun 25 19:12:14 PDT 2026
  
  ## ⚠️ Agent Navigation Guide
  1. Start with the **Current State** below to understand the focus.
-@@ -76,15 +76,20 @@ Incighder is a multi-service data application that aggregates and visualizes art
- - **Applying schema**: `docker compose run --rm data-api python apply_schema.py` (first run / reset).
+@@ -65,7 +65,7 @@ Incighder is a multi-service data application that aggregates and visualizes art
+ - **Subprocess pattern**: insert/search/similar shell out to standalone scripts (`insert_artist_from_json.py`, `spotify_search.py`, `similar_artists.py`) so each is runnable and testable in isolation; `app.py` marshals JSON in/out. Scrape/discover/history call modules in-process (`scrape_service`, `scrapers.discovery`, `link_preview`).
+ - **Scrape orchestration (`scrape_service.py`)**: owns the DB read/write and the **24h cache TTL**; fans out to per-platform scrapers in `scrapers/` (`spotify`, `youtube`, `soundcloud`, `instagram`, `tiktok`) which stay pure (`link in → ScrapeResult out`). Returns **partial results** — one platform failing never blocks the others. X is manual-entry only. Writes are guarded by an `ALLOWED_METRIC_COLUMNS` allowlist (no column-name injection); `PLATFORM_COLUMNS` defines what each source owns and is nulled on unlink.
+ - **Artist discovery (similar artists)**: `/discover` seeds on an artist name and uses the free **Last.fm `artist.getSimilar`** graph (Spotify's related-artists API was retired in late 2024), then enriches each result via Spotify search + Last.fm `artist.getInfo`. Backed by `similar_artists.py`; requires `LAST_FM_API_KEY`. "Track" reuses the standard `/insert_artist` pipeline.
+-- **Auto-discovery of links (`scrapers/discovery.py`)**: best-guesses official YouTube/SoundCloud/IG/TikTok profiles for an artist name.
++- **Auto-discovery of links (`scrapers/discovery.py`)**: finds official profiles for an artist name. YouTube/SoundCloud use their native search APIs. IG/TikTok use a free **web search** (`web_search.py` → Google Programmable Search, `GOOGLE_CSE_KEY`/`GOOGLE_CSE_ID`): it queries `{name} site:<platform>`, normalizes hits to profile roots (rejecting `/p/`, `/reel/`, `/video/`, reserved paths), AI-verifies each candidate, and returns the best match plus ranked `alternates`. This recovers accounts whose handle differs from the artist's name. The old name-slug guess remains a fallback candidate, so discovery still works with no search key configured.
+ - **AI verification (`ai_verify.py`, optional)**: cross-checks discovered IG/TikTok profiles against the artist with a **local LLM via Ollama** (`OLLAMA_URL`, default `host.docker.internal:11434`; `OLLAMA_MODEL`, default `qwen2.5-coder:14b`). Returns `{match, confidence, reason}`. Free, private, best-effort — **no paid AI APIs**; if Ollama is unreachable the guess is kept as unverified. Reaches the host's Ollama via `extra_hosts: host.docker.internal:host-gateway` in `docker-compose.yml`.
  
- ### 4. Infrastructure (Docker)
--- **Services** (`docker-compose.yml`): `db`, `data-api`, `incighder-dev` (Next.js). `extra_hosts` bridges the data-api to the host's Ollama.
-+- **Services** (`docker-compose.yml`): `db`, `data-api`, `incighder-dev` (Next.js), and `scheduler`. `extra_hosts` bridges the data-api/scheduler to the host's Ollama.
- - **Run**: `docker compose up --build` → frontend at `http://localhost:3000`.
- 
-+### 5. Scheduler (auto-scrape worker — `data-api/scheduler.py`)
-+- **Role**: recurring metric pulls so growth history accrues without manual scraping.
-+- **How**: reuses the `data-api` image but runs `python scheduler.py` instead of Flask — a sleep/sweep loop that every `AUTO_SCRAPE_INTERVAL_HOURS` (default 24) calls `scrape_service.scrape_all(force=False)`. The 24h cache TTL means only stale platforms actually refetch; each sweep appends `metric_snapshots` through the normal scrape path. One artist failing never aborts the sweep. `AUTO_SCRAPE_STARTUP_DELAY` (default 60s) delays the first sweep on boot.
-+
- ## Data Flow
- 1. **Search**: Next.js → `/api/spotify-search` → `data-api /spotify_search` → Spotify.
- 2. **Discover**: seed name → `/api/discover|similar` → `data-api` → Last.fm `getSimilar` + Spotify/Last.fm enrichment → grid; "Track" feeds ingestion.
- 3. **Ingestion**: `data-api` transforms API data → inserts into PostgreSQL.
- 4. **Scrape**: `/api/scrape` → `scrape_service` → per-platform scrapers (TTL-cached) → updates `artists` + appends `metric_snapshots`.
- 5. **Display**: Next.js reads structured data (via API routes / `pg`) and renders dashboard, table, detail, sparklines, and history.
-+6. **Scheduled sweep**: the `scheduler` worker periodically runs `scrape_all` over every artist (TTL-respected), feeding the same update + snapshot path as a manual scrape.
- 
- ## AI Workspace Substrate
- This repo uses an AI-assisted engineering substrate in `ai/`.
-@@ -100,7 +105,7 @@ This repo uses an AI-assisted engineering substrate in `ai/`.
+ ### 3. Database (PostgreSQL)
+@@ -105,7 +105,7 @@ This repo uses an AI-assisted engineering substrate in `ai/`.
  PURPOSE: High-level summary of the system's current focus, the product vision, and recent changes — the single place an agent reads first to avoid drift. (Absorbs the former `GOALS.md`.)
  
  ## Last Updated: 2026-06-25
--## Current Focus: Artist discovery (seed → similar artists) shipped. Backlog: scheduled auto-scrape, bulk import, data export.
-+## Current Focus: Scheduled auto-scrape (`scheduler` container) shipped. Backlog: bulk import, data export, change alerts.
+-## Current Focus: Scheduled auto-scrape (`scheduler` container) shipped. Backlog: bulk import, data export, change alerts.
++## Current Focus: Bulk artist import shipped (`/artists/bulk` — paste names → verify Spotify match per row → batch insert). Backlog: data export, change alerts.
  
  ## Project Goal
  Build a data application that gives A&Rs, labels, and artists a **holistic view of an artist's online traction and growth potential** by aggregating public metrics across music and social platforms — Spotify, YouTube, SoundCloud, Instagram, TikTok, and X — and tracking how they move over time.
-@@ -169,7 +174,6 @@ PURPOSE: Tracks active work and backlog. AI agents should update this after comp
+@@ -149,6 +149,7 @@ The long-term aim is a single dashboard that scores artist traction from many si
+ ---
+ 
+ ## Recent Changes
++- **Search-backed social discovery**: IG/TikTok auto-discovery now runs a free web search (Google Programmable Search, `web_search.py`) for the artist on each platform instead of blind name-slug guessing, so it finds handles that differ from the artist's name. Candidates are normalized to profile roots, AI-verified, ranked; the best is auto-filled and `alternates` are one-click switchable in the sources panel. Falls back to the name-slug guess when no search key is set. Needs `GOOGLE_CSE_KEY`/`GOOGLE_CSE_ID`.
+ - **Artist Discovery**: New `/discover` page — seed artist → Last.fm `getSimilar` → Spotify-enriched grid (followers/popularity + Last.fm listeners/playcount/tags), one-click "Track" reuses the insert pipeline; already-tracked artists are marked. Backend `similar_artists.py` + `/similar_artists` route; uses `LAST_FM_API_KEY`.
+ - **Scraping Plan**: Authored `SCRAPING_PLAN.md` for cross-platform metric scraping (the live engineering plan; supersedes the old GOALS phases).
+ - **Cleanup**: Fixed substrate drift, removed dead endpoints, guarded PATCH/scrape writes against column-name injection.
+@@ -163,7 +164,7 @@ The long-term aim is a single dashboard that scores artist traction from many si
+ ## Next Steps
+ 1. Execute `SCRAPING_PLAN.md` follow-ups; keep `YOUTUBE_API_KEY` / `LAST_FM_API_KEY` provisioned in `.env`.
+ 2. Scheduled auto-scrape for growth (cron/worker pulling metrics on a cadence).
+-3. Bulk artist import and data export (CSV/JSON).
++3. Data export (CSV/JSON); optional bulk re-scrape / social auto-discovery for bulk-imported artists.
+ 
+ 
+ # Tasks
+@@ -174,8 +175,7 @@ PURPOSE: Tracks active work and backlog. AI agents should update this after comp
  - (nothing in progress — pick next from Backlog)
+ 
+ ## Backlog
+-- [ ] Bulk import: paste several artist names → auto-add + auto-discover socials
+-- [ ] Update / re-scrape multiple artists in one action
++- [ ] Update / re-scrape multiple artists in one action (incl. social auto-discovery for bulk-imported artists)
+ - [ ] Export artist data (CSV / JSON)
+ - [ ] Discovery seeded from an already-tracked artist (in-app, not just the `/discover` search box)
+ - [ ] Weighted cross-platform traction score
+@@ -184,6 +184,8 @@ PURPOSE: Tracks active work and backlog. AI agents should update this after comp
+ - [ ] Playlist / chart-placement tracking — competitor table-stakes we lack (see `COMPETITORS.md`)
 ```
