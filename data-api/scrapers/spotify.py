@@ -75,8 +75,10 @@ def _web_api_data(artist_id: str) -> dict:
         "spotify_id": artist_id,
         "followers": (artist.get("followers") or {}).get("total"),
         "popularity": artist.get("popularity"),
-        # genres is a TEXT column storing a JSON array, matching the insert path.
+        # genres/images/external_urls are JSON columns; serialize to match the insert path.
         "genres": json.dumps(artist.get("genres")) if artist.get("genres") is not None else None,
+        "images": json.dumps(artist.get("images")) if artist.get("images") is not None else None,
+        "external_urls": json.dumps(artist.get("external_urls")) if artist.get("external_urls") is not None else None,
     }
     try:
         tracks = sp.artist_top_tracks(artist_id).get("tracks") or []

@@ -1,5 +1,5 @@
 # AI Context Bundle
-Generated: Thu Jun 25 17:50:10 PDT 2026
+Generated: Thu Jun 25 18:16:32 PDT 2026
 
 ## ⚠️ Agent Navigation Guide
 1. Start with the **Current State** below to understand the focus.
@@ -250,113 +250,113 @@ PURPOSE: Tracks active work and backlog. AI agents should update this after comp
 
 ## 5. Recent Git Changes (Summary)
 ```text
+4d3961e fix(scrape): Spotify scrape backfills Web API baseline for manual artists
 581aabd docs: fuse GOALS into PROJECT_STATE; align ai/ docs + README with code
 bce4b5d add more goals
 e35414e docs: note artist discovery (Last.fm) in ARCHITECTURE; regen context bundle
 77ff62f feat(discovery): /discover page — seed artist → similar artists
-a3798b0 docs: prioritize docker compose up over bash wrapper scripts in README
 ```
 
 ## 6. Active Diff
 ```diff
 diff --git a/ai/CONTEXT_BUNDLE.md b/ai/CONTEXT_BUNDLE.md
-index 9e07faf..11232f3 100644
+index 074d0cc..4d2c355 100644
 --- a/ai/CONTEXT_BUNDLE.md
 +++ b/ai/CONTEXT_BUNDLE.md
 @@ -1,5 +1,5 @@
  # AI Context Bundle
--Generated: Thu Jun 25 17:42:50 PDT 2026
-+Generated: Thu Jun 25 17:50:10 PDT 2026
+-Generated: Thu Jun 25 17:50:10 PDT 2026
++Generated: Thu Jun 25 18:16:32 PDT 2026
  
  ## ⚠️ Agent Navigation Guide
  1. Start with the **Current State** below to understand the focus.
-@@ -177,7 +177,6 @@ PURPOSE: Tracks active work and backlog. AI agents should update this after comp
- - [ ] Weighted cross-platform traction score
- - [ ] Robust history charts (currently sparse — often only 2 points until more scans accrue)
- - [ ] Remove Spotify logos from the design
--- [ ] Bug: manual artist add has no follower/etc. data even after adding Spotify as a source and scraping — works when added via search / Spotify-search instead
- 
- ## Completed
- - [x] Artist discovery: `/discover` page (seed → Last.fm similar → Spotify-enriched grid → one-click Track)
-@@ -185,6 +184,7 @@ PURPOSE: Tracks active work and backlog. AI agents should update this after comp
- - [x] Scraping Phase 0-4: scrapers + `/scrape` + auto-discovery + metrics across the UI (`SCRAPING_PLAN.md`)
- - [x] Growth-over-time: account-keyed metric snapshots + `/history` + sparklines (re-linking doesn't fake growth)
- - [x] AI-verified discovery: local Ollama (`qwen2.5-coder`) checks auto-found IG/TikTok accounts; panel flags uncertain/mismatch (`ARCHITECTURE.md`)
-+- [x] Bug fix: Spotify scrape now backfills the Web API baseline (followers, popularity, genres, spotify_id, top track) so manually-added artists get full data once their Spotify source is scraped
- - [x] Artist editing (PATCH) + delete + manual insert (`/insert_artist_manual`)
- - [x] Navigation bar; decoupled schema (spotify_id nullable); consolidated `schema.sql` to `data-api/`
- - [x] Deploy with ngrok / cloudflared
-@@ -248,213 +248,12 @@ PURPOSE: Tracks active work and backlog. AI agents should update this after comp
+@@ -248,113 +248,12 @@ PURPOSE: Tracks active work and backlog. AI agents should update this after comp
  
  ## 5. Recent Git Changes (Summary)
  ```text
-+581aabd docs: fuse GOALS into PROJECT_STATE; align ai/ docs + README with code
++4d3961e fix(scrape): Spotify scrape backfills Web API baseline for manual artists
+ 581aabd docs: fuse GOALS into PROJECT_STATE; align ai/ docs + README with code
  bce4b5d add more goals
  e35414e docs: note artist discovery (Last.fm) in ARCHITECTURE; regen context bundle
  77ff62f feat(discovery): /discover page — seed artist → similar artists
- a3798b0 docs: prioritize docker compose up over bash wrapper scripts in README
--7563006 docs: update README to reflect cross-platform scrapers, Ollama verification, and growth history; rename package-lock project name
+-a3798b0 docs: prioritize docker compose up over bash wrapper scripts in README
  ```
  
  ## 6. Active Diff
  ```diff
--diff --git a/GOALS.md b/GOALS.md
--deleted file mode 100644
--index 76a3748..0000000
----- a/GOALS.md
--+++ /dev/null
--@@ -1,399 +0,0 @@
---Comprehensive Data Integration Plan for Artist Assessment (Revised)
---
---  Overall Goal: To build a data application that provides a holistic view
---  of an artist's online traction and potential, incorporating a wide array
---   of metrics from various digital platforms for A&R assessment, with a
---  continuously updated and reflective user interface.
---
---  1. Core Metrics to Integrate (User's Requirements)
---
---  Here's a structured list of the metrics we aim to integrate, categorized
---   for clarity:
---
---  A. Artist Identity & Basic Presence:
---   * Artist Name
---   * Instagram Handle
---   * TikTok Handle
---   * X/Twitter Handle
---
---
---  B. Follower & Subscriber Counts:
---   * Instagram Follower Count
---   * TikTok Follower Count
---   * X/Twitter Follower Count
---   * Spotify Monthly Listeners (Note: Proprietary, manual input/proxy
---     needed)
---   * SoundCloud Follower Count
---   * YouTube Subscriber Count
---
---
---  C. Top Content & Performance:
---   * Top Spotify Song
---   * Spotify Top Song Plays (Note: Public API provides popularity, not
---     exact plays)
---   * Top SoundCloud Song
---   * SoundCloud Top Song Plays
---   * Top YouTube Song
---   * YouTube Top Song Plays (Video Views)
---
---
---  D. Engagement & Growth Metrics:
---   * Instagram Engagement Rate (Likes + Comments ÷ Followers)
---   * TikTok Engagement Rate (Likes, Shares, Comments per video)
---   * TikTok Average Views Per Video
---   * TikTok Virality Score (Number of viral videos)
---   * TikTok Sounds Usage (How many people are using their original sounds)
---   * YouTube Engagement Rate (Likes, Comments, Watch Time per video)
---   * YouTube Average Views Per Video
---   * YouTube Shorts Performance (Views, Likes, Shares)
---   * X/Twitter Engagement Rate (Likes, Retweets, Comments per tweet)
---   * Follower Growth Rate (Across all platforms)
---   * Cross-Platform Presence (How well they perform across multiple
---     platforms)
---
+-diff --git a/ai/CONTEXT_BUNDLE.md b/ai/CONTEXT_BUNDLE.md
+-index 9e07faf..11232f3 100644
+---- a/ai/CONTEXT_BUNDLE.md
+-+++ b/ai/CONTEXT_BUNDLE.md
+-@@ -1,5 +1,5 @@
+- # AI Context Bundle
+--Generated: Thu Jun 25 17:42:50 PDT 2026
+-+Generated: Thu Jun 25 17:50:10 PDT 2026
+- 
+- ## ⚠️ Agent Navigation Guide
+- 1. Start with the **Current State** below to understand the focus.
+-@@ -177,7 +177,6 @@ PURPOSE: Tracks active work and backlog. AI agents should update this after comp
+- - [ ] Weighted cross-platform traction score
+- - [ ] Robust history charts (currently sparse — often only 2 points until more scans accrue)
+- - [ ] Remove Spotify logos from the design
+--- [ ] Bug: manual artist add has no follower/etc. data even after adding Spotify as a source and scraping — works when added via search / Spotify-search instead
+- 
+- ## Completed
+- - [x] Artist discovery: `/discover` page (seed → Last.fm similar → Spotify-enriched grid → one-click Track)
+-@@ -185,6 +184,7 @@ PURPOSE: Tracks active work and backlog. AI agents should update this after comp
+- - [x] Scraping Phase 0-4: scrapers + `/scrape` + auto-discovery + metrics across the UI (`SCRAPING_PLAN.md`)
+- - [x] Growth-over-time: account-keyed metric snapshots + `/history` + sparklines (re-linking doesn't fake growth)
+- - [x] AI-verified discovery: local Ollama (`qwen2.5-coder`) checks auto-found IG/TikTok accounts; panel flags uncertain/mismatch (`ARCHITECTURE.md`)
+-+- [x] Bug fix: Spotify scrape now backfills the Web API baseline (followers, popularity, genres, spotify_id, top track) so manually-added artists get full data once their Spotify source is scraped
+- - [x] Artist editing (PATCH) + delete + manual insert (`/insert_artist_manual`)
+- - [x] Navigation bar; decoupled schema (spotify_id nullable); consolidated `schema.sql` to `data-api/`
+- - [x] Deploy with ngrok / cloudflared
+-@@ -248,213 +248,12 @@ PURPOSE: Tracks active work and backlog. AI agents should update this after comp
+- 
+- ## 5. Recent Git Changes (Summary)
+- ```text
+-+581aabd docs: fuse GOALS into PROJECT_STATE; align ai/ docs + README with code
+- bce4b5d add more goals
+- e35414e docs: note artist discovery (Last.fm) in ARCHITECTURE; regen context bundle
+- 77ff62f feat(discovery): /discover page — seed artist → similar artists
+- a3798b0 docs: prioritize docker compose up over bash wrapper scripts in README
+--7563006 docs: update README to reflect cross-platform scrapers, Ollama verification, and growth history; rename package-lock project name
+- ```
+- 
+- ## 6. Active Diff
+- ```diff
+--diff --git a/GOALS.md b/GOALS.md
+--deleted file mode 100644
+--index 76a3748..0000000
+----- a/GOALS.md
+--+++ /dev/null
+--@@ -1,399 +0,0 @@
+---Comprehensive Data Integration Plan for Artist Assessment (Revised)
+---
+---  Overall Goal: To build a data application that provides a holistic view
+---  of an artist's online traction and potential, incorporating a wide array
+---   of metrics from various digital platforms for A&R assessment, with a
+---  continuously updated and reflective user interface.
+---
+---  1. Core Metrics to Integrate (User's Requirements)
+---
+---  Here's a structured list of the metrics we aim to integrate, categorized
+---   for clarity:
+---
+---  A. Artist Identity & Basic Presence:
+---   * Artist Name
+---   * Instagram Handle
+---   * TikTok Handle
+---   * X/Twitter Handle
+---
+---
+---  B. Follower & Subscriber Counts:
+---   * Instagram Follower Count
+---   * TikTok Follower Count
+---   * X/Twitter Follower Count
+---   * Spotify Monthly Listeners (Note: Proprietary, manual input/proxy
+---     needed)
+---   * SoundCloud Follower Count
+---   * YouTube Subscriber Count
+---
 ```
