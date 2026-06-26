@@ -28,6 +28,7 @@ Incighder is a professional data application designed to help recording artists,
   - Uses a **local LLM via Ollama** (`qwen2.5-coder:14b`) to inspect profile metadata and previews, deciding if a guessed link belongs to the artist (`match` / `uncertain` / `mismatch`) before it is scraped.
 - **Historical Growth Analytics**:
   - Automatically captures account-keyed metric snapshots in the database when new data is pulled.
+  - A background **auto-scrape scheduler** sweeps all tracked artists on a recurring interval (default 24h, TTL-respected), so growth history accrues without manual scraping.
   - Renders inline metric sparklines on the dashboard.
   - Features a dedicated historical section showing growth trends since tracking began.
 - **Modern Sleek Design System**:
@@ -102,6 +103,9 @@ OLLAMA_MODEL=qwen2.5-coder:14b
 # Scraping Throttle Configuration (Optional; defaults to 2.0s and 6.0s)
 SCRAPE_THROTTLE_MIN=2.0
 SCRAPE_THROTTLE_MAX=6.0
+
+# Auto-scrape scheduler (Optional; defaults to a 24h sweep interval)
+AUTO_SCRAPE_INTERVAL_HOURS=24
 ```
 
 ### 3. Running the Application
@@ -159,6 +163,5 @@ For more customized development workflows, we also provide several helper script
 ## Future Enhancements (Roadmap)
 
 - **Bulk Artist Import**: Ingest a batch of artist names or Spotify IDs in a single operation.
-- **Automated Scraping Scheduler**: Set up recurring cron jobs to pull metrics automatically at night.
 - **Data Exporting**: Export metric sets to CSV or JSON formats for custom analysis.
 - **Weighted Analytics Score**: Combine metrics from all platforms into a single weighted health/traction score.

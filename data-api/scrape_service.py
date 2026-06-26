@@ -175,6 +175,37 @@ def scrape_artist(artist_id: str, links: dict | None = None, force: bool = False
         conn.close()
 
 
+def all_artist_ids() -> list:
+    """Every tracked artist id, for the scheduled sweep."""
+    conn = get_db_connection()
+    if not conn:
+        raise RuntimeError("database connection failed")
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT id FROM artists ORDER BY name")
+            return [r[0] for r in cur.fetchall()]
+    finally:
+        conn.close()
+
+
+def scrape_all(force: bool = False) -> dict:
+    """Sweep every tracked artist (TTL-respected unless force). Returns a per-artist
+    summary; one artist failing never aborts the sweep. Used by the scheduler."""
+    summary: dict = {}
+    for aid in all_artist_ids():
+        try:
+            results = scrape_artist(aid, force=force).get("results", {})
+            summary[aid] = {
+                "ok": True,
+                "scraped": [p for p, r in results.items()
+                            if r.get("ok") and not r.get("skipped")],
+                "skipped": [p for p, r in results.items() if r.get("skipped")],
+            }
+        except Exception as e:  # never let one artist abort the whole sweep
+            summary[aid] = {"ok": False, "error": str(e)}
+    return summary
+
+
 def clear_platform(artist_id: str, platform: str) -> dict:
     """Remove a platform's source link, its metrics, and its scrape_meta entry."""
     conn = get_db_connection()

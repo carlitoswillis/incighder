@@ -1,5 +1,5 @@
 # AI Context Bundle
-Generated: Thu Jun 25 18:25:53 PDT 2026
+Generated: Thu Jun 25 18:40:29 PDT 2026
 
 ## ⚠️ Agent Navigation Guide
 1. Start with the **Current State** below to understand the focus.
@@ -76,8 +76,12 @@ Incighder is a multi-service data application that aggregates and visualizes art
 - **Applying schema**: `docker compose run --rm data-api python apply_schema.py` (first run / reset).
 
 ### 4. Infrastructure (Docker)
-- **Services** (`docker-compose.yml`): `db`, `data-api`, `incighder-dev` (Next.js). `extra_hosts` bridges the data-api to the host's Ollama.
+- **Services** (`docker-compose.yml`): `db`, `data-api`, `incighder-dev` (Next.js), and `scheduler`. `extra_hosts` bridges the data-api/scheduler to the host's Ollama.
 - **Run**: `docker compose up --build` → frontend at `http://localhost:3000`.
+
+### 5. Scheduler (auto-scrape worker — `data-api/scheduler.py`)
+- **Role**: recurring metric pulls so growth history accrues without manual scraping.
+- **How**: reuses the `data-api` image but runs `python scheduler.py` instead of Flask — a sleep/sweep loop that every `AUTO_SCRAPE_INTERVAL_HOURS` (default 24) calls `scrape_service.scrape_all(force=False)`. The 24h cache TTL means only stale platforms actually refetch; each sweep appends `metric_snapshots` through the normal scrape path. One artist failing never aborts the sweep. `AUTO_SCRAPE_STARTUP_DELAY` (default 60s) delays the first sweep on boot.
 
 ## Data Flow
 1. **Search**: Next.js → `/api/spotify-search` → `data-api /spotify_search` → Spotify.
@@ -85,6 +89,7 @@ Incighder is a multi-service data application that aggregates and visualizes art
 3. **Ingestion**: `data-api` transforms API data → inserts into PostgreSQL.
 4. **Scrape**: `/api/scrape` → `scrape_service` → per-platform scrapers (TTL-cached) → updates `artists` + appends `metric_snapshots`.
 5. **Display**: Next.js reads structured data (via API routes / `pg`) and renders dashboard, table, detail, sparklines, and history.
+6. **Scheduled sweep**: the `scheduler` worker periodically runs `scrape_all` over every artist (TTL-respected), feeding the same update + snapshot path as a manual scrape.
 
 ## AI Workspace Substrate
 This repo uses an AI-assisted engineering substrate in `ai/`.
@@ -100,7 +105,7 @@ This repo uses an AI-assisted engineering substrate in `ai/`.
 PURPOSE: High-level summary of the system's current focus, the product vision, and recent changes — the single place an agent reads first to avoid drift. (Absorbs the former `GOALS.md`.)
 
 ## Last Updated: 2026-06-25
-## Current Focus: Artist discovery (seed → similar artists) shipped. Backlog: scheduled auto-scrape, bulk import, data export.
+## Current Focus: Scheduled auto-scrape (`scheduler` container) shipped. Backlog: bulk import, data export, change alerts.
 
 ## Project Goal
 Build a data application that gives A&Rs, labels, and artists a **holistic view of an artist's online traction and growth potential** by aggregating public metrics across music and social platforms — Spotify, YouTube, SoundCloud, Instagram, TikTok, and X — and tracking how they move over time.
@@ -169,7 +174,6 @@ PURPOSE: Tracks active work and backlog. AI agents should update this after comp
 - (nothing in progress — pick next from Backlog)
 
 ## Backlog
-- [ ] Scheduled auto-scrape for growth (recurring metric pulls)
 - [ ] Bulk import: paste several artist names → auto-add + auto-discover socials
 - [ ] Update / re-scrape multiple artists in one action
 - [ ] Export artist data (CSV / JSON)
@@ -185,6 +189,7 @@ PURPOSE: Tracks active work and backlog. AI agents should update this after comp
 - [x] Scraping Phase 0-4: scrapers + `/scrape` + auto-discovery + metrics across the UI (`SCRAPING_PLAN.md`)
 - [x] Growth-over-time: account-keyed metric snapshots + `/history` + sparklines (re-linking doesn't fake growth)
 - [x] AI-verified discovery: local Ollama (`qwen2.5-coder`) checks auto-found IG/TikTok accounts; panel flags uncertain/mismatch (`ARCHITECTURE.md`)
+- [x] Scheduled auto-scrape for growth: `scheduler` container runs a recurring sweep (`scrape_all`, TTL-respected, default 24h via `AUTO_SCRAPE_INTERVAL_HOURS`) appending growth snapshots (`scheduler.py`, `ARCHITECTURE.md`)
 - [x] UI: removed misplaced Spotify logos from Incighder actions (Discover "Track", Spotify-search "Add to dataset" → neutral Plus); kept logos that genuinely open Spotify
 - [x] Bug fix: Spotify scrape now backfills the Web API baseline (followers, popularity, genres, spotify_id, top track, images, external_urls) so manually-added artists get full data once their Spotify source is scraped
 - [x] Artist editing (PATCH) + delete + manual insert (`/insert_artist_manual`)
@@ -233,6 +238,7 @@ PURPOSE: Tracks active work and backlog. AI agents should update this after comp
 ./data-api/wait-for-it.sh
 ./data-api/insert_artist_from_json.py
 ./data-api/app.py
+./data-api/scheduler.py
 ./data-api/scrapers
 ./data-api/brezzo.json
 ./README.md
@@ -251,113 +257,113 @@ PURPOSE: Tracks active work and backlog. AI agents should update this after comp
 
 ## 5. Recent Git Changes (Summary)
 ```text
+db24d8d docs: mark Spotify-logo cleanup done; note images in scrape backfill
 ba79ee3 ui: drop misplaced Spotify logo from Incighder actions
 6c0dd86 docs: add competitive landscape (Songstats et al.) + roadmap gaps
 3090aa8 fix(scrape): also backfill Spotify images + external_urls on scrape
 4d3961e fix(scrape): Spotify scrape backfills Web API baseline for manual artists
-581aabd docs: fuse GOALS into PROJECT_STATE; align ai/ docs + README with code
 ```
 
 ## 6. Active Diff
 ```diff
+diff --git a/README.md b/README.md
+index c165ebe..a2e9e57 100644
+--- a/README.md
++++ b/README.md
+@@ -28,6 +28,7 @@ Incighder is a professional data application designed to help recording artists,
+   - Uses a **local LLM via Ollama** (`qwen2.5-coder:14b`) to inspect profile metadata and previews, deciding if a guessed link belongs to the artist (`match` / `uncertain` / `mismatch`) before it is scraped.
+ - **Historical Growth Analytics**:
+   - Automatically captures account-keyed metric snapshots in the database when new data is pulled.
++  - A background **auto-scrape scheduler** sweeps all tracked artists on a recurring interval (default 24h, TTL-respected), so growth history accrues without manual scraping.
+   - Renders inline metric sparklines on the dashboard.
+   - Features a dedicated historical section showing growth trends since tracking began.
+ - **Modern Sleek Design System**:
+@@ -102,6 +103,9 @@ OLLAMA_MODEL=qwen2.5-coder:14b
+ # Scraping Throttle Configuration (Optional; defaults to 2.0s and 6.0s)
+ SCRAPE_THROTTLE_MIN=2.0
+ SCRAPE_THROTTLE_MAX=6.0
++
++# Auto-scrape scheduler (Optional; defaults to a 24h sweep interval)
++AUTO_SCRAPE_INTERVAL_HOURS=24
+ ```
+ 
+ ### 3. Running the Application
+@@ -159,6 +163,5 @@ For more customized development workflows, we also provide several helper script
+ ## Future Enhancements (Roadmap)
+ 
+ - **Bulk Artist Import**: Ingest a batch of artist names or Spotify IDs in a single operation.
+-- **Automated Scraping Scheduler**: Set up recurring cron jobs to pull metrics automatically at night.
+ - **Data Exporting**: Export metric sets to CSV or JSON formats for custom analysis.
+ - **Weighted Analytics Score**: Combine metrics from all platforms into a single weighted health/traction score.
+\ No newline at end of file
+diff --git a/ai/ARCHITECTURE.md b/ai/ARCHITECTURE.md
+index 2092a3c..161d83f 100644
+--- a/ai/ARCHITECTURE.md
++++ b/ai/ARCHITECTURE.md
+@@ -34,15 +34,20 @@ Incighder is a multi-service data application that aggregates and visualizes art
+ - **Applying schema**: `docker compose run --rm data-api python apply_schema.py` (first run / reset).
+ 
+ ### 4. Infrastructure (Docker)
+-- **Services** (`docker-compose.yml`): `db`, `data-api`, `incighder-dev` (Next.js). `extra_hosts` bridges the data-api to the host's Ollama.
++- **Services** (`docker-compose.yml`): `db`, `data-api`, `incighder-dev` (Next.js), and `scheduler`. `extra_hosts` bridges the data-api/scheduler to the host's Ollama.
+ - **Run**: `docker compose up --build` → frontend at `http://localhost:3000`.
+ 
++### 5. Scheduler (auto-scrape worker — `data-api/scheduler.py`)
++- **Role**: recurring metric pulls so growth history accrues without manual scraping.
++- **How**: reuses the `data-api` image but runs `python scheduler.py` instead of Flask — a sleep/sweep loop that every `AUTO_SCRAPE_INTERVAL_HOURS` (default 24) calls `scrape_service.scrape_all(force=False)`. The 24h cache TTL means only stale platforms actually refetch; each sweep appends `metric_snapshots` through the normal scrape path. One artist failing never aborts the sweep. `AUTO_SCRAPE_STARTUP_DELAY` (default 60s) delays the first sweep on boot.
++
+ ## Data Flow
+ 1. **Search**: Next.js → `/api/spotify-search` → `data-api /spotify_search` → Spotify.
+ 2. **Discover**: seed name → `/api/discover|similar` → `data-api` → Last.fm `getSimilar` + Spotify/Last.fm enrichment → grid; "Track" feeds ingestion.
+ 3. **Ingestion**: `data-api` transforms API data → inserts into PostgreSQL.
+ 4. **Scrape**: `/api/scrape` → `scrape_service` → per-platform scrapers (TTL-cached) → updates `artists` + appends `metric_snapshots`.
+ 5. **Display**: Next.js reads structured data (via API routes / `pg`) and renders dashboard, table, detail, sparklines, and history.
++6. **Scheduled sweep**: the `scheduler` worker periodically runs `scrape_all` over every artist (TTL-respected), feeding the same update + snapshot path as a manual scrape.
+ 
+ ## AI Workspace Substrate
+ This repo uses an AI-assisted engineering substrate in `ai/`.
 diff --git a/ai/CONTEXT_BUNDLE.md b/ai/CONTEXT_BUNDLE.md
-index a5ab0e1..2c1ed9e 100644
+index 5327b3d..754a14f 100644
 --- a/ai/CONTEXT_BUNDLE.md
 +++ b/ai/CONTEXT_BUNDLE.md
 @@ -1,5 +1,5 @@
  # AI Context Bundle
--Generated: Thu Jun 25 18:20:34 PDT 2026
-+Generated: Thu Jun 25 18:25:53 PDT 2026
+-Generated: Thu Jun 25 18:25:53 PDT 2026
++Generated: Thu Jun 25 18:40:29 PDT 2026
  
  ## ⚠️ Agent Navigation Guide
  1. Start with the **Current State** below to understand the focus.
-@@ -176,7 +176,6 @@ PURPOSE: Tracks active work and backlog. AI agents should update this after comp
- - [ ] Discovery seeded from an already-tracked artist (in-app, not just the `/discover` search box)
- - [ ] Weighted cross-platform traction score
- - [ ] Robust history charts (currently sparse — often only 2 points until more scans accrue)
--- [ ] Remove Spotify logos from the design
- - [ ] Change/threshold alerts (notify when a metric jumps X%) — `metric_snapshots` is the foundation; pairs with scheduled auto-scrape. Closes a gap vs competitors (see `COMPETITORS.md`)
- - [ ] Playlist / chart-placement tracking — competitor table-stakes we lack (see `COMPETITORS.md`)
+@@ -76,15 +76,20 @@ Incighder is a multi-service data application that aggregates and visualizes art
+ - **Applying schema**: `docker compose run --rm data-api python apply_schema.py` (first run / reset).
  
-@@ -186,7 +185,8 @@ PURPOSE: Tracks active work and backlog. AI agents should update this after comp
- - [x] Scraping Phase 0-4: scrapers + `/scrape` + auto-discovery + metrics across the UI (`SCRAPING_PLAN.md`)
- - [x] Growth-over-time: account-keyed metric snapshots + `/history` + sparklines (re-linking doesn't fake growth)
- - [x] AI-verified discovery: local Ollama (`qwen2.5-coder`) checks auto-found IG/TikTok accounts; panel flags uncertain/mismatch (`ARCHITECTURE.md`)
--- [x] Bug fix: Spotify scrape now backfills the Web API baseline (followers, popularity, genres, spotify_id, top track) so manually-added artists get full data once their Spotify source is scraped
-+- [x] UI: removed misplaced Spotify logos from Incighder actions (Discover "Track", Spotify-search "Add to dataset" → neutral Plus); kept logos that genuinely open Spotify
-+- [x] Bug fix: Spotify scrape now backfills the Web API baseline (followers, popularity, genres, spotify_id, top track, images, external_urls) so manually-added artists get full data once their Spotify source is scraped
- - [x] Artist editing (PATCH) + delete + manual insert (`/insert_artist_manual`)
- - [x] Navigation bar; decoupled schema (spotify_id nullable); consolidated `schema.sql` to `data-api/`
- - [x] Deploy with ngrok / cloudflared
-@@ -251,113 +251,12 @@ PURPOSE: Tracks active work and backlog. AI agents should update this after comp
+ ### 4. Infrastructure (Docker)
+-- **Services** (`docker-compose.yml`): `db`, `data-api`, `incighder-dev` (Next.js). `extra_hosts` bridges the data-api to the host's Ollama.
++- **Services** (`docker-compose.yml`): `db`, `data-api`, `incighder-dev` (Next.js), and `scheduler`. `extra_hosts` bridges the data-api/scheduler to the host's Ollama.
+ - **Run**: `docker compose up --build` → frontend at `http://localhost:3000`.
  
- ## 5. Recent Git Changes (Summary)
- ```text
-+ba79ee3 ui: drop misplaced Spotify logo from Incighder actions
-+6c0dd86 docs: add competitive landscape (Songstats et al.) + roadmap gaps
- 3090aa8 fix(scrape): also backfill Spotify images + external_urls on scrape
- 4d3961e fix(scrape): Spotify scrape backfills Web API baseline for manual artists
- 581aabd docs: fuse GOALS into PROJECT_STATE; align ai/ docs + README with code
--bce4b5d add more goals
--e35414e docs: note artist discovery (Last.fm) in ARCHITECTURE; regen context bundle
- ```
++### 5. Scheduler (auto-scrape worker — `data-api/scheduler.py`)
++- **Role**: recurring metric pulls so growth history accrues without manual scraping.
++- **How**: reuses the `data-api` image but runs `python scheduler.py` instead of Flask — a sleep/sweep loop that every `AUTO_SCRAPE_INTERVAL_HOURS` (default 24) calls `scrape_service.scrape_all(force=False)`. The 24h cache TTL means only stale platforms actually refetch; each sweep appends `metric_snapshots` through the normal scrape path. One artist failing never aborts the sweep. `AUTO_SCRAPE_STARTUP_DELAY` (default 60s) delays the first sweep on boot.
++
+ ## Data Flow
+ 1. **Search**: Next.js → `/api/spotify-search` → `data-api /spotify_search` → Spotify.
+ 2. **Discover**: seed name → `/api/discover|similar` → `data-api` → Last.fm `getSimilar` + Spotify/Last.fm enrichment → grid; "Track" feeds ingestion.
+ 3. **Ingestion**: `data-api` transforms API data → inserts into PostgreSQL.
+ 4. **Scrape**: `/api/scrape` → `scrape_service` → per-platform scrapers (TTL-cached) → updates `artists` + appends `metric_snapshots`.
+ 5. **Display**: Next.js reads structured data (via API routes / `pg`) and renders dashboard, table, detail, sparklines, and history.
++6. **Scheduled sweep**: the `scheduler` worker periodically runs `scrape_all` over every artist (TTL-respected), feeding the same update + snapshot path as a manual scrape.
  
- ## 6. Active Diff
- ```diff
--diff --git a/ai/CONTEXT_BUNDLE.md b/ai/CONTEXT_BUNDLE.md
--index 9664871..a7b0697 100644
----- a/ai/CONTEXT_BUNDLE.md
--+++ b/ai/CONTEXT_BUNDLE.md
--@@ -1,5 +1,5 @@
-- # AI Context Bundle
---Generated: Thu Jun 25 18:16:32 PDT 2026
--+Generated: Thu Jun 25 18:20:34 PDT 2026
-- 
-- ## ⚠️ Agent Navigation Guide
-- 1. Start with the **Current State** below to understand the focus.
--@@ -177,6 +177,8 @@ PURPOSE: Tracks active work and backlog. AI agents should update this after comp
-- - [ ] Weighted cross-platform traction score
-- - [ ] Robust history charts (currently sparse — often only 2 points until more scans accrue)
-- - [ ] Remove Spotify logos from the design
--+- [ ] Change/threshold alerts (notify when a metric jumps X%) — `metric_snapshots` is the foundation; pairs with scheduled auto-scrape. Closes a gap vs competitors (see `COMPETITORS.md`)
--+- [ ] Playlist / chart-placement tracking — competitor table-stakes we lack (see `COMPETITORS.md`)
-- 
-- ## Completed
-- - [x] Artist discovery: `/discover` page (seed → Last.fm similar → Spotify-enriched grid → one-click Track)
--@@ -239,6 +241,7 @@ PURPOSE: Tracks active work and backlog. AI agents should update this after comp
-- ./ai/ai-context.sh
-- ./ai/DESIGN_OVERHAUL_PLAN.md
-- ./ai/ARCHITECTURE.md
--+./ai/COMPETITORS.md
-- ./ai/SCRAPING_PLAN.md
-- ./ai/CONTEXT_BUNDLE.md
-- ./ai/PROJECT_STATE.md
--@@ -248,113 +251,12 @@ PURPOSE: Tracks active work and backlog. AI agents should update this after comp
-- 
-- ## 5. Recent Git Changes (Summary)
-- ```text
--+3090aa8 fix(scrape): also backfill Spotify images + external_urls on scrape
-- 4d3961e fix(scrape): Spotify scrape backfills Web API baseline for manual artists
-- 581aabd docs: fuse GOALS into PROJECT_STATE; align ai/ docs + README with code
-- bce4b5d add more goals
-- e35414e docs: note artist discovery (Last.fm) in ARCHITECTURE; regen context bundle
---77ff62f feat(discovery): /discover page — seed artist → similar artists
-- ```
-- 
-- ## 6. Active Diff
-- ```diff
---diff --git a/ai/CONTEXT_BUNDLE.md b/ai/CONTEXT_BUNDLE.md
---index 074d0cc..4d2c355 100644
------ a/ai/CONTEXT_BUNDLE.md
---+++ b/ai/CONTEXT_BUNDLE.md
---@@ -1,5 +1,5 @@
--- # AI Context Bundle
----Generated: Thu Jun 25 17:50:10 PDT 2026
---+Generated: Thu Jun 25 18:16:32 PDT 2026
--- 
--- ## ⚠️ Agent Navigation Guide
--- 1. Start with the **Current State** below to understand the focus.
---@@ -248,113 +248,12 @@ PURPOSE: Tracks active work and backlog. AI agents should update this after comp
--- 
--- ## 5. Recent Git Changes (Summary)
+ ## AI Workspace Substrate
+ This repo uses an AI-assisted engineering substrate in `ai/`.
+@@ -100,7 +105,7 @@ This repo uses an AI-assisted engineering substrate in `ai/`.
+ PURPOSE: High-level summary of the system's current focus, the product vision, and recent changes — the single place an agent reads first to avoid drift. (Absorbs the former `GOALS.md`.)
+ 
+ ## Last Updated: 2026-06-25
+-## Current Focus: Artist discovery (seed → similar artists) shipped. Backlog: scheduled auto-scrape, bulk import, data export.
++## Current Focus: Scheduled auto-scrape (`scheduler` container) shipped. Backlog: bulk import, data export, change alerts.
+ 
+ ## Project Goal
+ Build a data application that gives A&Rs, labels, and artists a **holistic view of an artist's online traction and growth potential** by aggregating public metrics across music and social platforms — Spotify, YouTube, SoundCloud, Instagram, TikTok, and X — and tracking how they move over time.
+@@ -169,7 +174,6 @@ PURPOSE: Tracks active work and backlog. AI agents should update this after comp
+ - (nothing in progress — pick next from Backlog)
 ```

@@ -34,8 +34,12 @@ Incighder is a multi-service data application that aggregates and visualizes art
 - **Applying schema**: `docker compose run --rm data-api python apply_schema.py` (first run / reset).
 
 ### 4. Infrastructure (Docker)
-- **Services** (`docker-compose.yml`): `db`, `data-api`, `incighder-dev` (Next.js). `extra_hosts` bridges the data-api to the host's Ollama.
+- **Services** (`docker-compose.yml`): `db`, `data-api`, `incighder-dev` (Next.js), and `scheduler`. `extra_hosts` bridges the data-api/scheduler to the host's Ollama.
 - **Run**: `docker compose up --build` → frontend at `http://localhost:3000`.
+
+### 5. Scheduler (auto-scrape worker — `data-api/scheduler.py`)
+- **Role**: recurring metric pulls so growth history accrues without manual scraping.
+- **How**: reuses the `data-api` image but runs `python scheduler.py` instead of Flask — a sleep/sweep loop that every `AUTO_SCRAPE_INTERVAL_HOURS` (default 24) calls `scrape_service.scrape_all(force=False)`. The 24h cache TTL means only stale platforms actually refetch; each sweep appends `metric_snapshots` through the normal scrape path. One artist failing never aborts the sweep. `AUTO_SCRAPE_STARTUP_DELAY` (default 60s) delays the first sweep on boot.
 
 ## Data Flow
 1. **Search**: Next.js → `/api/spotify-search` → `data-api /spotify_search` → Spotify.
@@ -43,6 +47,7 @@ Incighder is a multi-service data application that aggregates and visualizes art
 3. **Ingestion**: `data-api` transforms API data → inserts into PostgreSQL.
 4. **Scrape**: `/api/scrape` → `scrape_service` → per-platform scrapers (TTL-cached) → updates `artists` + appends `metric_snapshots`.
 5. **Display**: Next.js reads structured data (via API routes / `pg`) and renders dashboard, table, detail, sparklines, and history.
+6. **Scheduled sweep**: the `scheduler` worker periodically runs `scrape_all` over every artist (TTL-respected), feeding the same update + snapshot path as a manual scrape.
 
 ## AI Workspace Substrate
 This repo uses an AI-assisted engineering substrate in `ai/`.

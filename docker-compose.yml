@@ -65,5 +65,35 @@ services:
       timeout: 5s
       retries: 5
 
+  # Recurring auto-scrape for growth tracking. Reuses the data-api image; runs a
+  # sleep/sweep loop (TTL-respected) instead of the Flask server. See scheduler.py.
+  scheduler:
+    build:
+      context: .
+      dockerfile: ./data-api/Dockerfile
+    restart: unless-stopped
+    volumes:
+      - ./data-api:/app
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PGUSER: postgres
+      PGPASSWORD: password
+      PGDATABASE: incighder
+      PGHOST: db
+      SPOTIFY_CLIENT_ID: ${SPOTIFY_CLIENT_ID}
+      SPOTIFY_CLIENT_SECRET: ${SPOTIFY_CLIENT_SECRET}
+      YOUTUBE_API_KEY: ${YOUTUBE_API_KEY}
+      LAST_FM_API_KEY: ${LAST_FM_API_KEY}
+      OLLAMA_URL: ${OLLAMA_URL:-http://host.docker.internal:11434}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen2.5-coder:14b}
+      AUTO_SCRAPE_INTERVAL_HOURS: ${AUTO_SCRAPE_INTERVAL_HOURS:-24}
+    env_file:
+      - ./.env
+    command: python scheduler.py
+
 volumes:
   postgres_data:
