@@ -28,6 +28,9 @@ PLATFORMS = ("spotify", "youtube", "soundcloud", "instagram", "tiktok")
 
 # artists columns a scraper is allowed to write (guards the UPDATE identifiers).
 ALLOWED_METRIC_COLUMNS = {
+    # Spotify Web API baseline backfilled on scrape (so manually-added artists get it).
+    "followers", "popularity", "genres", "spotify_id", "images", "external_urls",
+    "top_track_id", "top_track_popularity",
     "monthly_listeners", "top_track_name", "top_track_plays",
     "youtube_subscribers", "youtube_total_views", "youtube_video_count",
     "youtube_top_video_title", "youtube_top_video_views",
@@ -37,9 +40,12 @@ ALLOWED_METRIC_COLUMNS = {
     "tiktok_followers", "tiktok_likes", "tiktok_video_count",
 }
 
-# Columns each platform owns - nulled when its source link is removed.
+# Columns each platform owns - nulled when its source link is removed. (spotify_id is
+# kept so the Web API fallback still resolves the artist after a link is cleared.)
 PLATFORM_COLUMNS = {
-    "spotify": ["monthly_listeners", "top_track_name", "top_track_plays"],
+    "spotify": ["monthly_listeners", "top_track_name", "top_track_plays",
+                "followers", "popularity", "genres", "images", "external_urls",
+                "top_track_id", "top_track_popularity"],
     "youtube": ["youtube_subscribers", "youtube_total_views", "youtube_video_count",
                 "youtube_top_video_title", "youtube_top_video_views"],
     "soundcloud": ["soundcloud_followers", "soundcloud_track_count",
@@ -167,6 +173,37 @@ def scrape_artist(artist_id: str, links: dict | None = None, force: bool = False
         return {"results": results, "artist": dict(zip(updated_cols, updated_row))}
     finally:
         conn.close()
+
+
+def all_artist_ids() -> list:
+    """Every tracked artist id, for the scheduled sweep."""
+    conn = get_db_connection()
+    if not conn:
+        raise RuntimeError("database connection failed")
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT id FROM artists ORDER BY name")
+            return [r[0] for r in cur.fetchall()]
+    finally:
+        conn.close()
+
+
+def scrape_all(force: bool = False) -> dict:
+    """Sweep every tracked artist (TTL-respected unless force). Returns a per-artist
+    summary; one artist failing never aborts the sweep. Used by the scheduler."""
+    summary: dict = {}
+    for aid in all_artist_ids():
+        try:
+            results = scrape_artist(aid, force=force).get("results", {})
+            summary[aid] = {
+                "ok": True,
+                "scraped": [p for p, r in results.items()
+                            if r.get("ok") and not r.get("skipped")],
+                "skipped": [p for p, r in results.items() if r.get("skipped")],
+            }
+        except Exception as e:  # never let one artist abort the whole sweep
+            summary[aid] = {"ok": False, "error": str(e)}
+    return summary
 
 
 def clear_platform(artist_id: str, platform: str) -> dict:

@@ -28,6 +28,7 @@ Incighder is a professional data application designed to help recording artists,
   - Uses a **local LLM via Ollama** (`qwen2.5-coder:14b`) to inspect profile metadata and previews, deciding if a guessed link belongs to the artist (`match` / `uncertain` / `mismatch`) before it is scraped.
 - **Historical Growth Analytics**:
   - Automatically captures account-keyed metric snapshots in the database when new data is pulled.
+  - A background **auto-scrape scheduler** sweeps all tracked artists on a recurring interval (default 24h, TTL-respected), so growth history accrues without manual scraping.
   - Renders inline metric sparklines on the dashboard.
   - Features a dedicated historical section showing growth trends since tracking began.
 - **Modern Sleek Design System**:
@@ -102,6 +103,9 @@ OLLAMA_MODEL=qwen2.5-coder:14b
 # Scraping Throttle Configuration (Optional; defaults to 2.0s and 6.0s)
 SCRAPE_THROTTLE_MIN=2.0
 SCRAPE_THROTTLE_MAX=6.0
+
+# Auto-scrape scheduler (Optional; defaults to a 24h sweep interval)
+AUTO_SCRAPE_INTERVAL_HOURS=24
 ```
 
 ### 3. Running the Application
@@ -148,9 +152,9 @@ For more customized development workflows, we also provide several helper script
 - **Home Page (`/`)**: Displays card layouts of all tracked artists, showcasing their key indicators (Spotify popularity, followers, top track metrics) and visual sparklines showing metric history.
 - **Table View (`/table`)**: A spreadsheet-style breakdown displaying all platform follower counts side-by-side. Sortable by platform metrics.
 - **Discover (`/discover`)**: Enter a seed artist to surface similar artists (Last.fm) enriched with Spotify and Last.fm metrics; one-click "Track" adds any of them to the dataset, with already-tracked artists marked.
-- **Add Artist (`/artists/add`)**: Search for an artist on Spotify and ingest their baseline metrics into the local PostgreSQL database.
+- **Add Artist (`/artists/add`)**: Search for an artist on Spotify and ingest their baseline metrics into the local PostgreSQL database, or add an artist manually when they aren't on Spotify.
 - **Artist Detail (`/artists/[id]`)**:
-  - Displays detailed stats grids and a track summary.
+  - Displays detailed stats grids and a track summary, with inline editing of artist fields and the option to remove a tracked artist.
   - Shows growth metrics and a history panel tracing historical subscriber metrics.
   - **Sources & Scraping Control Panel**: Paste platform profile URLs, trigger auto-discovery, or invoke a manually-triggered scrape (which obeys the 24h TTL or bypasses it with a "Force Refresh" toggle). Displays the success or error status of the latest scrapers.
 
@@ -159,6 +163,5 @@ For more customized development workflows, we also provide several helper script
 ## Future Enhancements (Roadmap)
 
 - **Bulk Artist Import**: Ingest a batch of artist names or Spotify IDs in a single operation.
-- **Automated Scraping Scheduler**: Set up recurring cron jobs to pull metrics automatically at night.
 - **Data Exporting**: Export metric sets to CSV or JSON formats for custom analysis.
 - **Weighted Analytics Score**: Combine metrics from all platforms into a single weighted health/traction score.
