@@ -54,6 +54,8 @@ services:
       SPOTIFY_CLIENT_SECRET: ${SPOTIFY_CLIENT_SECRET}
       YOUTUBE_API_KEY: ${YOUTUBE_API_KEY}
       LAST_FM_API_KEY: ${LAST_FM_API_KEY}
+      GOOGLE_CSE_KEY: ${GOOGLE_CSE_KEY}
+      GOOGLE_CSE_ID: ${GOOGLE_CSE_ID}
       OLLAMA_URL: ${OLLAMA_URL:-http://host.docker.internal:11434}
       OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen2.5-coder:14b}
     env_file:
