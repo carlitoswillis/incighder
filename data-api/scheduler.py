@@ -12,6 +12,9 @@ import os
 import time
 from datetime import datetime, timezone
 
+from dotenv import load_dotenv
+load_dotenv()
+
 from scrape_service import scrape_all
 
 INTERVAL_HOURS = float(os.getenv("AUTO_SCRAPE_INTERVAL_HOURS", "24"))

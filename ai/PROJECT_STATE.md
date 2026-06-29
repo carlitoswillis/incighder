@@ -78,6 +78,8 @@ PURPOSE: Tracks active work and backlog. AI agents should update this after comp
 - (nothing in progress — pick next from Backlog)
 
 ## Backlog
+- [ ] De-dockerize lol. In prep for deployment
+- [ ] Prioritize the most resume-impressive additions next (this is a portfolio/interview piece — weigh features by how well they demonstrate engineering depth, not just product value)
 - [ ] discover feature should prioritize smaller artists that have super high match to the search
 - [ ] ADD A BIO. BIOGRAPHY section for artists (v1: single source — Last.fm `artist.getInfo`; later: AI-synthesized summary across all sources)
 - [ ] Top youtube video embedded in the artist page like as a hero under or over the stats idk yet

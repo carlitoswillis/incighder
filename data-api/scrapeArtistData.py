@@ -3,21 +3,35 @@ import os
 import sys
 import spotipy
 from spotipy.oauth2 import SpotifyClientCredentials
-import psycopg2
+import pymysql
+from pymysql.constants import FIELD_TYPE
 import json
 
 
+# Decode MySQL JSON columns into Python objects on read, matching the behaviour
+# psycopg2 gave us for json/jsonb columns (callers expect dict/list, not raw text).
+_CONV = pymysql.converters.conversions.copy()
+_CONV[FIELD_TYPE.JSON] = lambda v: json.loads(v) if v else None
+
+
+def _db_config():
+    """Connection settings, env-overridable. Defaults target a local MySQL."""
+    return dict(
+        host=os.getenv("DB_HOST", os.getenv("PGHOST", "127.0.0.1")),
+        port=int(os.getenv("DB_PORT", "3306")),
+        user=os.getenv("DB_USER", os.getenv("PGUSER", "incighder")),
+        password=os.getenv("DB_PASSWORD", os.getenv("PGPASSWORD", "password")),
+        database=os.getenv("DB_NAME", os.getenv("PGDATABASE", "incighder")),
+        charset="utf8mb4",
+        conv=_CONV,
+    )
+
+
 def get_db_connection():
-    """Establishes a connection to the PostgreSQL database."""
+    """Establishes a connection to the MySQL database."""
     try:
-        conn = psycopg2.connect(
-            host=os.getenv("PGHOST", "db"),
-            database="incighder",
-            user="postgres",
-            password="password" # Be cautious with hardcoded passwords in production
-        )
-        return conn
-    except psycopg2.Error as e:
+        return pymysql.connect(**_db_config())
+    except pymysql.Error as e:
         print(f"Error connecting to database: {e}")
         return None
 
@@ -65,18 +79,18 @@ def insert_artist_data(conn, artist_data):
     sql = """
     INSERT INTO artists (id, name, followers, popularity, genres, images, external_urls, monthly_listeners, spotify_id, top_track_id, top_track_name, top_track_popularity)
     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-    ON CONFLICT (id) DO UPDATE SET
-        name = EXCLUDED.name,
-        followers = EXCLUDED.followers,
-        popularity = EXCLUDED.popularity,
-        genres = EXCLUDED.genres,
-        images = EXCLUDED.images,
-        external_urls = EXCLUDED.external_urls,
-        monthly_listeners = EXCLUDED.monthly_listeners,
-        spotify_id = EXCLUDED.spotify_id,
-        top_track_id = EXCLUDED.top_track_id,
-        top_track_name = EXCLUDED.top_track_name,
-        top_track_popularity = EXCLUDED.top_track_popularity;
+    ON DUPLICATE KEY UPDATE
+        name = VALUES(name),
+        followers = VALUES(followers),
+        popularity = VALUES(popularity),
+        genres = VALUES(genres),
+        images = VALUES(images),
+        external_urls = VALUES(external_urls),
+        monthly_listeners = VALUES(monthly_listeners),
+        spotify_id = VALUES(spotify_id),
+        top_track_id = VALUES(top_track_id),
+        top_track_name = VALUES(top_track_name),
+        top_track_popularity = VALUES(top_track_popularity);
     """
 
     try:
@@ -101,7 +115,7 @@ def insert_artist_data(conn, artist_data):
         conn.commit()
         print(f"SQL execution successful. Rows affected: {cur.rowcount}", file=sys.stderr)
         return True
-    except psycopg2.Error as e:
+    except pymysql.Error as e:
         print(f"Database error: {e}", file=sys.stderr)
         conn.rollback()
         return False

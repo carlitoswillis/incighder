@@ -1,19 +1,24 @@
-"""Local-LLM verification via Ollama (free, private).
+"""LLM verification via Google Gemini.
 
 Judges whether a discovered social profile actually belongs to the artist, catching
-wrong auto-linked accounts. Reaches the host's Ollama at OLLAMA_URL (default
-host.docker.internal:11434 so the Dockerized data-api can call it). Best-effort: if
-Ollama is unreachable the caller treats the result as unverified and keeps the guess.
+wrong auto-linked accounts. Calls the Gemini generateContent API using GOOGLE_AI_API_KEY.
+Best-effort: if the key is missing or the API is unreachable the caller treats the
+result as unverified and keeps the guess.
 """
 from __future__ import annotations
 
 import json
 import os
+import time
 
 import requests
 
-OLLAMA_URL = os.getenv("OLLAMA_URL", "http://host.docker.internal:11434")
-OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen2.5-coder:14b")
+GEMINI_API_KEY = os.getenv("GOOGLE_AI_API_KEY") or os.getenv("GEMINI_API_KEY")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+GEMINI_URL = (
+    "https://generativelanguage.googleapis.com/v1beta/models/"
+    f"{GEMINI_MODEL}:generateContent"
+)
 
 _SYSTEM = (
     "You verify whether a social media profile belongs to a given music artist. "
@@ -24,28 +29,32 @@ _SYSTEM = (
 
 def verify_account(artist: str, platform: str, profile_text: str) -> dict | None:
     """Return {match, confidence, reason} or None if the model is unavailable."""
+    if not GEMINI_API_KEY:
+        return None
+
     prompt = (
         f"Artist: {artist}\nPlatform: {platform}\n"
         f"Candidate profile info: {profile_text}\n\n"
         "Is this the artist's own official/personal account?"
     )
+    payload = {
+        "system_instruction": {"parts": [{"text": _SYSTEM}]},
+        "contents": [{"role": "user", "parts": [{"text": prompt}]}],
+        "generationConfig": {"temperature": 0, "responseMimeType": "application/json"},
+    }
     try:
-        resp = requests.post(
-            f"{OLLAMA_URL}/api/chat",
-            json={
-                "model": OLLAMA_MODEL,
-                "format": "json",
-                "stream": False,
-                "options": {"temperature": 0},
-                "messages": [
-                    {"role": "system", "content": _SYSTEM},
-                    {"role": "user", "content": prompt},
-                ],
-            },
-            timeout=60,
-        )
+        resp = None
+        # gemini-2.5-flash intermittently returns 503 UNAVAILABLE under load; retry a few times.
+        for attempt in range(3):
+            resp = requests.post(
+                GEMINI_URL, params={"key": GEMINI_API_KEY}, json=payload, timeout=60
+            )
+            if resp.status_code != 503:
+                break
+            time.sleep(1.5 * (attempt + 1))
         resp.raise_for_status()
-        data = json.loads(resp.json()["message"]["content"])
+        text = resp.json()["candidates"][0]["content"]["parts"][0]["text"]
+        data = json.loads(text)
         return {
             "match": bool(data.get("match")),
             "confidence": max(0.0, min(1.0, float(data.get("confidence", 0)))),

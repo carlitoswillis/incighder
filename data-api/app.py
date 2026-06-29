@@ -6,6 +6,11 @@ import sys
 import atexit
 import traceback
 
+# Load repo-root .env so API keys / DB settings are available when run natively
+# (in Docker these came from compose's env_file). Searches parent dirs for .env.
+from dotenv import load_dotenv
+load_dotenv()
+
 from scrape_service import scrape_artist, refresh_artist, clear_platform, metric_history
 from scrapers.discovery import discover_links
 from link_preview import link_preview
@@ -22,7 +27,7 @@ def insert_artist():
 
     try:
         process = subprocess.run(
-            ['python', 'insert_artist_from_json.py'],
+            [sys.executable, 'insert_artist_from_json.py'],
             input=json.dumps(data), text=True, capture_output=True, check=True
         )
         return jsonify(json.loads(process.stdout)), 200
@@ -44,7 +49,7 @@ def spotify_search():
 
     try:
         process = subprocess.run(
-            ['python', 'spotify_search.py'],
+            [sys.executable, 'spotify_search.py'],
             input=query, text=True, capture_output=True, check=True
         )
         return jsonify(json.loads(process.stdout)), 200
@@ -66,7 +71,7 @@ def similar_artists_route():
 
     try:
         process = subprocess.run(
-            ['python', 'similar_artists.py'],
+            [sys.executable, 'similar_artists.py'],
             input=query, text=True, capture_output=True, check=True
         )
         return jsonify(json.loads(process.stdout)), 200

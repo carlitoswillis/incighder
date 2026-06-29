@@ -169,10 +169,12 @@ def scrape_artist(artist_id: str, links: dict | None = None, force: bool = False
         set_vals = list(updates.values()) + [json.dumps(merged_links), json.dumps(meta)]
         assignments = ", ".join(f"{c} = %s" for c in set_cols)
         with conn.cursor() as cur:
+            # MySQL has no UPDATE ... RETURNING; update then read the row back.
             cur.execute(
-                f"UPDATE artists SET {assignments} WHERE id = %s RETURNING *",
+                f"UPDATE artists SET {assignments} WHERE id = %s",
                 set_vals + [artist_id],
             )
+            cur.execute("SELECT * FROM artists WHERE id = %s", (artist_id,))
             updated_row = cur.fetchone()
             updated_cols = [d[0] for d in cur.description]
 
@@ -308,10 +310,12 @@ def clear_platform(artist_id: str, platform: str) -> dict:
         set_vals = [None] * len(cols) + [json.dumps(links), json.dumps(meta)]
         assignments = ", ".join(f"{c} = %s" for c in set_cols)
         with conn.cursor() as cur:
+            # MySQL has no UPDATE ... RETURNING; update then read the row back.
             cur.execute(
-                f"UPDATE artists SET {assignments} WHERE id = %s RETURNING *",
+                f"UPDATE artists SET {assignments} WHERE id = %s",
                 set_vals + [artist_id],
             )
+            cur.execute("SELECT * FROM artists WHERE id = %s", (artist_id,))
             updated_row = cur.fetchone()
             updated_cols = [d[0] for d in cur.description]
         conn.commit()
@@ -342,7 +346,7 @@ def _account_key(platform, link, data, artist):
 def _maybe_snapshot(cur, artist_id, platform, account_key, value):
     cur.execute(
         "SELECT value FROM metric_snapshots WHERE artist_id = %s AND platform = %s "
-        "AND account_key IS NOT DISTINCT FROM %s ORDER BY captured_at DESC LIMIT 1",
+        "AND account_key <=> %s ORDER BY captured_at DESC LIMIT 1",
         (artist_id, platform, account_key),
     )
     last = cur.fetchone()

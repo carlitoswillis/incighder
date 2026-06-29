@@ -1,29 +1,38 @@
-
-import psycopg2
 import os
+import pymysql
+
+from scrapeArtistData import get_db_connection
+
 
 def apply_schema():
+    conn = get_db_connection()
+    if not conn:
+        print("Error applying schema: could not connect to database")
+        return
     try:
-        conn = psycopg2.connect(
-            host=os.getenv("PGHOST", "localhost"),
-            database="incighder",
-            user="postgres",
-            password="password"
-        )
-        cur = conn.cursor()
-
-        with open("schema.sql", "r") as f:
+        schema_path = os.path.join(os.path.dirname(__file__), "schema.sql")
+        with open(schema_path, "r") as f:
             sql = f.read()
-            cur.execute("DROP TABLE IF EXISTS metric_snapshots, tracks, albums, artists CASCADE;")
-            cur.execute(sql)
+
+        # PyMySQL runs one statement per execute(), so split the file ourselves.
+        statements = [s.strip() for s in sql.split(";") if s.strip()]
+
+        with conn.cursor() as cur:
+            cur.execute("SET FOREIGN_KEY_CHECKS = 0")
+            for table in ("metric_snapshots", "tracks", "albums", "artists"):
+                cur.execute(f"DROP TABLE IF EXISTS {table}")
+            for stmt in statements:
+                cur.execute(stmt)
+            cur.execute("SET FOREIGN_KEY_CHECKS = 1")
 
         conn.commit()
-        cur.close()
-        conn.close()
         print("Schema applied successfully!")
 
-    except psycopg2.Error as e:
+    except pymysql.Error as e:
         print("Error applying schema:", e)
+    finally:
+        conn.close()
+
 
 if __name__ == "__main__":
     apply_schema()

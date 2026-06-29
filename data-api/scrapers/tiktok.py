@@ -1,7 +1,7 @@
 """TikTok follower/like counts (best-effort - strong bot detection).
 
-TikTok signs its API requests, so we render the public profile page and read the
-embedded __UNIVERSAL_DATA_FOR_REHYDRATION__ JSON blob.
+The public profile page server-renders an __UNIVERSAL_DATA_FOR_REHYDRATION__ JSON
+blob, so a plain HTTP GET (no browser) gives us the stats.
 """
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ import re
 from typing import Optional
 from urllib.parse import urlparse
 
-from .base import ScrapeResult, render_html
+from .base import ScrapeResult, polite_get
 
 _REHYDRATION_RE = re.compile(
     r'<script id="__UNIVERSAL_DATA_FOR_REHYDRATION__"[^>]*>(.*?)</script>',
@@ -41,9 +41,9 @@ def fetch_tiktok(handle_or_url: str) -> ScrapeResult:
     if not handle:
         return ScrapeResult.failure(platform, "could not parse TikTok handle")
     try:
-        html = render_html(f"https://www.tiktok.com/@{handle}", timeout_ms=25000)
+        html = polite_get(f"https://www.tiktok.com/@{handle}").text
     except Exception as e:
-        return ScrapeResult.failure(platform, f"render failed: {e}")
+        return ScrapeResult.failure(platform, f"fetch failed: {e}")
 
     m = _REHYDRATION_RE.search(html)
     if not m:

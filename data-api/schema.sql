@@ -1,4 +1,3 @@
-
 CREATE TABLE artists (
     id VARCHAR(255) PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
@@ -33,19 +32,20 @@ CREATE TABLE artists (
     tiktok_likes BIGINT NULL,
     tiktok_video_count INTEGER NULL,
     x_followers BIGINT NULL,
-    social_links JSONB NULL,
-    scrape_meta JSONB NULL
-);
+    social_links JSON NULL,
+    scrape_meta JSON NULL
+) ENGINE=InnoDB;
 
 CREATE TABLE albums (
     id VARCHAR(255) PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     release_date VARCHAR(255),
     total_tracks INTEGER,
-    images JSONB,
-    external_urls JSONB,
-    artist_id VARCHAR(255) REFERENCES artists(id)
-);
+    images JSON,
+    external_urls JSON,
+    artist_id VARCHAR(255),
+    FOREIGN KEY (artist_id) REFERENCES artists(id)
+) ENGINE=InnoDB;
 
 CREATE TABLE tracks (
     id VARCHAR(255) PRIMARY KEY,
@@ -53,20 +53,24 @@ CREATE TABLE tracks (
     duration_ms INTEGER,
     popularity INTEGER,
     explicit BOOLEAN,
-    external_urls JSONB,
-    album_id VARCHAR(255) REFERENCES albums(id),
-    artist_id VARCHAR(255) REFERENCES artists(id)
-);
+    external_urls JSON,
+    album_id VARCHAR(255),
+    artist_id VARCHAR(255),
+    FOREIGN KEY (album_id) REFERENCES albums(id),
+    FOREIGN KEY (artist_id) REFERENCES artists(id)
+) ENGINE=InnoDB;
 
 -- Per-account metric snapshots for growth-over-time tracking. account_key ties a
 -- data point to the specific linked profile, so switching to a different account
 -- starts a fresh timeline instead of registering a fake jump.
 CREATE TABLE metric_snapshots (
-    id SERIAL PRIMARY KEY,
-    artist_id VARCHAR(255) REFERENCES artists(id) ON DELETE CASCADE,
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    artist_id VARCHAR(255),
     platform VARCHAR(32) NOT NULL,
     account_key VARCHAR(255),
     value BIGINT,
-    captured_at TIMESTAMPTZ NOT NULL DEFAULT now()
-);
+    captured_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (artist_id) REFERENCES artists(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
 CREATE INDEX idx_snapshots_lookup ON metric_snapshots (artist_id, platform, captured_at);

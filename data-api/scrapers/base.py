@@ -131,61 +131,11 @@ def polite_get(
         return resp
 
 
-# --- Headless browser rendering ---
-# Playwright's sync API is bound to the thread that creates it, and Flask's dev
-# server handles each request on a different (often short-lived) thread - sharing
-# one browser across them raises "cannot switch to a different thread". So we run
-# Playwright entirely within each call. At our low volume the per-call launch cost
-# is fine, and it works under any threaded/forked WSGI server.
-
-
-def render_html(
-    url: str,
-    *,
-    wait_selector: Optional[str] = None,
-    wait_text: Optional[str] = None,
-    timeout_ms: int = 20000,
-    text: bool = False,
-) -> str:
-    """Return a JS-rendered page's HTML (throttled).
-
-    wait_selector waits for a CSS selector; wait_text waits until that substring
-    appears in the page's visible text (case-insensitive) - useful for SPA values
-    that render after load (e.g. Spotify monthly listeners). Playwright is imported
-    lazily so the HTTP-only scrapers work even without the browser installed.
-    """
-    from playwright.sync_api import sync_playwright
-
-    throttle(urlparse(url).hostname)
-    with sync_playwright() as pw:
-        browser = pw.chromium.launch(
-            headless=True,
-            args=["--no-sandbox", "--disable-blink-features=AutomationControlled"],
-        )
-        try:
-            context = browser.new_context(
-                user_agent=DEFAULT_USER_AGENT,
-                locale="en-US",
-                viewport={"width": 1280, "height": 800},
-            )
-            page = context.new_page()
-            page.goto(url, wait_until="domcontentloaded", timeout=timeout_ms)
-            if wait_selector:
-                page.wait_for_selector(wait_selector, timeout=timeout_ms)
-            if wait_text:
-                page.wait_for_function(
-                    "t => document.body && document.body.innerText.toLowerCase().includes(t)",
-                    arg=wait_text.lower(),
-                    timeout=timeout_ms,
-                )
-            return page.inner_text("body") if text else page.content()
-        finally:
-            browser.close()
+# Headless-browser rendering was removed: all scrapers now fetch over plain HTTP
+# (authenticated via session cookies in .env where a site needs it), so the data-api
+# no longer depends on Playwright/Chromium and can run anywhere — including serverless.
 
 
 def shutdown() -> None:
-    """No-op: Playwright is now started and stopped per render call.
-
-    Kept so existing imports / atexit hooks stay valid.
-    """
+    """No-op, kept so existing imports / atexit hooks stay valid."""
     return None
