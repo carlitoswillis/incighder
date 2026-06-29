@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import mysql, { RowDataPacket, ResultSetHeader } from 'mysql2/promise';
+import fallbackArtists from '@/data/artists-fallback.json';
 
 const pool = mysql.createPool({
   user: process.env.DB_USER || 'incighder',
@@ -26,8 +27,13 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     }
     return NextResponse.json(rows[0]);
   } catch (error) {
-    console.error('Error fetching artist:', error);
-    return NextResponse.json({ error: 'Failed to fetch artist' }, { status: 500 });
+    // No reachable MySQL (e.g. serverless deploy) — fall back to the snapshot.
+    console.error('Error fetching artist; serving JSON fallback:', error);
+    const match = (fallbackArtists as { id: string }[]).find((a) => a.id === id);
+    if (!match) {
+      return NextResponse.json({ error: 'Artist not found' }, { status: 404 });
+    }
+    return NextResponse.json(match);
   }
 }
 
