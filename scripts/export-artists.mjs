@@ -16,10 +16,18 @@ const pool = mysql.createPool({
   database: process.env.DB_NAME || 'incighder',
   password: process.env.DB_PASSWORD || 'password',
   port: parseInt(process.env.DB_PORT || '3306', 10),
+  connectTimeout: 3000,
 });
 
-const [rows] = await pool.query('SELECT * FROM artists');
-mkdirSync(dirname(OUT), { recursive: true });
-writeFileSync(OUT, JSON.stringify(rows, null, 2) + '\n');
-console.log(`Wrote ${rows.length} artist(s) to ${OUT}`);
-await pool.end();
+try {
+  const [rows] = await pool.query('SELECT * FROM artists');
+  mkdirSync(dirname(OUT), { recursive: true });
+  writeFileSync(OUT, JSON.stringify(rows, null, 2) + '\n');
+  console.log(`Wrote ${rows.length} artist(s) to ${OUT}`);
+} catch (err) {
+  // Run on every dev start; if MySQL isn't up yet just keep the existing
+  // snapshot rather than failing the launch.
+  console.warn(`Skipping artist snapshot (DB unavailable): ${err.message}`);
+} finally {
+  await pool.end();
+}

@@ -27,6 +27,11 @@ fi
 echo "==> Applying database schema..."
 ./.venv/bin/python apply_schema.py
 
+echo "==> Refreshing artist JSON snapshot (fallback for serverless deploys)..."
+cd "$ROOT"
+node scripts/export-artists.mjs || true
+cd "$ROOT/data-api"
+
 echo "==> Starting data-api on :5050..."
 # macOS fork-safety: threaded workers make network calls that touch the system
 # proxy resolver (CoreFoundation/ObjC), which otherwise crashes the worker after
