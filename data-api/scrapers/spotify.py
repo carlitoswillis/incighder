@@ -1,28 +1,29 @@
-"""Spotify artist data: Web API baseline + scraped monthly listeners / top-track plays.
+"""Spotify artist data: Web API baseline + monthly listeners via a render API.
 
 Two sources, merged:
 - **Web API** (spotipy) gives the baseline identity metrics — followers, popularity,
   genres, and the top track (by popularity). These are NOT scraped anywhere else, so a
   manually-added artist only gets them once their Spotify source is scraped.
-- **Rendered page**: monthly listeners (absent from the Web API) and the most-played
-  track's play count. open.spotify.com is a JS SPA, so we render and read visible text.
+- **Render API**: monthly listeners is absent from the Web API and the page is a JS SPA
+  that Spotify protects against non-browser requests. So we render the public artist page
+  through scrape.do (SCRAPE_DO_TOKEN) and parse "N monthly listeners" from the result.
+  Best-effort, browser-free on our side, and serverless-friendly — skipped if no token.
 
-Either source succeeding yields a successful result; neither one being available is the
-only failure. (token -> GraphQL is faster but TOTP-signed now.)
+Either source succeeding yields a successful result; neither being available is the
+only failure.
 """
 from __future__ import annotations
 
 import json
+import os
 import re
 import sys
 from typing import Optional
 from urllib.parse import urlparse
 
-from .base import ScrapeResult, render_html
+from .base import ScrapeResult, get_session, throttle
 
 _MONTHLY_RE = re.compile(r"([\d.,]+)\s*monthly listeners", re.IGNORECASE)
-# A Popular-list row in the page's innerText: rank, name, (E?), plays, duration.
-_TRACK_RE = re.compile(r"^\d+\n(.+?)\n(?:E\n)?([\d,]+)\n\d+:\d+", re.MULTILINE)
 
 
 def _artist_id(spotify_id_or_url: str) -> Optional[str]:
@@ -39,23 +40,34 @@ def _artist_id(spotify_id_or_url: str) -> Optional[str]:
     return s  # assume bare id
 
 
-def _top_track(text: str):
-    """Most-played track in the Popular section: (name, plays) or (None, None)."""
-    start = text.find("Popular")
-    if start == -1:
-        return None, None
-    block = text[start:]
-    for marker in ("See more", "Artist pick", "Discography"):
-        e = block.find(marker)
-        if e != -1:
-            block = block[:e]
-            break
-    best_name, best_plays = None, -1
-    for m in _TRACK_RE.finditer(block):
-        plays = int(m.group(2).replace(",", ""))
-        if plays > best_plays:
-            best_plays, best_name = plays, m.group(1).strip()
-    return (best_name, best_plays) if best_name else (None, None)
+def _monthly_listeners(artist_id: str) -> Optional[int]:
+    """Render the public artist page via scrape.do and parse monthly listeners.
+    Best-effort: returns None (skipped) if SCRAPE_DO_TOKEN is unset or the render fails."""
+    token = os.getenv("SCRAPE_DO_TOKEN")
+    if not token:
+        return None
+    try:
+        throttle("api.scrape.do")
+        resp = get_session().get(
+            "https://api.scrape.do/",
+            params={
+                "token": token,
+                "url": f"https://open.spotify.com/artist/{artist_id}",
+                "render": "true",
+                "customWait": "3500",
+            },
+            timeout=120,
+        )
+        if resp.status_code != 200:
+            print(f"spotify render failed: HTTP {resp.status_code}", file=sys.stderr)
+            return None
+        m = _MONTHLY_RE.search(resp.text)
+        if not m:
+            return None
+        return int(re.sub(r"[.,\s]", "", m.group(1)))
+    except Exception as e:
+        print(f"spotify monthly-listeners error: {e}", file=sys.stderr)
+        return None
 
 
 def _web_api_data(artist_id: str) -> dict:
@@ -100,27 +112,12 @@ def fetch_spotify(spotify_id_or_url: str) -> ScrapeResult:
 
     data = _web_api_data(artist_id)
 
-    # Page render for monthly listeners + top-track plays (neither is in the Web API).
-    try:
-        text = render_html(
-            f"https://open.spotify.com/artist/{artist_id}",
-            wait_text="monthly listeners",
-            timeout_ms=25000,
-            text=True,
-        )
-        m = _MONTHLY_RE.search(text)
-        if m:
-            data["monthly_listeners"] = int(re.sub(r"[.,\s]", "", m.group(1)))
-        name, plays = _top_track(text)
-        if name:
-            # Page's most-played track is a matched (name, plays) pair; prefer it for
-            # the play count the Web API can't give.
-            data["top_track_name"] = name
-            if plays is not None:
-                data["top_track_plays"] = plays
-    except Exception as e:
-        print(f"spotify page render failed: {e}", file=sys.stderr)
+    # Monthly listeners isn't in the Web API; fetch it via the internal web API
+    # (SPOTIFY_SP_DC cookie). Best-effort — skipped if the cookie is unset.
+    ml = _monthly_listeners(artist_id)
+    if ml is not None:
+        data["monthly_listeners"] = ml
 
     if not data:
-        return ScrapeResult.failure(platform, "no data from Web API or rendered page")
+        return ScrapeResult.failure(platform, "no data from Web API or internal API")
     return ScrapeResult.success(platform, data)

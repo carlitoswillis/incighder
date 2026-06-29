@@ -4,13 +4,13 @@ PURPOSE: This is the authoritative rulebook for AI assistants. It defines the 'h
 
 ## Project Context
 - **Objective**: Build a data application for A&Rs/Labels to track artist audience traction.
-- **Stack**: Next.js (TypeScript, Tailwind), Python (Data API), PostgreSQL, Docker.
+- **Stack**: Next.js (TypeScript, Tailwind) flat at the repo root, Python `data-api`, MySQL 8.4. **No Docker** — runs natively. Targets a flat Vercel deploy.
 
 ## Architecture Constraints
-- **Dual-API Structure**: The Next.js frontend calls Next.js API routes, which in turn communicate with the Python `data-api` service. See `ARCHITECTURE.md` for the route map.
-- **Docker-First**: All services run in Docker. Prefer `docker compose up --build`; the root `./start_*.sh` scripts are convenience wrappers.
-- **Database**: PostgreSQL is the source of truth. `data-api/schema.sql` is the master schema; apply it via `docker compose run --rm data-api python apply_schema.py`.
-- **Local-First & Free AI**: Prioritize local inference and development. AI verification uses local Ollama only — no paid AI APIs.
+- **Flat app, native run**: The Next.js app lives at the repo root (run `npm` there, not a subdir). Bring up the full stack with **`./start_dev.sh`** (MySQL + venv gunicorn data-api on :5050 + `npm run dev` on :3000). No Docker.
+- **Two halves, collapsing**: Native TS routes own DB access (`mysql2`) and Spotify search; the rest still proxy to the Python `data-api` via `DATA_API_URL` (`src/lib/data-api.ts`). Direction: keep porting API-call endpoints into TS so the app stays flat/Vercel-deployable. See `ARCHITECTURE.md` for the route map.
+- **Database**: MySQL 8.4 is the source of truth. `data-api/schema.sql` (MySQL DDL) is the master schema; apply it via `./.venv/bin/python apply_schema.py` from `data-api/` (drop-and-recreate). `mysql2` (Node) / `PyMySQL` (Python); `?` placeholders, no `RETURNING`.
+- **Browser-free scraping**: No Playwright/Chromium. All scrapers are HTTP. Spotify monthly listeners renders via the **scrape.do** API (`SCRAPE_DO_TOKEN`); Instagram uses the `IG_SESSIONID` cookie. AI verification uses **Google Gemini** (`gemini-2.5-flash`, `GOOGLE_AI_API_KEY`).
 - **Best-Effort Scraping**: Scrapers are isolated and partial-by-design; one platform failing must never block the others. Respect the 24h cache TTL.
 - **Markdown Persistence**: All state must be tracked in `ai/*.md`.
 

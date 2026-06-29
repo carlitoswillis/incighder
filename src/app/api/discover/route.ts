@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { DATA_API_URL } from "@/lib/data-api";
 
 export const maxDuration = 120;
 
@@ -6,7 +7,7 @@ export async function POST(request: Request) {
   const body = await request.json();
 
   try {
-    const response = await fetch("http://127.0.0.1:5050/discover", {
+    const response = await fetch(`${DATA_API_URL}/discover`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),

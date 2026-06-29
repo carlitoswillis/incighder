@@ -5,8 +5,22 @@ API no longer exposes (and that other platforms never did) via low-volume,
 ban-resistant scraping. This is the active feature plan; see `PROJECT_STATE.md`
 for status.
 
-## Last Updated: 2026-06-20
-## Status: Planned (not started)
+## Last Updated: 2026-06-29
+## Status: Shipped (Phases 0–4), then **de-browsered**.
+
+> **2026-06-29 migration note (supersedes the browser-based design below).** Playwright/
+> Chromium has been **removed** — every scraper is now HTTP-only, so the data-api runs
+> anywhere (incl. serverless). Specifics that differ from the original plan:
+> - **TikTok / SoundCloud / YouTube**: plain HTTP (TikTok reads the server-rendered
+>   `__UNIVERSAL_DATA_FOR_REHYDRATION__` blob; SoundCloud api-v2 with a scraped client_id; YouTube Data API).
+> - **Instagram**: `i.instagram.com/api/v1/users/web_profile_info/` authenticated with the
+>   `IG_SESSIONID` cookie (.env); the browser og:description fallback is gone.
+> - **Spotify monthly listeners**: the value is JS-gated and Spotify edge-blocks non-browser
+>   requests (the token endpoint is TOTP-gated + Akamai-blocked, proven 6 ways). So it is now
+>   fetched by rendering the public artist page through the **scrape.do** render API
+>   (`SCRAPE_DO_TOKEN`) and parsing "N monthly listeners". Everything else Spotify = Web API.
+> - **AI verify**: Ollama → **Google Gemini** (`gemini-2.5-flash`, `GOOGLE_AI_API_KEY`).
+> - **DB**: Postgres → **MySQL 8.4**. The historical plan below is kept for context.
 
 ---
 

@@ -3,56 +3,58 @@
 PURPOSE: Technical system design and data flow of the Incighder application.
 
 ## Overview
-Incighder is a multi-service data application that aggregates and visualizes artist audience metrics from music and social platforms. Three Docker services: a Next.js frontend, a Python `data-api`, and PostgreSQL.
+Incighder aggregates and visualizes artist audience metrics from music and social platforms. It is a **flat Next.js app** (repo root) backed by **MySQL**, with a Python `data-api` for the heavy scraping/discovery work. **No Docker** — everything runs natively (`./start_dev.sh`), and the frontend is structured to deploy to **Vercel** as a single project.
+
+> Migration note (2026-06-29): the app was de-dockerized, moved Postgres→MySQL, flattened out of the old `incighder/incighder/` nesting to the repo root, dropped Playwright/Chromium (all scrapers are now HTTP), and swapped Ollama→Gemini. See `PROJECT_STATE.md` history.
 
 ## System Components
 
-### 1. Frontend (Next.js — `incighder/`)
-- **Role**: User interface and primary application logic.
-- **Stack**: Next.js (App Router, React 19, TypeScript), Tailwind CSS, shadcn-inspired UI (`src/components/ui/`), `lucide-react`/`react-icons`, `next-themes`, `sonner` toasts.
-- **API routes as proxy/orchestrator** (`src/app/api/*/route.ts`): they don't hold business logic — they forward to the Python `data-api` (or, for reads, query Postgres directly via `pg`). Route map:
-  - `GET/POST /api/artists` → list / insert · `GET/PATCH/DELETE /api/artists/[id]` → detail / edit / remove · `POST /api/artists/manual` → manual insert
-  - `GET /api/spotify-search` · `GET /api/similar` · `POST /api/discover` · `POST /api/scrape` · `POST /api/clear-source` · `GET /api/history` · `GET /api/preview`
-- **Pages**: `/` (artist cards), `/table` (sortable grid), `/discover`, `/artists/add`, `/artists/[id]` (detail + sources panel), `/about`, `/search_spotify`.
-- **Key components**: `app-shell` (global nav), `artist-card`, `metric-grid`, `sources-panel`, `growth-section`, `sparkline`, `score-badge`, `delete-artist-dialog`, `link-preview`.
+### 1. Frontend (Next.js — repo root)
+- **Role**: User interface and primary application logic. Lives at the repo root (Vercel auto-detects it; no Root Directory setting needed).
+- **Stack**: Next.js 15 (App Router, React 19, TypeScript, Turbopack), Tailwind CSS, shadcn-inspired UI (`src/components/ui/`), `lucide-react`/`react-icons`, `next-themes`, `sonner` toasts.
+- **DB access**: reads/writes MySQL directly via **`mysql2`** (`?` placeholders; no `RETURNING` — update/insert then SELECT). Pools configured from `DB_HOST`/`DB_USER`/`DB_PASSWORD`/`DB_NAME`/`DB_PORT` (default `127.0.0.1:3306`, user/db `incighder`).
+- **API routes** (`src/app/api/*/route.ts`):
+  - **Native (no data-api)**: `GET/POST /api/artists` (list via mysql2 / insert proxies), `GET/PATCH/DELETE /api/artists/[id]`, `POST /api/artists/manual`, `GET /api/spotify-search` (calls the Spotify Web API directly with a cached client-credentials token).
+  - **Proxy to data-api** via `DATA_API_URL` (`src/lib/data-api.ts`, default `http://127.0.0.1:5050`): `POST /api/discover`, `GET /api/similar`, `POST /api/scrape`, `POST /api/refresh`, `POST /api/clear-source`, `GET /api/history`, `GET /api/preview`, `POST /api/artists` (insert).
+- **Pages**: `/` (artist cards), `/table` (sortable grid), `/discover`, `/artists/add`, `/artists/bulk`, `/artists/refresh`, `/artists/[id]` (detail + sources panel), `/search_spotify`.
+- **Key components**: `app-shell`, `artist-card`, `metric-grid` (per-platform `stat-tile`s; Spotify tile = monthly listeners), `sources-panel`, `growth-section`, `sparkline`, `score-badge`.
 
 ### 2. Data API (Python Flask — `data-api/app.py`)
-- **Role**: All heavy lifting — data ingestion, search, scraping, AI verification, history.
-- **Stack**: Flask, `spotipy`, `psycopg2`, Playwright (headless browser), BeautifulSoup4/lxml, `requests`.
-- **Routes**: `/insert_artist`, `/spotify_search`, `/similar_artists`, `/scrape`, `/discover`, `/preview`, `/history`, `/clear_source`.
-- **Subprocess pattern**: insert/search/similar shell out to standalone scripts (`insert_artist_from_json.py`, `spotify_search.py`, `similar_artists.py`) so each is runnable and testable in isolation; `app.py` marshals JSON in/out. Scrape/discover/history call modules in-process (`scrape_service`, `scrapers.discovery`, `link_preview`).
-- **Scrape orchestration (`scrape_service.py`)**: owns the DB read/write and the **24h cache TTL**; fans out to per-platform scrapers in `scrapers/` (`spotify`, `youtube`, `soundcloud`, `instagram`, `tiktok`) which stay pure (`link in → ScrapeResult out`). Returns **partial results** — one platform failing never blocks the others. X is manual-entry only. Writes are guarded by an `ALLOWED_METRIC_COLUMNS` allowlist (no column-name injection); `PLATFORM_COLUMNS` defines what each source owns and is nulled on unlink.
-- **Artist discovery (similar artists)**: `/discover` seeds on an artist name and uses the free **Last.fm `artist.getSimilar`** graph (Spotify's related-artists API was retired in late 2024), then enriches each result via Spotify search + Last.fm `artist.getInfo`. Backed by `similar_artists.py`; requires `LAST_FM_API_KEY`. "Track" reuses the standard `/insert_artist` pipeline.
-- **Auto-discovery of links (`scrapers/discovery.py`)**: finds official profiles for an artist name. YouTube/SoundCloud use their native search APIs. IG/TikTok use a free **web search** (`web_search.py` → Google Programmable Search, `GOOGLE_CSE_KEY`/`GOOGLE_CSE_ID`): it queries `{name} site:<platform>`, normalizes hits to profile roots (rejecting `/p/`, `/reel/`, `/video/`, reserved paths), AI-verifies each candidate, and returns the best match plus ranked `alternates`. This recovers accounts whose handle differs from the artist's name. The old name-slug guess remains a fallback candidate, so discovery still works with no search key configured.
-- **AI verification (`ai_verify.py`, optional)**: cross-checks discovered IG/TikTok profiles against the artist with a **local LLM via Ollama** (`OLLAMA_URL`, default `host.docker.internal:11434`; `OLLAMA_MODEL`, default `qwen2.5-coder:14b`). Returns `{match, confidence, reason}`. Free, private, best-effort — **no paid AI APIs**; if Ollama is unreachable the guess is kept as unverified. Reaches the host's Ollama via `extra_hosts: host.docker.internal:host-gateway` in `docker-compose.yml`.
+- **Role**: scraping, link discovery, AI verification, history. Runs from a local venv via **gunicorn on port 5050** (5000 is taken by macOS AirPlay). `--reload` in dev. Loads the repo-root `.env` via `load_dotenv()`.
+- **Stack**: Flask, `spotipy`, **`PyMySQL`** (+`cryptography`), BeautifulSoup4/lxml, `requests`. **No Playwright/Chromium** — every scraper is HTTP-only.
+- **Routes**: `/insert_artist`, `/spotify_search`, `/similar_artists`, `/scrape`, `/refresh_artist`, `/discover`, `/preview`, `/history`, `/clear_source`.
+- **Subprocess pattern**: insert/search/similar shell out to standalone scripts (`insert_artist_from_json.py`, `spotify_search.py`, `similar_artists.py`) via `sys.executable` (not the literal `python`); `app.py` marshals JSON. Scrape/discover/history call modules in-process.
+- **Scrape orchestration (`scrape_service.py`)**: owns the DB read/write and the **24h cache TTL**; fans out to per-platform scrapers in `scrapers/` (`spotify`, `youtube`, `soundcloud`, `instagram`, `tiktok`) which stay pure (`link in → ScrapeResult out`). Returns **partial results**. Writes guarded by `ALLOWED_METRIC_COLUMNS`; `PLATFORM_COLUMNS` defines per-source ownership.
+- **Browser-free scraping (`scrapers/`)**: YouTube (Data API) and SoundCloud (api-v2 + scraped client_id) are pure HTTP. TikTok reads the server-rendered `__UNIVERSAL_DATA_FOR_REHYDRATION__` blob over plain HTTP. Instagram uses the `i.instagram.com` web-profile JSON API, authenticated with the **`IG_SESSIONID`** cookie (.env). **Spotify monthly listeners** (a JS-gated metric Spotify blocks for non-browsers) is fetched by rendering the public artist page through the **scrape.do** render API (`SCRAPE_DO_TOKEN`) and parsing "N monthly listeners"; everything else Spotify comes from the Web API.
+- **Auto-discovery (`scrapers/discovery.py`)**: finds official profiles for an artist name. YouTube/SoundCloud use native search; IG/TikTok use a free web search (`web_search.py` → Google Programmable Search, `GOOGLE_CSE_KEY`/`GOOGLE_CSE_ID` if set, else a name-slug fallback), then AI-verifies candidates.
+- **AI verification (`ai_verify.py`)**: cross-checks discovered IG/TikTok profiles using **Google Gemini** (`gemini-2.5-flash` via `GOOGLE_AI_API_KEY`). Returns `{match, confidence, reason}`. Best-effort — if unavailable the guess is kept unverified.
 
-### 3. Database (PostgreSQL)
-- **Role**: Source of truth for all artist metrics and history.
-- **Master schema**: `data-api/schema.sql` — the **single source of truth**. Tables: `artists` (Spotify + per-platform metric columns, `social_links`, `scrape_meta`), `albums`, `tracks`, and `metric_snapshots`.
-- **Growth tracking**: `metric_snapshots` stores `(artist_id, platform, account_key, value, captured_at)`. `account_key` ties a data point to the specific linked profile, so switching accounts starts a fresh timeline instead of registering a fake jump. Big counts are `BIGINT` (views/plays exceed `INTEGER`'s 2.1B cap).
-- **Incremental migrations**: `data-api/migrations/*.sql` (`0001_social_columns`, `0002_more_metrics`, `0003_growth_snapshots`) record schema evolution; `schema.sql` is the consolidated truth.
-- **Applying schema**: `docker compose run --rm data-api python apply_schema.py` (first run / reset).
+### 3. Database (MySQL 8.4)
+- **Role**: Source of truth for all artist metrics and history. Local install via Homebrew `mysql@8.4`; DB `incighder`, user `incighder`.
+- **Master schema**: `data-api/schema.sql` (MySQL DDL — `JSON` columns, `AUTO_INCREMENT`, `TIMESTAMP DEFAULT CURRENT_TIMESTAMP`, table-level `FOREIGN KEY`s on InnoDB). Tables: `artists`, `albums`, `tracks`, `metric_snapshots`.
+- **Growth tracking**: `metric_snapshots(artist_id, platform, account_key, value, captured_at)`. `account_key` ties a point to the specific linked profile so account switches start a fresh timeline. Big counts are `BIGINT`.
+- **Applying schema**: `./.venv/bin/python apply_schema.py` from `data-api/` (drop-and-recreate; `start_dev.sh` runs it on boot). There is no incremental-migration framework yet (see tech-debt backlog).
 
-### 4. Infrastructure (Docker)
-- **Services** (`docker-compose.yml`): `db`, `data-api`, `incighder-dev` (Next.js), and `scheduler`. `extra_hosts` bridges the data-api/scheduler to the host's Ollama.
-- **Run**: `docker compose up --build` → frontend at `http://localhost:3000`.
+### 4. Running it (native, no Docker)
+- **`./start_dev.sh`** (repo root): starts MySQL 8.4, sets up the Python venv + installs deps on first run, applies the schema, launches the data-api (gunicorn :5050, with `OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES` for macOS thread-fork safety), then `npm run dev` (frontend :3000).
+- Frontend alone: `npm run dev` at the repo root. Data-api alone: venv gunicorn in `data-api/`.
 
 ### 5. Scheduler (auto-scrape worker — `data-api/scheduler.py`)
-- **Role**: recurring metric pulls so growth history accrues without manual scraping.
-- **How**: reuses the `data-api` image but runs `python scheduler.py` instead of Flask — a sleep/sweep loop that every `AUTO_SCRAPE_INTERVAL_HOURS` (default 24) calls `scrape_service.scrape_all(force=False)`. The 24h cache TTL means only stale platforms actually refetch; each sweep appends `metric_snapshots` through the normal scrape path. One artist failing never aborts the sweep. `AUTO_SCRAPE_STARTUP_DELAY` (default 60s) delays the first sweep on boot.
+- Optional recurring metric pulls. Runs `python scheduler.py` (its own process) — a sleep/sweep loop that every `AUTO_SCRAPE_INTERVAL_HOURS` (default 24) calls `scrape_service.scrape_all(force=False)`. TTL means only stale platforms refetch; each sweep appends `metric_snapshots`.
 
 ## Data Flow
-1. **Search**: Next.js → `/api/spotify-search` → `data-api /spotify_search` → Spotify.
-2. **Discover**: seed name → `/api/discover|similar` → `data-api` → Last.fm `getSimilar` + Spotify/Last.fm enrichment → grid; "Track" feeds ingestion.
-3. **Ingestion**: `data-api` transforms API data → inserts into PostgreSQL.
-4. **Scrape**: `/api/scrape` → `scrape_service` → per-platform scrapers (TTL-cached) → updates `artists` + appends `metric_snapshots`.
-5. **Display**: Next.js reads structured data (via API routes / `pg`) and renders dashboard, table, detail, sparklines, and history.
-6. **Scheduled sweep**: the `scheduler` worker periodically runs `scrape_all` over every artist (TTL-respected), feeding the same update + snapshot path as a manual scrape.
+1. **Search**: Next.js `/api/spotify-search` → **Spotify Web API directly** (native TS, no data-api).
+2. **Discover**: seed name → `/api/discover|similar` → `data-api` → Last.fm `getSimilar` + Spotify/Last.fm enrichment + Gemini verify → grid; "Track" feeds ingestion.
+3. **Ingestion**: `data-api` transforms API data → inserts into MySQL.
+4. **Scrape**: `/api/scrape` → `scrape_service` → per-platform HTTP scrapers (TTL-cached; Spotify monthly listeners via scrape.do) → updates `artists` + appends `metric_snapshots`.
+5. **Display**: Next.js reads MySQL via `mysql2` and renders dashboard, table, detail, sparklines, history.
+
+## Deployment (Vercel)
+The frontend is Vercel-ready as a single flat project. To actually deploy: point `DB_*` env at a **hosted MySQL**, and either host the `data-api` somewhere public and set `DATA_API_URL`, or continue porting its endpoints into native TS routes (Spotify search already is). Note scrapers may be IP-blocked from datacenter ranges — see the deep tech-debt item in `PROJECT_STATE.md`.
 
 ## AI Workspace Substrate
-This repo uses an AI-assisted engineering substrate in `ai/`.
-- **State & vision**: `ai/PROJECT_STATE.md` (read first; absorbs the former `GOALS.md`).
-- **Rules**: `ai/AGENTS.md` defines agent constraints.
-- **Plans**: `ai/SCRAPING_PLAN.md` (live scraping plan), `ai/DESIGN_OVERHAUL_PLAN.md` (UI system).
-- **Context bundle**: `ai/CONTEXT_BUNDLE.md` is generated by `ai/ai-context.sh` — regenerate it after editing the docs above; don't hand-edit.
-- **Flow**: Human Pilot → AI Implementation → Verification (`docker compose up` + manual QA).
+- **State & vision**: `ai/PROJECT_STATE.md` (read first).
+- **Rules**: `ai/AGENTS.md`.
+- **Plans**: `ai/SCRAPING_PLAN.md`, `ai/DESIGN_OVERHAUL_PLAN.md`.
+- **Context bundle**: `ai/CONTEXT_BUNDLE.md` is generated by `ai/ai-context.sh` — regenerate after editing docs; don't hand-edit.
+- **Flow**: Human Pilot → AI Implementation → Verification (`./start_dev.sh` + manual QA).

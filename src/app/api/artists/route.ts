@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { DATA_API_URL } from "@/lib/data-api";
 import mysql from 'mysql2/promise';
 
 const pool = mysql.createPool({
@@ -23,7 +24,7 @@ export async function POST(request: Request) {
   const artistData = await request.json();
 
   try {
-    const response = await fetch('http://127.0.0.1:5050/insert_artist', {
+    const response = await fetch(`${DATA_API_URL}/insert_artist`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { DATA_API_URL } from "@/lib/data-api";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -10,7 +11,7 @@ export async function GET(request: Request) {
 
   try {
     const response = await fetch(
-      `http://127.0.0.1:5050/similar_artists?q=${encodeURIComponent(query)}`,
+      `${DATA_API_URL}/similar_artists?q=${encodeURIComponent(query)}`,
     );
 
     if (!response.ok) {

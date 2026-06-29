@@ -1,18 +1,14 @@
 """SoundCloud metrics via the unofficial api-v2.
 
-api-v2 needs a client_id, which we extract from the site and cache. We try a cheap
-HTTP fetch of the homepage JS first; if SoundCloud bot-challenges that (it returns a
-tiny 202 interstitial), we fall back to a real browser and capture the client_id
-from the api-v2 calls the web app fires. The id rotates, so on an auth failure we
-re-extract once and retry.
+api-v2 needs a client_id, which we extract from the homepage JS over plain HTTP and
+cache. The id rotates, so on an auth failure we re-extract once and retry.
 """
 from __future__ import annotations
 
 import re
-import urllib.parse
 from typing import Optional
 
-from .base import DEFAULT_USER_AGENT, ScrapeResult, polite_get, throttle
+from .base import ScrapeResult, polite_get
 
 _SCRIPT_RE = re.compile(r'<script[^>]+src="(https://[^"]*sndcdn\.com/assets/[^"]+\.js)"')
 _CLIENT_ID_RE = re.compile(r'client_id\s*[:=]\s*"([A-Za-z0-9]{20,})"')
@@ -36,46 +32,11 @@ def _client_id_via_http() -> Optional[str]:
     return None
 
 
-def _client_id_via_browser() -> Optional[str]:
-    """Load a SoundCloud page in a real browser and capture the client_id from the
-    api-v2 requests it fires - works when the plain HTTP homepage is bot-challenged."""
-    try:
-        from playwright.sync_api import sync_playwright
-    except Exception:
-        return None
-    holder: dict = {}
-    throttle("soundcloud.com")
-    with sync_playwright() as pw:
-        browser = pw.chromium.launch(
-            headless=True,
-            args=["--no-sandbox", "--disable-blink-features=AutomationControlled"],
-        )
-        try:
-            page = browser.new_context(
-                user_agent=DEFAULT_USER_AGENT, locale="en-US"
-            ).new_page()
-
-            def on_request(req):
-                if "api-v2.soundcloud.com" in req.url and "client_id=" in req.url and "id" not in holder:
-                    qs = urllib.parse.parse_qs(urllib.parse.urlparse(req.url).query)
-                    if qs.get("client_id"):
-                        holder["id"] = qs["client_id"][0]
-
-            page.on("request", on_request)
-            try:
-                page.goto("https://soundcloud.com/discover", wait_until="networkidle", timeout=25000)
-            except Exception:
-                pass  # may time out after we already captured the id
-        finally:
-            browser.close()
-    return holder.get("id")
-
-
 def _get_client_id(force: bool = False) -> Optional[str]:
     global _client_id
     if _client_id and not force:
         return _client_id
-    cid = _client_id_via_http() or _client_id_via_browser()
+    cid = _client_id_via_http()
     if cid:
         _client_id = cid
     return cid

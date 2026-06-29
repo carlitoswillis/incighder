@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
+import { DATA_API_URL } from "@/lib/data-api";
 
 export async function POST(request: Request) {
   const body = await request.json();
 
   try {
-    const r = await fetch("http://127.0.0.1:5050/clear_source", {
+    const r = await fetch(`${DATA_API_URL}/clear_source`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
