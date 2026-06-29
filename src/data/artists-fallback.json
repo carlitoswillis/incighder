@@ -1,0 +1,254 @@
+[
+  {
+    "id": "1Cc8XsEdqruB06bfcpF6FQ",
+    "name": "zizii",
+    "followers": 868,
+    "popularity": 23,
+    "genres": "[]",
+    "images": [
+      {
+        "url": "https://i.scdn.co/image/ab6761610000e5eba5b3b143655232411c08128f",
+        "width": 640,
+        "height": 640
+      },
+      {
+        "url": "https://i.scdn.co/image/ab67616100005174a5b3b143655232411c08128f",
+        "width": 320,
+        "height": 320
+      },
+      {
+        "url": "https://i.scdn.co/image/ab6761610000f178a5b3b143655232411c08128f",
+        "width": 160,
+        "height": 160
+      }
+    ],
+    "external_urls": {
+      "spotify": "https://open.spotify.com/artist/1Cc8XsEdqruB06bfcpF6FQ"
+    },
+    "monthly_listeners": 7820,
+    "spotify_id": "1Cc8XsEdqruB06bfcpF6FQ",
+    "youtube_id": null,
+    "top_track_id": "1N5KC9etlDfsjOfpbYHNog",
+    "top_track_name": "Acapella 2",
+    "top_track_popularity": 39,
+    "top_track_plays": 49999,
+    "youtube_subscribers": 138000,
+    "youtube_total_views": 12864350,
+    "youtube_video_count": 89,
+    "youtube_top_video_title": "I SCORED TWICE IN A SEMI FINAL CUP MATCH!!",
+    "youtube_top_video_views": 3278504,
+    "soundcloud_followers": 776,
+    "soundcloud_track_count": 26,
+    "soundcloud_top_track": "Acapella 2 prod me",
+    "soundcloud_top_track_plays": 49305,
+    "instagram_followers": 6238,
+    "instagram_posts": 40,
+    "instagram_verified": 0,
+    "tiktok_followers": 8315,
+    "tiktok_likes": 213308,
+    "tiktok_video_count": 228,
+    "x_followers": null,
+    "social_links": {
+      "tiktok": "https://www.tiktok.com/@zizikinz",
+      "spotify": "https://open.spotify.com/artist/1Cc8XsEdqruB06bfcpF6FQ",
+      "youtube": "https://www.youtube.com/channel/UCuj70nZBDKJ9rGa-bwIXZuA",
+      "instagram": "https://www.instagram.com/soyazizi/",
+      "soundcloud": "https://soundcloud.com/zizikinz"
+    },
+    "scrape_meta": {
+      "tiktok": {
+        "error": null,
+        "status": "ok",
+        "last_scraped_at": "2026-06-29T07:17:12.227800+00:00"
+      },
+      "spotify": {
+        "error": null,
+        "status": "ok",
+        "last_scraped_at": "2026-06-29T07:17:12.375443+00:00"
+      },
+      "youtube": {
+        "error": null,
+        "status": "ok",
+        "last_scraped_at": "2026-06-29T07:17:12.338905+00:00"
+      },
+      "instagram": {
+        "error": null,
+        "status": "ok",
+        "last_scraped_at": "2026-06-29T07:17:12.712456+00:00"
+      },
+      "soundcloud": {
+        "error": null,
+        "status": "ok",
+        "last_scraped_at": "2026-06-29T07:17:14.957073+00:00"
+      }
+    }
+  },
+  {
+    "id": "37Nev24TbRvZdcymARiXwh",
+    "name": "holottacheese",
+    "followers": 4750,
+    "popularity": 21,
+    "genres": "[]",
+    "images": [
+      {
+        "url": "https://i.scdn.co/image/ab6761610000e5ebfbef5a92c688f64161eb22d2",
+        "width": 640,
+        "height": 640
+      },
+      {
+        "url": "https://i.scdn.co/image/ab67616100005174fbef5a92c688f64161eb22d2",
+        "width": 320,
+        "height": 320
+      },
+      {
+        "url": "https://i.scdn.co/image/ab6761610000f178fbef5a92c688f64161eb22d2",
+        "width": 160,
+        "height": 160
+      }
+    ],
+    "external_urls": {
+      "spotify": "https://open.spotify.com/artist/37Nev24TbRvZdcymARiXwh"
+    },
+    "monthly_listeners": 5922,
+    "spotify_id": "37Nev24TbRvZdcymARiXwh",
+    "youtube_id": null,
+    "top_track_id": "5h8MDZNVWMZSKJbY2Peh1E",
+    "top_track_name": "BANDO",
+    "top_track_popularity": 26,
+    "top_track_plays": null,
+    "youtube_subscribers": 10900,
+    "youtube_total_views": 771452,
+    "youtube_video_count": 8,
+    "youtube_top_video_title": "NEED A CIG- HolottaCheese [dir. by @noahsocold]",
+    "youtube_top_video_views": 291723,
+    "soundcloud_followers": 2063,
+    "soundcloud_track_count": 20,
+    "soundcloud_top_track": "ALEXA DEMIE",
+    "soundcloud_top_track_plays": 21472,
+    "instagram_followers": 36180,
+    "instagram_posts": 13,
+    "instagram_verified": 1,
+    "tiktok_followers": 14036,
+    "tiktok_likes": 385491,
+    "tiktok_video_count": 47,
+    "x_followers": null,
+    "social_links": {
+      "tiktok": "https://www.tiktok.com/@holottacheese",
+      "spotify": "https://open.spotify.com/artist/37Nev24TbRvZdcymARiXwh",
+      "youtube": "https://www.youtube.com/channel/UCKUdEPdxbJCH7ff0il7vyPg",
+      "instagram": "https://www.instagram.com/holottacheese",
+      "soundcloud": "https://soundcloud.com/holottacheese-487961846"
+    },
+    "scrape_meta": {
+      "tiktok": {
+        "error": null,
+        "status": "ok",
+        "last_scraped_at": "2026-06-29T07:48:41.824653+00:00"
+      },
+      "spotify": {
+        "error": null,
+        "status": "ok",
+        "last_scraped_at": "2026-06-29T07:48:50.617684+00:00"
+      },
+      "youtube": {
+        "error": null,
+        "status": "ok",
+        "last_scraped_at": "2026-06-29T07:48:41.882531+00:00"
+      },
+      "instagram": {
+        "error": null,
+        "status": "ok",
+        "last_scraped_at": "2026-06-29T07:48:42.383535+00:00"
+      },
+      "soundcloud": {
+        "error": null,
+        "status": "ok",
+        "last_scraped_at": "2026-06-29T07:48:45.031631+00:00"
+      }
+    }
+  },
+  {
+    "id": "3PBLEBKGVTKW845ylh5Dul",
+    "name": "matt proxy",
+    "followers": 34010,
+    "popularity": 50,
+    "genres": "[]",
+    "images": [
+      {
+        "url": "https://i.scdn.co/image/ab6761610000e5eba3b61d800a10636b672ebc0d",
+        "width": 640,
+        "height": 640
+      },
+      {
+        "url": "https://i.scdn.co/image/ab67616100005174a3b61d800a10636b672ebc0d",
+        "width": 320,
+        "height": 320
+      },
+      {
+        "url": "https://i.scdn.co/image/ab6761610000f178a3b61d800a10636b672ebc0d",
+        "width": 160,
+        "height": 160
+      }
+    ],
+    "external_urls": {
+      "spotify": "https://open.spotify.com/artist/3PBLEBKGVTKW845ylh5Dul"
+    },
+    "monthly_listeners": 253167,
+    "spotify_id": "3PBLEBKGVTKW845ylh5Dul",
+    "youtube_id": null,
+    "top_track_id": "1VcQ6LxIF5r8qEuespPIuD",
+    "top_track_name": "5 (with fakemink)",
+    "top_track_popularity": 57,
+    "top_track_plays": null,
+    "youtube_subscribers": 19200,
+    "youtube_total_views": 875859,
+    "youtube_video_count": 81,
+    "youtube_top_video_title": "matt proxy - THC ABUSER",
+    "youtube_top_video_views": 52879,
+    "soundcloud_followers": 9123,
+    "soundcloud_track_count": 79,
+    "soundcloud_top_track": "5 (feat. fakemink)",
+    "soundcloud_top_track_plays": 15301,
+    "instagram_followers": 57860,
+    "instagram_posts": 14,
+    "instagram_verified": 0,
+    "tiktok_followers": 11653,
+    "tiktok_likes": 1472775,
+    "tiktok_video_count": 3,
+    "x_followers": null,
+    "social_links": {
+      "tiktok": "https://www.tiktok.com/@proxyproxyproxyproxy",
+      "spotify": "https://open.spotify.com/artist/3PBLEBKGVTKW845ylh5Dul",
+      "youtube": "https://www.youtube.com/channel/UCzMM3Dtr1NKdd7rcPne5Glw",
+      "instagram": "https://www.instagram.com/mattproxy",
+      "soundcloud": "https://soundcloud.com/mattproxy"
+    },
+    "scrape_meta": {
+      "tiktok": {
+        "error": null,
+        "status": "ok",
+        "last_scraped_at": "2026-06-29T07:43:51.055885+00:00"
+      },
+      "spotify": {
+        "error": null,
+        "status": "ok",
+        "last_scraped_at": "2026-06-29T07:44:07.428542+00:00"
+      },
+      "youtube": {
+        "error": null,
+        "status": "ok",
+        "last_scraped_at": "2026-06-29T07:43:50.130735+00:00"
+      },
+      "instagram": {
+        "error": null,
+        "status": "ok",
+        "last_scraped_at": "2026-06-29T07:43:50.125965+00:00"
+      },
+      "soundcloud": {
+        "error": null,
+        "status": "ok",
+        "last_scraped_at": "2026-06-29T07:43:55.843960+00:00"
+      }
+    }
+  }
+]

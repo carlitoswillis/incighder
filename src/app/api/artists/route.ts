@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { DATA_API_URL } from "@/lib/data-api";
 import mysql from 'mysql2/promise';
+import fallbackArtists from '@/data/artists-fallback.json';
 
 const pool = mysql.createPool({
   user: process.env.DB_USER || 'incighder',
@@ -8,6 +9,7 @@ const pool = mysql.createPool({
   database: process.env.DB_NAME || 'incighder',
   password: process.env.DB_PASSWORD || 'password',
   port: parseInt(process.env.DB_PORT || '3306', 10),
+  connectTimeout: 3000,
 });
 
 export async function GET() {
@@ -15,8 +17,10 @@ export async function GET() {
     const [rows] = await pool.query('SELECT * FROM artists');
     return NextResponse.json(rows);
   } catch (error) {
-    console.error('Error fetching artists:', error);
-    return NextResponse.json({ error: 'Failed to fetch artists' }, { status: 500 });
+    // No reachable MySQL (e.g. serverless deploy on Vercel) — serve the static
+    // snapshot from scripts/export-artists.mjs so the dashboard still loads.
+    console.error('Error fetching artists; serving JSON fallback:', error);
+    return NextResponse.json(fallbackArtists);
   }
 }
 

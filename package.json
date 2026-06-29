@@ -6,7 +6,9 @@
     "dev": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "artists:export": "node scripts/export-artists.mjs",
+    "artists:import": "node scripts/import-artists.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",
