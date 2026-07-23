@@ -6,6 +6,14 @@ from spotipy.oauth2 import SpotifyClientCredentials
 import pymysql
 from pymysql.constants import FIELD_TYPE
 import json
+from urllib.parse import urlparse, parse_qs, unquote
+
+from dotenv import load_dotenv
+
+# Standalone scripts (apply_schema.py, flush_db.py) import this module directly
+# without going through app.py, so load .env here; find_dotenv walks up to the
+# repo root. override=False keeps real environment variables authoritative.
+load_dotenv()
 
 
 # Decode MySQL JSON columns into Python objects on read, matching the behaviour
@@ -14,17 +22,61 @@ _CONV = pymysql.converters.conversions.copy()
 _CONV[FIELD_TYPE.JSON] = lambda v: json.loads(v) if v else None
 
 
+def _truthy(val):
+    return str(val or "").strip().lower() in ("1", "true", "yes", "require", "required", "on")
+
+
 def _db_config():
-    """Connection settings, env-overridable. Defaults target a local MySQL."""
-    return dict(
-        host=os.getenv("DB_HOST", os.getenv("PGHOST", "127.0.0.1")),
-        port=int(os.getenv("DB_PORT", "3306")),
-        user=os.getenv("DB_USER", os.getenv("PGUSER", "incighder")),
-        password=os.getenv("DB_PASSWORD", os.getenv("PGPASSWORD", "password")),
-        database=os.getenv("DB_NAME", os.getenv("PGDATABASE", "incighder")),
+    """Connection settings, env-overridable. Defaults target a local MySQL.
+
+    DATABASE_URL (mysql://user:pass@host:port/dbname?ssl=true) wins when set —
+    one variable to point the whole stack at a hosted DB (TiDB Serverless,
+    Aiven, etc.). Individual DB_* vars still work and fill any gaps. TLS turns
+    on via ?ssl=true / ?sslmode=require in the URL or DB_SSL=true in the env.
+    """
+    url = os.getenv("DATABASE_URL", "").strip()
+    host = os.getenv("DB_HOST", os.getenv("PGHOST", "127.0.0.1"))
+    port = os.getenv("DB_PORT", "3306")
+    user = os.getenv("DB_USER", os.getenv("PGUSER", "incighder"))
+    password = os.getenv("DB_PASSWORD", os.getenv("PGPASSWORD", "password"))
+    database = os.getenv("DB_NAME", os.getenv("PGDATABASE", "incighder"))
+    use_ssl = _truthy(os.getenv("DB_SSL"))
+
+    if url:
+        parsed = urlparse(url)
+        host = parsed.hostname or host
+        port = parsed.port or port
+        user = unquote(parsed.username) if parsed.username else user
+        password = unquote(parsed.password) if parsed.password else password
+        database = parsed.path.lstrip("/") or database
+        query = {k: v[-1] for k, v in parse_qs(parsed.query).items()}
+        if _truthy(query.get("ssl")) or _truthy(query.get("sslmode")) or _truthy(query.get("ssl-mode")):
+            use_ssl = True
+
+    cfg = dict(
+        host=host,
+        port=int(port),
+        user=user,
+        password=password,
+        database=database,
         charset="utf8mb4",
         conv=_CONV,
     )
+    if use_ssl:
+        # Verified TLS against the system/certifi CA bundle — what hosted MySQL
+        # providers (TiDB Serverless, Aiven, PlanetScale) expect.
+        ca = os.getenv("DB_SSL_CA")
+        if not ca:
+            try:
+                import certifi
+
+                ca = certifi.where()
+            except ImportError:
+                ca = None
+        cfg.update(ssl_verify_cert=True, ssl_verify_identity=True)
+        if ca:
+            cfg["ssl_ca"] = ca
+    return cfg
 
 
 def get_db_connection():

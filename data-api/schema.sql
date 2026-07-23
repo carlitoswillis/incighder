@@ -1,4 +1,4 @@
-CREATE TABLE artists (
+CREATE TABLE IF NOT EXISTS artists (
     id VARCHAR(255) PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     followers INTEGER NULL,
@@ -36,7 +36,7 @@ CREATE TABLE artists (
     scrape_meta JSON NULL
 ) ENGINE=InnoDB;
 
-CREATE TABLE albums (
+CREATE TABLE IF NOT EXISTS albums (
     id VARCHAR(255) PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     release_date VARCHAR(255),
@@ -47,7 +47,7 @@ CREATE TABLE albums (
     FOREIGN KEY (artist_id) REFERENCES artists(id)
 ) ENGINE=InnoDB;
 
-CREATE TABLE tracks (
+CREATE TABLE IF NOT EXISTS tracks (
     id VARCHAR(255) PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     duration_ms INTEGER,
@@ -63,14 +63,13 @@ CREATE TABLE tracks (
 -- Per-account metric snapshots for growth-over-time tracking. account_key ties a
 -- data point to the specific linked profile, so switching to a different account
 -- starts a fresh timeline instead of registering a fake jump.
-CREATE TABLE metric_snapshots (
+CREATE TABLE IF NOT EXISTS metric_snapshots (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     artist_id VARCHAR(255),
     platform VARCHAR(32) NOT NULL,
     account_key VARCHAR(255),
     value BIGINT,
     captured_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (artist_id) REFERENCES artists(id) ON DELETE CASCADE
+    FOREIGN KEY (artist_id) REFERENCES artists(id) ON DELETE CASCADE,
+    INDEX idx_snapshots_lookup (artist_id, platform, captured_at)
 ) ENGINE=InnoDB;
-
-CREATE INDEX idx_snapshots_lookup ON metric_snapshots (artist_id, platform, captured_at);

@@ -1,14 +1,9 @@
 import { NextResponse } from 'next/server';
-import mysql, { RowDataPacket } from 'mysql2/promise';
+import { RowDataPacket } from 'mysql2/promise';
 import crypto from 'crypto';
+import { getPool } from '@/lib/db';
 
-const pool = mysql.createPool({
-  user: process.env.DB_USER || 'incighder',
-  host: process.env.DB_HOST || '127.0.0.1',
-  database: process.env.DB_NAME || 'incighder',
-  password: process.env.DB_PASSWORD || 'password',
-  port: parseInt(process.env.DB_PORT || '3306', 10),
-});
+const pool = getPool();
 
 export async function POST(request: Request) {
   try {

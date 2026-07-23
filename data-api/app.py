@@ -174,5 +174,7 @@ def clear_source():
         return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
-    # Ensure the Flask app is accessible from outside the container
-    app.run(host='0.0.0.0', port=5000)
+    # PORT is what cloud hosts (Render, Fly, ...) inject; DATA_API_PORT matches
+    # the local dev convention in start_dev.sh.
+    port = int(os.getenv('PORT', os.getenv('DATA_API_PORT', '5050')))
+    app.run(host='0.0.0.0', port=port)

@@ -1,16 +1,9 @@
 import { NextResponse } from 'next/server';
 import { DATA_API_URL } from "@/lib/data-api";
-import mysql from 'mysql2/promise';
 import fallbackArtists from '@/data/artists-fallback.json';
+import { getPool } from '@/lib/db';
 
-const pool = mysql.createPool({
-  user: process.env.DB_USER || 'incighder',
-  host: process.env.DB_HOST || '127.0.0.1',
-  database: process.env.DB_NAME || 'incighder',
-  password: process.env.DB_PASSWORD || 'password',
-  port: parseInt(process.env.DB_PORT || '3306', 10),
-  connectTimeout: 3000,
-});
+const pool = getPool();
 
 export async function GET() {
   try {

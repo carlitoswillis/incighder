@@ -3,6 +3,7 @@
 // from the committed snapshot:
 //   node scripts/import-artists.mjs
 import mysql from 'mysql2/promise';
+import { poolOptions } from './db-config.mjs';
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -16,13 +17,7 @@ if (!Array.isArray(rows) || rows.length === 0) {
   process.exit(0);
 }
 
-const pool = mysql.createPool({
-  user: process.env.DB_USER || 'incighder',
-  host: process.env.DB_HOST || '127.0.0.1',
-  database: process.env.DB_NAME || 'incighder',
-  password: process.env.DB_PASSWORD || 'password',
-  port: parseInt(process.env.DB_PORT || '3306', 10),
-});
+const pool = mysql.createPool(poolOptions());
 
 // JSON columns must be re-serialized; other values pass through as-is.
 const toCell = (v) => (v !== null && typeof v === 'object' ? JSON.stringify(v) : v);

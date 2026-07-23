@@ -2,8 +2,8 @@
 
 PURPOSE: High-level summary of the system's current focus, the product vision, and recent changes — the single place an agent reads first to avoid drift. (Absorbs the former `GOALS.md`.)
 
-## Last Updated: 2026-06-29
-## Current Focus: **Flattened & Vercel-ready.** Migrated off Docker to a native run (`./start_dev.sh`); Postgres→MySQL 8.4; flattened the Next app out of `incighder/incighder/` to the repo root; dropped Playwright/Chromium (all scrapers now HTTP — Spotify monthly listeners via the scrape.do render API, Instagram via the `IG_SESSIONID` cookie); Ollama→Gemini (`gemini-2.5-flash`) for AI verify; Spotify search ported to a native TS route. Next: keep collapsing the remaining `data-api` proxy endpoints into TS routes, and stand up a hosted MySQL + public `data-api` (or finish the TS port) for an actual Vercel deploy. Backlog: deep scraping/deploy tech debt (below), artist bio, data export, change alerts.
+## Last Updated: 2026-07-23
+## Current Focus: **Deploy-ready with hosted DB.** Killed the recurring data-wipe bug (apply_schema was drop-and-recreate and ran on every dev start — now idempotent, `--reset` gated behind confirmation). Whole stack now takes a single `DATABASE_URL` (mysql://...?sslmode=require, TLS supported) so a free hosted MySQL (TiDB Serverless/Aiven) becomes the wipe-proof source of truth for both local dev and the Vercel deploy; DB config centralized (`src/lib/db.ts`, `scripts/db-config.mjs`, `_db_config()`). Ports env-driven (`DATA_API_PORT`/`WEB_PORT`). See `DEPLOY.md`. Next: create the hosted DB + set Vercel env vars; keep collapsing `data-api` proxy endpoints into TS routes. Backlog: deep scraping/deploy tech debt (below), artist bio, data export, change alerts.
 
 ## Project Goal
 Build a data application that gives A&Rs, labels, and artists a **holistic view of an artist's online traction and growth potential** by aggregating public metrics across music and social platforms — Spotify, YouTube, SoundCloud, Instagram, TikTok, and X — and tracking how they move over time.
@@ -47,6 +47,9 @@ The long-term aim is a single dashboard that scores artist traction from many si
 ---
 
 ## Recent Changes
+- **Data-wipe bug fixed (2026-07-23)**: the repeated "DB lost everything" incidents were self-inflicted — Docker-era `start_dev.sh` ran `docker-compose down --volumes` (deleted the data volume), and post-migration `apply_schema.py` still dropped all tables on every dev start. `schema.sql` is now `CREATE TABLE IF NOT EXISTS`, `apply_schema.py` is idempotent, and destructive resets require `--reset` + typed confirmation (`APPLY_SCHEMA_RESET_CONFIRM=yes` non-interactively).
+- **Single `DATABASE_URL` for the whole stack (2026-07-23)**: `mysql://user:pass@host:port/db?sslmode=require` understood by Next (`src/lib/db.ts` `getPool()` — one shared mysql2 pool replacing 4 duplicates), the node scripts (`scripts/db-config.mjs`, loads root `.env`), and Python (`_db_config()` in `scrapeArtistData.py`, PyMySQL TLS via certifi). `DB_*` vars still fill gaps; `DB_SSL=true` forces TLS. Enables free hosted MySQL (TiDB Serverless/Aiven) for the Vercel deploy — see `DEPLOY.md` + `.env.example`.
+- **Port-agnostic (2026-07-23)**: `DATA_API_PORT` (default 5050) and `WEB_PORT` (default 3000) drive `start_dev.sh`, `src/lib/data-api.ts`, and app.py's dev server (`PORT` also honored for cloud hosts). `start_dev.sh` skips local MySQL when `DATABASE_URL` is set.
 - **Bulk re-scrape + auto-discover** (`/artists/refresh`, `/api/refresh` → data-api `/refresh_artist`): select tracked artists → auto-discover socials for unlinked platforms (confident matches only) → scrape. Honors the per-platform 24h cache (fresh platforms are skipped, not re-scraped) and surfaces per-platform failure reasons in the UI.
 - **Bulk tools hub**: `/artists/bulk` (import) and `/artists/refresh` now share one entry point via an Import/Refresh tab bar (`components/bulk-tabs.tsx`); nav collapsed from two items to one "Bulk".
 - **Shareable artist pages**: `artists/[id]` split into a server `page.tsx` (exports `generateMetadata`, reads `lib/artist-meta.ts` straight from Postgres) + `artist-detail.tsx` (the existing client UI). Emits per-artist `<title>` and Open Graph/Twitter cards (name, Spotify image, genres) so links unfurl in iMessage/Slack/etc. Root layout uses a `"%s · Incighder"` title template.
@@ -61,7 +64,7 @@ The long-term aim is a single dashboard that scores artist traction from many si
 
 ## Active Context
 - **Branch**: `main` (commit directly to main for this repo)
-- **Environment**: Local Development (Docker Compose)
+- **Environment**: Local native dev (`./start_dev.sh`); Vercel deploy pending `DATABASE_URL` + env vars in the dashboard (`DEPLOY.md`)
 - **Blockers**: None
 
 ## Next Steps
@@ -78,12 +81,15 @@ PURPOSE: Tracks active work and backlog. AI agents should update this after comp
 - (nothing in progress — pick next from Backlog)
 
 ## Backlog
+- [ ] Add twitch?
+- [ ] login?
+- [ ] data export (select multiple people, or just one person, or groups)
 - [ ] **[DEEP TECH DEBT] Scraping & data-api architecture is fragile post-migration.** The 2026-06-28/29 de-dockerize + MySQL + de-Chromium pass shipped working but accrued real debt that will bite on deployment:
   - **Datacenter-IP blocking**: scrapers now use plain HTTP (no browser). That runs fine from a laptop but Instagram/TikTok/Spotify aggressively block cloud/serverless IPs — these scrapers will largely fail if the data-api ever runs on Vercel/Railway/etc. Needs a deliberate strategy: residential/rotating proxy, official APIs where they exist, and honest graceful degradation + alerting when a source goes dark.
   - **Undocumented internal endpoints**: IG `web_profile_info`, TikTok `__UNIVERSAL_DATA_FOR_REHYDRATION__`, and especially the Spotify pathfinder GraphQL (hardcoded persisted-query `sha256Hash` in `scrapers/spotify.py`, TOTP-gated token mint) break with zero notice when the sites change. No version pinning, no health checks, no fallback.
   - **Personal-credential coupling**: monthly-listeners / reliable IG depend on personal login cookies (`SPOTIFY_SP_DC`, `IG_SESSIONID`) in `.env`. These expire, can't be rotated automatically, and tie scraping to a personal account (ban risk). Needs proper secret handling, token refresh, and ideally a dedicated service account.
-  - **data-api ↔ Next coupling**: the 9 Next API routes hardcode `http://127.0.0.1:5050`. Not deploy-portable. Needs a `DATA_API_URL` env var, and a decision on the bigger fork: port the API-call endpoints (spotify/similar/discover/preview/history/clear) into Next TS routes vs. host the Python service publicly. MySQL is the natural unification layer (scraper writes, Vercel reads).
-  - **Migration leftovers**: dead selenium scripts (`followerCounts.py`, `artistSoundCloudScrape.py`); now-unused `Dockerfile`/`Dockerfile.dev`/`docker-compose.yml` + stale `start_db.sh`/`start_data_api.sh`/`start_incighder_dev.sh`; no DB migration framework (schema applied by drop-and-recreate, old data was lost in the PG→MySQL switch).
+  - **data-api ↔ Next coupling**: ~~hardcoded `127.0.0.1:5050`~~ done — `DATA_API_URL`/`DATA_API_PORT` env-driven. Remaining fork: port the API-call endpoints (similar/discover/preview/history/clear) into Next TS routes vs. host the Python service publicly (interim: cloudflared tunnel, `DEPLOY.md`). MySQL is the natural unification layer (scraper writes, Vercel reads).
+  - **Migration leftovers**: dead selenium scripts (`followerCounts.py`, `artistSoundCloudScrape.py`); no DB migration framework yet (though schema apply is now idempotent — new columns still need hand-run ALTERs).
 - [ ] Prioritize the most resume-impressive additions next (this is a portfolio/interview piece — weigh features by how well they demonstrate engineering depth, not just product value)
 - [ ] discover feature should prioritize smaller artists that have super high match to the search
 - [ ] ADD A BIO. BIOGRAPHY section for artists (v1: single source — Last.fm `artist.getInfo`; later: AI-synthesized summary across all sources)
@@ -96,6 +102,7 @@ PURPOSE: Tracks active work and backlog. AI agents should update this after comp
 - [ ] Playlist / chart-placement tracking — competitor table-stakes we lack (see `COMPETITORS.md`)
 
 ## Completed
+- [x] **Data-wipe fix + hosted-DB/deploy readiness (2026-07-23)**: idempotent `apply_schema.py` (`--reset` gated), `DATABASE_URL`+TLS support across Next/scripts/Python, centralized pool config, env-driven ports, `DEPLOY.md` + `.env.example`
 - [x] **De-dockerize + flatten for Vercel (2026-06-29)**: removed Docker entirely (run natively via `./start_dev.sh`); **Postgres → MySQL 8.4** (`mysql2`/`PyMySQL`, `?` placeholders, `ON DUPLICATE KEY UPDATE`, update-then-SELECT in place of `RETURNING`); **flattened** the Next app from `incighder/incighder/` to the repo root; **dropped Playwright/Chromium** — all scrapers HTTP-only (TikTok rehydration blob, IG `web_profile_info` + `IG_SESSIONID` cookie, Spotify monthly listeners via **scrape.do** render API `SCRAPE_DO_TOKEN`); **Ollama → Gemini** (`gemini-2.5-flash`, `GOOGLE_AI_API_KEY`) in `ai_verify.py`; **Spotify search ported to a native TS route** (no data-api); remaining proxy routes parameterized via `DATA_API_URL`. data-api on :5050 (AirPlay owns 5000), `OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES` for macOS thread-fork safety.
 - [x] Bulk re-scrape + social auto-discovery for tracked artists: `/artists/refresh` + `/api/refresh` → data-api `refresh_artist`; 24h-cache-aware (skips fresh platforms) and surfaces per-platform failure reasons (`artists/refresh/page.tsx`, `scrape_service.py`)
 - [x] Bulk tools hub: Import/Refresh tabs over `/artists/bulk` + `/artists/refresh`; single "Bulk" nav entry (`components/bulk-tabs.tsx`)

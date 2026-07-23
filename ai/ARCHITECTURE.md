@@ -33,10 +33,11 @@ Incighder aggregates and visualizes artist audience metrics from music and socia
 - **Role**: Source of truth for all artist metrics and history. Local install via Homebrew `mysql@8.4`; DB `incighder`, user `incighder`.
 - **Master schema**: `data-api/schema.sql` (MySQL DDL — `JSON` columns, `AUTO_INCREMENT`, `TIMESTAMP DEFAULT CURRENT_TIMESTAMP`, table-level `FOREIGN KEY`s on InnoDB). Tables: `artists`, `albums`, `tracks`, `metric_snapshots`.
 - **Growth tracking**: `metric_snapshots(artist_id, platform, account_key, value, captured_at)`. `account_key` ties a point to the specific linked profile so account switches start a fresh timeline. Big counts are `BIGINT`.
-- **Applying schema**: `./.venv/bin/python apply_schema.py` from `data-api/` (drop-and-recreate; `start_dev.sh` runs it on boot). There is no incremental-migration framework yet (see tech-debt backlog).
+- **Applying schema**: `./.venv/bin/python apply_schema.py` from `data-api/` — **idempotent** (`CREATE TABLE IF NOT EXISTS`; existing data untouched), so `start_dev.sh` safely runs it on every boot. Destructive rebuild: `apply_schema.py --reset` (interactive confirmation, or `APPLY_SCHEMA_RESET_CONFIRM=yes`). History: the old drop-and-recreate default silently wiped all data on every dev start — that was the recurring "DB lost everything" bug. There is no incremental-migration framework yet (see tech-debt backlog).
+- **Connection config (all three runtimes)**: `DATABASE_URL` (`mysql://user:pass@host:port/db?sslmode=require`) wins; `DB_HOST`/`DB_PORT`/`DB_USER`/`DB_PASSWORD`/`DB_NAME`/`DB_SSL` fill gaps; defaults target local MySQL. Implemented once per runtime: `src/lib/db.ts` (`getPool()` — single shared mysql2 pool), `scripts/db-config.mjs`, `_db_config()` in `data-api/scrapeArtistData.py` (PyMySQL, TLS via certifi). Point `DATABASE_URL` at a hosted MySQL (TiDB Serverless/Aiven) and the whole stack follows — see `DEPLOY.md`.
 
 ### 4. Running it (native, no Docker)
-- **`./start_dev.sh`** (repo root): starts MySQL 8.4, sets up the Python venv + installs deps on first run, applies the schema, launches the data-api (gunicorn :5050, with `OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES` for macOS thread-fork safety), then `npm run dev` (frontend :3000).
+- **`./start_dev.sh`** (repo root): starts MySQL 8.4 (skipped when `DATABASE_URL` is set), sets up the Python venv + installs deps on first run, ensures the schema, launches the data-api (gunicorn `:$DATA_API_PORT`, default 5050, with `OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES` for macOS thread-fork safety), then `npm run dev` (frontend `:$WEB_PORT`, default 3000). Ports are env-overridable: `DATA_API_PORT=8080 WEB_PORT=4000 ./start_dev.sh`.
 - Frontend alone: `npm run dev` at the repo root. Data-api alone: venv gunicorn in `data-api/`.
 
 ### 5. Scheduler (auto-scrape worker — `data-api/scheduler.py`)
@@ -50,7 +51,7 @@ Incighder aggregates and visualizes artist audience metrics from music and socia
 5. **Display**: Next.js reads MySQL via `mysql2` and renders dashboard, table, detail, sparklines, history.
 
 ## Deployment (Vercel)
-The frontend is Vercel-ready as a single flat project. To actually deploy: point `DB_*` env at a **hosted MySQL**, and either host the `data-api` somewhere public and set `DATA_API_URL`, or continue porting its endpoints into native TS routes (Spotify search already is). Note scrapers may be IP-blocked from datacenter ranges — see the deep tech-debt item in `PROJECT_STATE.md`.
+See **`DEPLOY.md`** (repo root) for the step-by-step. Shape: Vercel hosts the flat Next app with `DATABASE_URL` pointed at a free hosted MySQL (TiDB Serverless/Aiven) — full read/write deployed, with the committed JSON snapshot as read-only fallback when no DB is reachable. The `data-api` stays local (residential IP scrapes more reliably than datacenter ranges) writing to the same hosted DB; a cloudflared tunnel + `DATA_API_URL` in Vercel lets the deployed site trigger live operations. Long-term direction remains porting proxy endpoints into TS routes.
 
 ## AI Workspace Substrate
 - **State & vision**: `ai/PROJECT_STATE.md` (read first).

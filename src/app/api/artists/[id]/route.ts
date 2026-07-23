@@ -1,14 +1,9 @@
 import { NextResponse } from 'next/server';
-import mysql, { RowDataPacket, ResultSetHeader } from 'mysql2/promise';
+import { RowDataPacket, ResultSetHeader } from 'mysql2/promise';
 import fallbackArtists from '@/data/artists-fallback.json';
+import { getPool } from '@/lib/db';
 
-const pool = mysql.createPool({
-  user: process.env.DB_USER || 'incighder',
-  host: process.env.DB_HOST || '127.0.0.1',
-  database: process.env.DB_NAME || 'incighder',
-  password: process.env.DB_PASSWORD || 'password',
-  port: parseInt(process.env.DB_PORT || '3306', 10),
-});
+const pool = getPool();
 
 // Columns on the artists table that may be updated via PATCH. Keys come from the
 // request body, so this allowlist guards against column-name (identifier) injection.

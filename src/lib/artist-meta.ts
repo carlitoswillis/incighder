@@ -1,19 +1,9 @@
-import mysql, { RowDataPacket } from "mysql2/promise";
+import { RowDataPacket } from "mysql2/promise";
+import { getPool } from "@/lib/db";
 
-// Standalone pool for server-side metadata reads (generateMetadata runs outside
-// the request route handlers). Mirrors the config in the artist API routes.
-// Reused across hot-reloads via a global so we don't leak connections in dev.
-const globalForPool = globalThis as unknown as { _metaPool?: mysql.Pool };
-const pool =
-  globalForPool._metaPool ??
-  mysql.createPool({
-    user: process.env.DB_USER || "incighder",
-    host: process.env.DB_HOST || "127.0.0.1",
-    database: process.env.DB_NAME || "incighder",
-    password: process.env.DB_PASSWORD || "password",
-    port: parseInt(process.env.DB_PORT || "3306", 10),
-  });
-if (process.env.NODE_ENV !== "production") globalForPool._metaPool = pool;
+// Server-side metadata reads (generateMetadata runs outside the request route
+// handlers). Shares the app-wide pool from lib/db.
+const pool = getPool();
 
 export interface ArtistMeta {
   name: string;
