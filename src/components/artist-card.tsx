@@ -7,7 +7,7 @@ import { MoreHorizontal, Trash2, SquareArrowOutUpRight, Pencil } from "lucide-re
 import { SiSpotify } from "react-icons/si";
 
 import type { Artist } from "@/lib/types";
-import { PLATFORMS } from "@/lib/platforms";
+import { PLATFORMS, platformHasPresence } from "@/lib/platforms";
 import { calculateArtistScore } from "@/utils/score";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -141,7 +141,7 @@ export function ArtistCard({
 
             {/* Metrics */}
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-              {PLATFORMS.map((p) => (
+              {PLATFORMS.filter((p) => platformHasPresence(artist, p)).map((p) => (
                 <StatTile key={p.key} platform={p} artist={artist} />
               ))}
             </div>

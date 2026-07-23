@@ -121,3 +121,14 @@ export const PLATFORMS: PlatformMeta[] = [
 
 /** Scraped platforms only — the SourcesPanel iterates these. */
 export const SCRAPED_PLATFORMS = PLATFORMS.filter((p) => p.scraped);
+
+/** Does this artist have any presence on the platform (linked account or a
+ * stored metric)? Cards and metric grids hide platforms with no presence —
+ * a tile full of dashes just advertises missing data. The SourcesPanel still
+ * lists every platform so new links can be added. */
+export function platformHasPresence(artist: Artist, p: PlatformMeta): boolean {
+  if (artist[p.metric.field] != null) return true;
+  if (p.linkField && artist.social_links?.[p.linkField]) return true;
+  if (p.key === "spotify" && (artist.spotify_id || artist.followers != null)) return true;
+  return false;
+}
