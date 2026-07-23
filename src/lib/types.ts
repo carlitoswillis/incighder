@@ -9,6 +9,9 @@ export interface Artist {
   name: string;
   /** 1 = shown to non-admin visitors of the deployed site. */
   is_public?: number | null;
+  bio?: string | null;
+  /** 'lastfm' | 'manual' */
+  bio_source?: string | null;
   followers: number | null;
   popularity: number | null;
   genres: string | null;

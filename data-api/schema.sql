@@ -4,6 +4,10 @@ CREATE TABLE IF NOT EXISTS artists (
     -- Visitor curation: only rows with is_public = 1 are shown to
     -- non-admin visitors of the deployed site.
     is_public TINYINT(1) NOT NULL DEFAULT 0,
+    -- Biography: fetched from Last.fm or hand-written for artists with no
+    -- scrapeable presence. bio_source: 'lastfm' | 'manual'.
+    bio TEXT NULL,
+    bio_source VARCHAR(32) NULL,
     followers INTEGER NULL,
     popularity INTEGER NULL,
     genres TEXT NULL,

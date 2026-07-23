@@ -51,6 +51,7 @@ function ArtistDetail() {
     images: "",
     external_urls: "",
     x_followers: "",
+    bio: "",
   });
 
   useEffect(() => {
@@ -75,6 +76,7 @@ function ArtistDetail() {
             ? JSON.stringify(data.external_urls, null, 2)
             : "",
           x_followers: data.x_followers != null ? String(data.x_followers) : "",
+          bio: data.bio || "",
         });
       } catch (e) {
         setError(e instanceof Error ? e.message : String(e));
@@ -112,6 +114,27 @@ function ArtistDetail() {
     }
   }
 
+  const [fetchingBio, setFetchingBio] = useState(false);
+  async function fetchBio() {
+    setFetchingBio(true);
+    try {
+      const r = await fetch("/api/bio", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ artist_id: artistId }),
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || `HTTP ${r.status}`);
+      setArtist(data);
+      setForm((f) => ({ ...f, bio: data.bio || "" }));
+      toast.success("Bio pulled from Last.fm");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : String(e));
+    } finally {
+      setFetchingBio(false);
+    }
+  }
+
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
     let parsedUrls: unknown = null;
@@ -143,6 +166,8 @@ function ArtistDetail() {
             .filter(Boolean)
             .map((url) => ({ url })),
           external_urls: parsedUrls,
+          bio: form.bio,
+          ...(form.bio !== (artist?.bio || "") ? { bio_source: "manual" } : {}),
         }),
       });
       const data = await r.json();
@@ -306,6 +331,17 @@ function ArtistDetail() {
               }
             />
           </div>
+          <div className="space-y-2">
+            <Label htmlFor="bio">Bio</Label>
+            <textarea
+              id="bio"
+              rows={6}
+              placeholder="Write a bio, or use “Fetch from Last.fm” below."
+              className={fieldClass}
+              value={form.bio}
+              onChange={(e) => setForm({ ...form, bio: e.target.value })}
+            />
+          </div>
           <div className="flex gap-2">
             <Button type="submit">Save changes</Button>
             <Button type="button" variant="ghost" onClick={() => setShowEdit(false)}>
@@ -313,6 +349,41 @@ function ArtistDetail() {
             </Button>
           </div>
         </form>
+      )}
+
+      {/* Bio */}
+      {(artist.bio || admin) && (
+        <div className="space-y-3 rounded-xl bg-card p-6 ring-1 ring-foreground/10">
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-lg font-semibold tracking-tight">About</h2>
+            {admin && (
+              <div className="flex items-center gap-2">
+                {artist.bio_source && (
+                  <Badge variant="secondary">
+                    {artist.bio_source === "lastfm" ? "Last.fm" : "manual"}
+                  </Badge>
+                )}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={fetchBio}
+                  disabled={fetchingBio}
+                >
+                  {fetchingBio ? "Fetching…" : "Fetch from Last.fm"}
+                </Button>
+              </div>
+            )}
+          </div>
+          {artist.bio ? (
+            <p className="whitespace-pre-line text-sm leading-relaxed text-muted-foreground">
+              {artist.bio}
+            </p>
+          ) : (
+            <p className="text-sm text-muted-foreground/70">
+              No bio yet — fetch one from Last.fm or write one via Edit.
+            </p>
+          )}
+        </div>
       )}
 
       {/* Metrics */}
