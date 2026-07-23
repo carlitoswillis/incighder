@@ -73,3 +73,12 @@ CREATE TABLE IF NOT EXISTS metric_snapshots (
     FOREIGN KEY (artist_id) REFERENCES artists(id) ON DELETE CASCADE,
     INDEX idx_snapshots_lookup (artist_id, platform, captured_at)
 ) ENGINE=InnoDB;
+
+-- Tiny shared key/value config. Currently holds `data_api_url`: the public
+-- (tunnel) URL of the home-run data-api, published by ./go_live.sh so the
+-- deployed frontend can find it without a redeploy.
+CREATE TABLE IF NOT EXISTS app_config (
+    k VARCHAR(64) PRIMARY KEY,
+    v TEXT,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB;

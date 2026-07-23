@@ -7,11 +7,25 @@ Architecture for a free deploy:
 - **Free hosted MySQL** — the shared source of truth, e.g. **TiDB Cloud
   Serverless** (5 GiB free, MySQL-compatible, no card) or **Aiven free MySQL**.
   Because it lives outside your machine, no local restart/reset can ever wipe it.
-- **data-api (Flask)** — runs on your Mac (`./start_dev.sh`), writing to the same
-  hosted DB. To let the *deployed* site trigger scrapes/search/discover, expose
-  it with `cloudflared tunnel --url http://localhost:5050` and set the tunnel URL
-  as `DATA_API_URL` in Vercel. (Residential IP also scrapes more reliably than a
-  datacenter host.)
+- **data-api (Flask)** — runs on your Mac, writing to the same hosted DB.
+  (Residential IP also scrapes more reliably than a datacenter host.)
+
+## Making the deployed site's live features work: `./go_live.sh`
+
+The deployed site reads/edits artists via the DB on its own. Scrape / refresh /
+discover need the data-api, which lives on your Mac. One command turns them on:
+
+```bash
+./go_live.sh     # Ctrl-C to go offline cleanly
+```
+
+It starts the data-api (if not already running), opens a cloudflared quick
+tunnel, and **publishes the tunnel URL into `app_config.data_api_url` in the
+shared DB** — the deployed frontend looks it up there (30s cache), so a new
+tunnel URL needs **no Vercel redeploy**. On Ctrl-C it clears the URL and stops
+both processes. While offline, the site shows an amber "live scraping is
+offline" banner (driven by `/api/data-api-status` → data-api `/health`) but
+browsing/editing keeps working.
 
 ## One-time setup
 
@@ -38,8 +52,8 @@ Architecture for a free deploy:
 
 4. **Set Vercel env vars** (Project → Settings → Environment Variables):
    - `DATABASE_URL` — same value as above (required for live data)
-   - `DATA_API_URL` — optional; cloudflared tunnel URL when you want the
-     deployed site to reach your local data-api
+   - (`DATA_API_URL` is NOT needed — the deployed site discovers the data-api
+     through the DB; see `./go_live.sh` above. Setting it would pin a stale URL.)
 
 5. **Push `main`** — Vercel builds and deploys.
 

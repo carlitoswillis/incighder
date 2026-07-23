@@ -19,6 +19,12 @@ from scrapers.base import shutdown as _scraper_shutdown
 app = Flask(__name__)
 atexit.register(_scraper_shutdown)
 
+@app.route('/health', methods=['GET'])
+def health():
+    """Liveness probe — the deployed site pings this to show the 'home data
+    server offline' banner."""
+    return jsonify({'ok': True}), 200
+
 @app.route('/insert_artist', methods=['POST'])
 def insert_artist():
     data = request.json

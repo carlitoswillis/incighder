@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { Menu, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { DataApiStatusBanner } from "@/components/data-api-status-banner";
 import {
   Sheet,
   SheetContent,
@@ -110,6 +111,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </Button>
         </div>
       </header>
+      <DataApiStatusBanner />
       <main className="mx-auto max-w-6xl px-4 py-8">{children}</main>
     </div>
   );

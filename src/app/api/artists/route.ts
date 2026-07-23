@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { DATA_API_URL } from "@/lib/data-api";
+import { getDataApiUrl } from "@/lib/data-api";
 import fallbackArtists from '@/data/artists-fallback.json';
 import { getPool } from '@/lib/db';
 
@@ -21,7 +21,7 @@ export async function POST(request: Request) {
   const artistData = await request.json();
 
   try {
-    const response = await fetch(`${DATA_API_URL}/insert_artist`, {
+    const response = await fetch(`${await getDataApiUrl()}/insert_artist`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

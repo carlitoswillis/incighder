@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { DATA_API_URL } from "@/lib/data-api";
+import { getDataApiUrl } from "@/lib/data-api";
 
 // Scraping can take a while (Playwright render + throttle), so allow a long run.
 export const maxDuration = 120;
@@ -8,7 +8,7 @@ export async function POST(request: Request) {
   const body = await request.json();
 
   try {
-    const response = await fetch(`${DATA_API_URL}/scrape`, {
+    const response = await fetch(`${await getDataApiUrl()}/scrape`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
