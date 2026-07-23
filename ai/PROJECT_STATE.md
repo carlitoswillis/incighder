@@ -47,6 +47,7 @@ The long-term aim is a single dashboard that scores artist traction from many si
 ---
 
 ## Recent Changes
+- **Twitch + photos (2026-07-23)**: Twitch is a first-class tracked platform (web GQL, keyless). Manual adds get profile pictures automatically from their socials on scrape; admins can also upload a photo (data-URI storage, no file infra, ~60-150KB/person — negligible vs TiDB's 5GiB). Group chips on home are now admin-only: grouped members are visible ONLY via their /g/<group> URL.
 - **Data export + one-sheets (2026-07-23)**: admin CSV export; print/PDF-ready per-person and per-group "traction one-sheet" pages (masthead, traction ledger with deltas + sparklines, footprint); `/api/history` now native TS. Glogang roster onboarded: 8 skaters + DJ Maino (IG links, Maino also YT + Twitch in `external_urls`; 7/9 scraped — IG anonymous rate limit blocked daniel/brandon, retry later or set `IG_SESSIONID`).
 - **Artist groups (2026-07-23)**: `group_name` column + `/g/[group]` pages + `/api/groups`; main list = ungrouped only (roster separation à la glogang); shared `ArtistGrid` component behind home and group pages.
 - **Artist bio (2026-07-23)**: `bio`/`bio_source` columns; admin "Fetch from Last.fm" (native TS route, works without the data-api) with graceful "no bio" handling; manual bios via the edit form for non-recording artists (skaters/clients). About card shows to visitors when a bio exists.
@@ -86,7 +87,7 @@ PURPOSE: Tracks active work and backlog. AI agents should update this after comp
 - (nothing in progress — pick next from Backlog)
 
 ## Backlog
-- [ ] Add twitch?
+- [ ] log events to see if stats moved at that date. like new post, new thing, song, video, etc.
 
 ### Manager-platform direction (from the 2026-07 Adam/ChatGPT conversation — "Manager Analytics Platform")
 Strategic frame: two complementary products. **Incighder Discover** = today's app (public data, A&Rs/labels). **Incighder Manager** = artist teams connecting their own accounts (official APIs + manual input — "aggregation without replacement", built *with* platforms not against them). Manager-side first-party data could later enrich Discover. The daily-open question that defines the product: "how are all my artists performing across every platform?" — a story no single platform dashboard can tell.
@@ -111,6 +112,8 @@ Strategic frame: two complementary products. **Incighder Discover** = today's ap
 - [ ] Playlist / chart-placement tracking — competitor table-stakes we lack (see `COMPETITORS.md`)
 
 ## Completed
+- [x] Twitch platform (2026-07-23): `scrapers/twitch.py` via the twitch.tv web GQL Client-ID (no API keys), `twitch_followers` + growth snapshots + UI/CSV. Maino Da Plug tracked (6.9K followers).
+- [x] Photos (2026-07-23): admin uploads (client-downscaled 512px JPEG → data-URI in `images`; `ArtistImage` renders both data: and CDN srcs) + **social-avatar fallback** — scrapers emit `profile_pic_url` (IG > TikTok > Twitch > YT > SC priority), scrape inlines it (≤400KB cap) when no image exists. Whole glogang roster has faces except daniel/brandon (IG anonymous-lookup blocks).
 - [x] Data export (2026-07-23): `/api/export` CSV (roster/group/all/ids, admin) + printable traction one-sheets `/artists/[id]/report` and `/g/[group]/report` (print CSS flips dark tokens to the light palette); `/api/history` ported to native TS (metric_snapshots read directly — growth works without the data-api)
 - [x] Artist groups (2026-07-23): `group_name` roster separation — grouped artists leave the main list and live at `/g/<name>` (public URL, is_public-respecting); group chips on home via `/api/groups`; `?all=1` keeps bulk tools whole-roster; Group field in edit form. Generalizes the "/glogang page" idea and pre-builds group export + Manager rosters.
 - [x] Artist bio (2026-07-23): native TS `/api/bio` (Last.fm `artist.getInfo`, admin-only) + editable bio in the edit form (`bio_source` lastfm|manual) + About card on artist pages (visitor-visible). Later: AI-synthesized multi-source summary.

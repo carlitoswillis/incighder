@@ -1,5 +1,5 @@
 # AI Context Bundle
-Generated: Thu Jul 23 14:58:28 PDT 2026
+Generated: Thu Jul 23 15:28:18 PDT 2026
 
 ## ⚠️ Agent Navigation Guide
 1. Start with the **Current State** below to understand the focus.
@@ -152,6 +152,7 @@ The long-term aim is a single dashboard that scores artist traction from many si
 ---
 
 ## Recent Changes
+- **Twitch + photos (2026-07-23)**: Twitch is a first-class tracked platform (web GQL, keyless). Manual adds get profile pictures automatically from their socials on scrape; admins can also upload a photo (data-URI storage, no file infra, ~60-150KB/person — negligible vs TiDB's 5GiB). Group chips on home are now admin-only: grouped members are visible ONLY via their /g/<group> URL.
 - **Data export + one-sheets (2026-07-23)**: admin CSV export; print/PDF-ready per-person and per-group "traction one-sheet" pages (masthead, traction ledger with deltas + sparklines, footprint); `/api/history` now native TS. Glogang roster onboarded: 8 skaters + DJ Maino (IG links, Maino also YT + Twitch in `external_urls`; 7/9 scraped — IG anonymous rate limit blocked daniel/brandon, retry later or set `IG_SESSIONID`).
 - **Artist groups (2026-07-23)**: `group_name` column + `/g/[group]` pages + `/api/groups`; main list = ungrouped only (roster separation à la glogang); shared `ArtistGrid` component behind home and group pages.
 - **Artist bio (2026-07-23)**: `bio`/`bio_source` columns; admin "Fetch from Last.fm" (native TS route, works without the data-api) with graceful "no bio" handling; manual bios via the edit form for non-recording artists (skaters/clients). About card shows to visitors when a bio exists.
@@ -191,7 +192,7 @@ PURPOSE: Tracks active work and backlog. AI agents should update this after comp
 - (nothing in progress — pick next from Backlog)
 
 ## Backlog
-- [ ] Add twitch?
+- [ ] log events to see if stats moved at that date. like new post, new thing, song, video, etc.
 
 ### Manager-platform direction (from the 2026-07 Adam/ChatGPT conversation — "Manager Analytics Platform")
 Strategic frame: two complementary products. **Incighder Discover** = today's app (public data, A&Rs/labels). **Incighder Manager** = artist teams connecting their own accounts (official APIs + manual input — "aggregation without replacement", built *with* platforms not against them). Manager-side first-party data could later enrich Discover. The daily-open question that defines the product: "how are all my artists performing across every platform?" — a story no single platform dashboard can tell.
@@ -216,6 +217,8 @@ Strategic frame: two complementary products. **Incighder Discover** = today's ap
 - [ ] Playlist / chart-placement tracking — competitor table-stakes we lack (see `COMPETITORS.md`)
 
 ## Completed
+- [x] Twitch platform (2026-07-23): `scrapers/twitch.py` via the twitch.tv web GQL Client-ID (no API keys), `twitch_followers` + growth snapshots + UI/CSV. Maino Da Plug tracked (6.9K followers).
+- [x] Photos (2026-07-23): admin uploads (client-downscaled 512px JPEG → data-URI in `images`; `ArtistImage` renders both data: and CDN srcs) + **social-avatar fallback** — scrapers emit `profile_pic_url` (IG > TikTok > Twitch > YT > SC priority), scrape inlines it (≤400KB cap) when no image exists. Whole glogang roster has faces except daniel/brandon (IG anonymous-lookup blocks).
 - [x] Data export (2026-07-23): `/api/export` CSV (roster/group/all/ids, admin) + printable traction one-sheets `/artists/[id]/report` and `/g/[group]/report` (print CSS flips dark tokens to the light palette); `/api/history` ported to native TS (metric_snapshots read directly — growth works without the data-api)
 - [x] Artist groups (2026-07-23): `group_name` roster separation — grouped artists leave the main list and live at `/g/<name>` (public URL, is_public-respecting); group chips on home via `/api/groups`; `?all=1` keeps bulk tools whole-roster; Group field in edit form. Generalizes the "/glogang page" idea and pre-builds group export + Manager rosters.
 - [x] Artist bio (2026-07-23): native TS `/api/bio` (Last.fm `artist.getInfo`, admin-only) + editable bio in the edit form (`bio_source` lastfm|manual) + About card on artist pages (visitor-visible). Later: AI-synthesized multi-source summary.
@@ -788,23 +791,23 @@ Strategic frame: two complementary products. **Incighder Discover** = today's ap
 
 ## 5. Recent Git Changes (Summary)
 ```text
+7fa80df tweak: cap avatar downloads at 400KB; group chips admin-only
+6965e26 feat: Twitch tracking, photo uploads, social-avatar fallback
+9548320 docs: export/one-sheets recorded; export backlog items closed
 7a7da52 feat: data export — CSV + printable one-sheets (per person and per group)
 3c1a6cf docs: groups feature recorded; /glogang backlog item closed
-bee0ef0 feat: artist groups — roster separation + /g/[group] pages
-ddb78ef docs: bio feature recorded; backlog items checked off
-d747829 feat: artist bio — Last.fm fetch (native TS /api/bio) + manual editing + About section
 ```
 
 ## 6. Active Diff
 ```diff
 diff --git a/ai/CONTEXT_BUNDLE.md b/ai/CONTEXT_BUNDLE.md
-index 65db099..132cdb0 100644
+index 2e6c871..6d80c61 100644
 --- a/ai/CONTEXT_BUNDLE.md
 +++ b/ai/CONTEXT_BUNDLE.md
 @@ -1,5 +1,5 @@
  # AI Context Bundle
--Generated: Thu Jul 23 14:41:00 PDT 2026
-+Generated: Thu Jul 23 14:58:28 PDT 2026
+-Generated: Thu Jul 23 14:58:28 PDT 2026
++Generated: Thu Jul 23 15:28:18 PDT 2026
  
  ## ⚠️ Agent Navigation Guide
  1. Start with the **Current State** below to understand the focus.
@@ -812,57 +815,52 @@ index 65db099..132cdb0 100644
  ---
  
  ## Recent Changes
-+- **Data export + one-sheets (2026-07-23)**: admin CSV export; print/PDF-ready per-person and per-group "traction one-sheet" pages (masthead, traction ledger with deltas + sparklines, footprint); `/api/history` now native TS. Glogang roster onboarded: 8 skaters + DJ Maino (IG links, Maino also YT + Twitch in `external_urls`; 7/9 scraped — IG anonymous rate limit blocked daniel/brandon, retry later or set `IG_SESSIONID`).
++- **Twitch + photos (2026-07-23)**: Twitch is a first-class tracked platform (web GQL, keyless). Manual adds get profile pictures automatically from their socials on scrape; admins can also upload a photo (data-URI storage, no file infra, ~60-150KB/person — negligible vs TiDB's 5GiB). Group chips on home are now admin-only: grouped members are visible ONLY via their /g/<group> URL.
+ - **Data export + one-sheets (2026-07-23)**: admin CSV export; print/PDF-ready per-person and per-group "traction one-sheet" pages (masthead, traction ledger with deltas + sparklines, footprint); `/api/history` now native TS. Glogang roster onboarded: 8 skaters + DJ Maino (IG links, Maino also YT + Twitch in `external_urls`; 7/9 scraped — IG anonymous rate limit blocked daniel/brandon, retry later or set `IG_SESSIONID`).
  - **Artist groups (2026-07-23)**: `group_name` column + `/g/[group]` pages + `/api/groups`; main list = ungrouped only (roster separation à la glogang); shared `ArtistGrid` component behind home and group pages.
  - **Artist bio (2026-07-23)**: `bio`/`bio_source` columns; admin "Fetch from Last.fm" (native TS route, works without the data-api) with graceful "no bio" handling; manual bios via the edit form for non-recording artists (skaters/clients). About card shows to visitors when a bio exists.
- - **Admin gate + visitor curation (2026-07-23)**: passphrase login (`/login`, `ADMIN_PASSWORDS` comma-separated — one each for Carlitos/Adam; HMAC cookie via `AUTH_SECRET`, `src/lib/auth.ts`). All mutating + data-api proxy routes 401 without the cookie; visitors see only `artists.is_public = 1` (list/detail/link-preview all filtered), with an admin Public/Private toggle on the detail page. Admin-only UI: Discover/Manual/Bulk nav, Add-artist, edit/delete/scrape, sources panel. The tunneled data-api now requires `DATA_API_SECRET` (header `X-Data-Api-Secret`, `/health` exempt). NOT a user system by design — swap `passwordOk()` for real auth when Manager mode needs it; the `isAdmin()` guards stay.
-@@ -191,7 +192,6 @@ PURPOSE: Tracks active work and backlog. AI agents should update this after comp
+@@ -191,7 +192,7 @@ PURPOSE: Tracks active work and backlog. AI agents should update this after comp
+ - (nothing in progress — pick next from Backlog)
  
  ## Backlog
- - [ ] Add twitch?
--- [ ] data export (select multiple people, or just one person, or groups)
+-- [ ] Add twitch?
++- [ ] log events to see if stats moved at that date. like new post, new thing, song, video, etc.
  
  ### Manager-platform direction (from the 2026-07 Adam/ChatGPT conversation — "Manager Analytics Platform")
  Strategic frame: two complementary products. **Incighder Discover** = today's app (public data, A&Rs/labels). **Incighder Manager** = artist teams connecting their own accounts (official APIs + manual input — "aggregation without replacement", built *with* platforms not against them). Manager-side first-party data could later enrich Discover. The daily-open question that defines the product: "how are all my artists performing across every platform?" — a story no single platform dashboard can tell.
-@@ -209,7 +209,6 @@ Strategic frame: two complementary products. **Incighder Discover** = today's ap
- - [ ] Prioritize the most resume-impressive additions next (this is a portfolio/interview piece — weigh features by how well they demonstrate engineering depth, not just product value)
- - [ ] discover feature should prioritize smaller artists that have super high match to the search
- - [ ] Top youtube video embedded in the artist page like as a hero under or over the stats idk yet
--- [ ] Export artist data (CSV / JSON)
- - [ ] Discovery seeded from an already-tracked artist (in-app, not just the `/discover` search box)
- - [ ] Weighted cross-platform traction score
- - [ ] Robust history charts (currently sparse — often only 2 points until more scans accrue)
-@@ -217,6 +216,7 @@ Strategic frame: two complementary products. **Incighder Discover** = today's ap
+@@ -216,6 +217,8 @@ Strategic frame: two complementary products. **Incighder Discover** = today's ap
  - [ ] Playlist / chart-placement tracking — competitor table-stakes we lack (see `COMPETITORS.md`)
  
  ## Completed
-+- [x] Data export (2026-07-23): `/api/export` CSV (roster/group/all/ids, admin) + printable traction one-sheets `/artists/[id]/report` and `/g/[group]/report` (print CSS flips dark tokens to the light palette); `/api/history` ported to native TS (metric_snapshots read directly — growth works without the data-api)
++- [x] Twitch platform (2026-07-23): `scrapers/twitch.py` via the twitch.tv web GQL Client-ID (no API keys), `twitch_followers` + growth snapshots + UI/CSV. Maino Da Plug tracked (6.9K followers).
++- [x] Photos (2026-07-23): admin uploads (client-downscaled 512px JPEG → data-URI in `images`; `ArtistImage` renders both data: and CDN srcs) + **social-avatar fallback** — scrapers emit `profile_pic_url` (IG > TikTok > Twitch > YT > SC priority), scrape inlines it (≤400KB cap) when no image exists. Whole glogang roster has faces except daniel/brandon (IG anonymous-lookup blocks).
+ - [x] Data export (2026-07-23): `/api/export` CSV (roster/group/all/ids, admin) + printable traction one-sheets `/artists/[id]/report` and `/g/[group]/report` (print CSS flips dark tokens to the light palette); `/api/history` ported to native TS (metric_snapshots read directly — growth works without the data-api)
  - [x] Artist groups (2026-07-23): `group_name` roster separation — grouped artists leave the main list and live at `/g/<name>` (public URL, is_public-respecting); group chips on home via `/api/groups`; `?all=1` keeps bulk tools whole-roster; Group field in edit form. Generalizes the "/glogang page" idea and pre-builds group export + Manager rosters.
  - [x] Artist bio (2026-07-23): native TS `/api/bio` (Last.fm `artist.getInfo`, admin-only) + editable bio in the edit form (`bio_source` lastfm|manual) + About card on artist pages (visitor-visible). Later: AI-synthesized multi-source summary.
- - [x] Login/data gate: passphrase admin sessions + `is_public` visitor curation + tunnel shared secret (2026-07-23) — closes "put some functionality behind gates"
-@@ -788,113 +788,12 @@ Strategic frame: two complementary products. **Incighder Discover** = today's ap
+@@ -788,113 +791,12 @@ Strategic frame: two complementary products. **Incighder Discover** = today's ap
  
  ## 5. Recent Git Changes (Summary)
  ```text
-+7a7da52 feat: data export — CSV + printable one-sheets (per person and per group)
-+3c1a6cf docs: groups feature recorded; /glogang backlog item closed
- bee0ef0 feat: artist groups — roster separation + /g/[group] pages
- ddb78ef docs: bio feature recorded; backlog items checked off
- d747829 feat: artist bio — Last.fm fetch (native TS /api/bio) + manual editing + About section
--56e8309 docs: record admin gate in project state; check off gating backlog items
--8d5c97e feat: passphrase admin gate, is_public visitor curation, tunnel shared secret
++7fa80df tweak: cap avatar downloads at 400KB; group chips admin-only
++6965e26 feat: Twitch tracking, photo uploads, social-avatar fallback
++9548320 docs: export/one-sheets recorded; export backlog items closed
+ 7a7da52 feat: data export — CSV + printable one-sheets (per person and per group)
+ 3c1a6cf docs: groups feature recorded; /glogang backlog item closed
+-bee0ef0 feat: artist groups — roster separation + /g/[group] pages
+-ddb78ef docs: bio feature recorded; backlog items checked off
+-d747829 feat: artist bio — Last.fm fetch (native TS /api/bio) + manual editing + About section
  ```
  
  ## 6. Active Diff
  ```diff
 -diff --git a/ai/CONTEXT_BUNDLE.md b/ai/CONTEXT_BUNDLE.md
--index 44c098d..78a7614 100644
+-index 65db099..132cdb0 100644
 ---- a/ai/CONTEXT_BUNDLE.md
 -+++ b/ai/CONTEXT_BUNDLE.md
 -@@ -1,5 +1,5 @@
 - # AI Context Bundle
---Generated: Thu Jul 23 14:33:39 PDT 2026
--+Generated: Thu Jul 23 14:41:00 PDT 2026
+--Generated: Thu Jul 23 14:41:00 PDT 2026
+-+Generated: Thu Jul 23 14:58:28 PDT 2026
 - 
 - ## ⚠️ Agent Navigation Guide
 - 1. Start with the **Current State** below to understand the focus.
@@ -870,31 +868,36 @@ index 65db099..132cdb0 100644
 - ---
 - 
 - ## Recent Changes
--+- **Artist groups (2026-07-23)**: `group_name` column + `/g/[group]` pages + `/api/groups`; main list = ungrouped only (roster separation à la glogang); shared `ArtistGrid` component behind home and group pages.
+-+- **Data export + one-sheets (2026-07-23)**: admin CSV export; print/PDF-ready per-person and per-group "traction one-sheet" pages (masthead, traction ledger with deltas + sparklines, footprint); `/api/history` now native TS. Glogang roster onboarded: 8 skaters + DJ Maino (IG links, Maino also YT + Twitch in `external_urls`; 7/9 scraped — IG anonymous rate limit blocked daniel/brandon, retry later or set `IG_SESSIONID`).
+- - **Artist groups (2026-07-23)**: `group_name` column + `/g/[group]` pages + `/api/groups`; main list = ungrouped only (roster separation à la glogang); shared `ArtistGrid` component behind home and group pages.
 - - **Artist bio (2026-07-23)**: `bio`/`bio_source` columns; admin "Fetch from Last.fm" (native TS route, works without the data-api) with graceful "no bio" handling; manual bios via the edit form for non-recording artists (skaters/clients). About card shows to visitors when a bio exists.
 - - **Admin gate + visitor curation (2026-07-23)**: passphrase login (`/login`, `ADMIN_PASSWORDS` comma-separated — one each for Carlitos/Adam; HMAC cookie via `AUTH_SECRET`, `src/lib/auth.ts`). All mutating + data-api proxy routes 401 without the cookie; visitors see only `artists.is_public = 1` (list/detail/link-preview all filtered), with an admin Public/Private toggle on the detail page. Admin-only UI: Discover/Manual/Bulk nav, Add-artist, edit/delete/scrape, sources panel. The tunneled data-api now requires `DATA_API_SECRET` (header `X-Data-Api-Secret`, `/health` exempt). NOT a user system by design — swap `passwordOk()` for real auth when Manager mode needs it; the `isAdmin()` guards stay.
-- - **Live deploy + self-healing tunnel (2026-07-23)**: site is LIVE at **incighder.vercel.app** (Vercel project recreated, GitHub-connected, `DATABASE_URL` in prod+preview) backed by **TiDB Cloud Serverless** (all data migrated: artists + growth snapshots). New **`./go_live.sh`**: starts data-api + cloudflared quick tunnel and publishes the tunnel URL to `app_config.data_api_url` in the shared DB; `getDataApiUrl()` (`src/lib/data-api.ts`) resolves it there in production (30s cache) so new tunnels need no redeploy. data-api `/health` + `/api/data-api-status` + amber offline banner in `app-shell` when the home server is unreachable (browse/edit still work — only scrape/refresh/discover pause).
 -@@ -191,7 +192,6 @@ PURPOSE: Tracks active work and backlog. AI agents should update this after comp
+- 
 - ## Backlog
 - - [ ] Add twitch?
-- - [ ] data export (select multiple people, or just one person, or groups)
---- [ ] maybe a /glogang page that tracks skaters and their djs accounts (instead of artists) and that way itll keep their data separate?
+--- [ ] data export (select multiple people, or just one person, or groups)
 - 
 - ### Manager-platform direction (from the 2026-07 Adam/ChatGPT conversation — "Manager Analytics Platform")
 - Strategic frame: two complementary products. **Incighder Discover** = today's app (public data, A&Rs/labels). **Incighder Manager** = artist teams connecting their own accounts (official APIs + manual input — "aggregation without replacement", built *with* platforms not against them). Manager-side first-party data could later enrich Discover. The daily-open question that defines the product: "how are all my artists performing across every platform?" — a story no single platform dashboard can tell.
--@@ -217,6 +217,7 @@ Strategic frame: two complementary products. **Incighder Discover** = today's ap
+-@@ -209,7 +209,6 @@ Strategic frame: two complementary products. **Incighder Discover** = today's ap
+- - [ ] Prioritize the most resume-impressive additions next (this is a portfolio/interview piece — weigh features by how well they demonstrate engineering depth, not just product value)
+- - [ ] discover feature should prioritize smaller artists that have super high match to the search
+- - [ ] Top youtube video embedded in the artist page like as a hero under or over the stats idk yet
+--- [ ] Export artist data (CSV / JSON)
+- - [ ] Discovery seeded from an already-tracked artist (in-app, not just the `/discover` search box)
+- - [ ] Weighted cross-platform traction score
+- - [ ] Robust history charts (currently sparse — often only 2 points until more scans accrue)
+-@@ -217,6 +216,7 @@ Strategic frame: two complementary products. **Incighder Discover** = today's ap
 - - [ ] Playlist / chart-placement tracking — competitor table-stakes we lack (see `COMPETITORS.md`)
 - 
 - ## Completed
--+- [x] Artist groups (2026-07-23): `group_name` roster separation — grouped artists leave the main list and live at `/g/<name>` (public URL, is_public-respecting); group chips on home via `/api/groups`; `?all=1` keeps bulk tools whole-roster; Group field in edit form. Generalizes the "/glogang page" idea and pre-builds group export + Manager rosters.
+-+- [x] Data export (2026-07-23): `/api/export` CSV (roster/group/all/ids, admin) + printable traction one-sheets `/artists/[id]/report` and `/g/[group]/report` (print CSS flips dark tokens to the light palette); `/api/history` ported to native TS (metric_snapshots read directly — growth works without the data-api)
+- - [x] Artist groups (2026-07-23): `group_name` roster separation — grouped artists leave the main list and live at `/g/<name>` (public URL, is_public-respecting); group chips on home via `/api/groups`; `?all=1` keeps bulk tools whole-roster; Group field in edit form. Generalizes the "/glogang page" idea and pre-builds group export + Manager rosters.
 - - [x] Artist bio (2026-07-23): native TS `/api/bio` (Last.fm `artist.getInfo`, admin-only) + editable bio in the edit form (`bio_source` lastfm|manual) + About card on artist pages (visitor-visible). Later: AI-synthesized multi-source summary.
 - - [x] Login/data gate: passphrase admin sessions + `is_public` visitor curation + tunnel shared secret (2026-07-23) — closes "put some functionality behind gates"
-- - [x] **Data-wipe fix + hosted-DB/deploy readiness (2026-07-23)**: idempotent `apply_schema.py` (`--reset` gated), `DATABASE_URL`+TLS support across Next/scripts/Python, centralized pool config, env-driven ports, `DEPLOY.md` + `.env.example`
--@@ -787,113 +788,12 @@ Strategic frame: two complementary products. **Incighder Discover** = today's ap
+-@@ -788,113 +788,12 @@ Strategic frame: two complementary products. **Incighder Discover** = today's ap
 - 
 - ## 5. Recent Git Changes (Summary)
 - ```text
--+bee0ef0 feat: artist groups — roster separation + /g/[group] pages
--+ddb78ef docs: bio feature recorded; backlog items checked off
-- d747829 feat: artist bio — Last.fm fetch (native TS /api/bio) + manual editing + About section
 ```
