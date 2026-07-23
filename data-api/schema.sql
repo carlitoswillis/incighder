@@ -8,6 +8,9 @@ CREATE TABLE IF NOT EXISTS artists (
     -- scrapeable presence. bio_source: 'lastfm' | 'manual'.
     bio TEXT NULL,
     bio_source VARCHAR(32) NULL,
+    -- Optional roster separation (e.g. 'glogang'). NULL = main artist list;
+    -- grouped rows appear only on /g/<group_name>.
+    group_name VARCHAR(64) NULL,
     followers INTEGER NULL,
     popularity INTEGER NULL,
     genres TEXT NULL,

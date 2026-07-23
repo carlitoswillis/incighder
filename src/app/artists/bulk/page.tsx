@@ -95,7 +95,7 @@ export default function BulkImportPage() {
     // Pull the current dataset once so we can flag already-tracked matches.
     let trackedIds = new Set<string>();
     try {
-      const r = await fetch("/api/artists");
+      const r = await fetch("/api/artists?all=1");
       if (r.ok) {
         const data = await r.json();
         trackedIds = new Set(

@@ -12,6 +12,8 @@ export interface Artist {
   bio?: string | null;
   /** 'lastfm' | 'manual' */
   bio_source?: string | null;
+  /** Roster separation — NULL = main list, e.g. 'glogang' → /g/glogang. */
+  group_name?: string | null;
   followers: number | null;
   popularity: number | null;
   genres: string | null;

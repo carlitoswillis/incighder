@@ -6,20 +6,37 @@ import { getPool } from '@/lib/db';
 
 const pool = getPool();
 
-export async function GET() {
+export async function GET(request: Request) {
   const admin = await isAdmin();
+  const params = new URL(request.url).searchParams;
+  const group = params.get('group');
+  const all = params.get('all') === '1';
+
+  // Roster separation: the default list is ungrouped artists only; a group's
+  // members live at ?group=<name>; ?all=1 (bulk tools) spans everything.
+  const where: string[] = [];
+  const values: string[] = [];
+  if (!admin) where.push('is_public = 1');
+  if (group) {
+    where.push('group_name = ?');
+    values.push(group);
+  } else if (!all) {
+    where.push('group_name IS NULL');
+  }
+  const sql =
+    'SELECT * FROM artists' + (where.length ? ` WHERE ${where.join(' AND ')}` : '');
+
   try {
-    // Visitors only see the curated public roster; admins see everything.
-    const [rows] = await pool.query(
-      admin ? 'SELECT * FROM artists' : 'SELECT * FROM artists WHERE is_public = 1',
-    );
+    const [rows] = await pool.query(sql, values);
     return NextResponse.json(rows);
   } catch (error) {
     // No reachable MySQL (e.g. serverless deploy on Vercel) — serve the static
     // snapshot from scripts/export-artists.mjs so the dashboard still loads.
     console.error('Error fetching artists; serving JSON fallback:', error);
-    const all = fallbackArtists as { is_public?: number }[];
-    return NextResponse.json(admin ? all : all.filter((a) => a.is_public));
+    const rows = (fallbackArtists as { is_public?: number; group_name?: string | null }[])
+      .filter((a) => admin || a.is_public)
+      .filter((a) => (group ? a.group_name === group : all || !a.group_name));
+    return NextResponse.json(rows);
   }
 }
 

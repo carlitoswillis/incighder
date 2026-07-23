@@ -52,6 +52,7 @@ function ArtistDetail() {
     external_urls: "",
     x_followers: "",
     bio: "",
+    group_name: "",
   });
 
   useEffect(() => {
@@ -77,6 +78,7 @@ function ArtistDetail() {
             : "",
           x_followers: data.x_followers != null ? String(data.x_followers) : "",
           bio: data.bio || "",
+          group_name: data.group_name || "",
         });
       } catch (e) {
         setError(e instanceof Error ? e.message : String(e));
@@ -167,6 +169,7 @@ function ArtistDetail() {
             .map((url) => ({ url })),
           external_urls: parsedUrls,
           bio: form.bio,
+          group_name: form.group_name.trim() || null,
           ...(form.bio !== (artist?.bio || "") ? { bio_source: "manual" } : {}),
         }),
       });
@@ -221,6 +224,11 @@ function ArtistDetail() {
         )}
         <div className="flex-1 space-y-2">
           <h1 className="text-3xl font-semibold tracking-tight">{artist.name}</h1>
+          {artist.group_name && (
+            <Link href={`/g/${encodeURIComponent(artist.group_name)}`}>
+              <Badge className="mr-1.5">{artist.group_name}</Badge>
+            </Link>
+          )}
           {genres.length > 0 && (
             <div className="flex flex-wrap gap-1.5">
               {genres.map((g) => (
@@ -329,6 +337,14 @@ function ArtistDetail() {
               onChange={(e) =>
                 setForm({ ...form, external_urls: e.target.value })
               }
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="group">Group (optional — e.g. glogang; moves them off the main list to /g/&lt;group&gt;)</Label>
+            <Input
+              id="group"
+              value={form.group_name}
+              onChange={(e) => setForm({ ...form, group_name: e.target.value })}
             />
           </div>
           <div className="space-y-2">

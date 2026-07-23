@@ -60,7 +60,7 @@ export default function RefreshPage() {
   const [done, setDone] = useState(0);
 
   useEffect(() => {
-    fetch("/api/artists")
+    fetch("/api/artists?all=1")
       .then((r) => r.json())
       .then((data: Artist[]) => {
         const sorted = [...data].sort((a, b) => a.name.localeCompare(b.name));
