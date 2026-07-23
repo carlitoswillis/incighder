@@ -276,7 +276,7 @@ function ArtistDetail() {
             </a>
           )}
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <ScoreBadge score={score} breakdown={breakdown} size="lg" />
           <Button
             variant="outline"
