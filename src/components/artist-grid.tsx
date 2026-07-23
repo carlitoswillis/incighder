@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Users } from "lucide-react";
+import { Download, FileText, Users } from "lucide-react";
 import type { Artist } from "@/lib/types";
 import { PageHeader } from "@/components/page-header";
 import { ArtistCard } from "@/components/artist-card";
@@ -48,9 +48,36 @@ export function ArtistGrid({ title, group }: { title: string; group?: string }) 
     setArtists((prev) => prev?.filter((a) => a.id !== id) ?? prev);
   }
 
+  const actions = (
+    <div className="flex items-center gap-2">
+      {group && (
+        <Button
+          variant="outline"
+          size="sm"
+          render={<Link href={`/g/${encodeURIComponent(group)}/report`} />}
+        >
+          <FileText className="size-4" /> One-sheet
+        </Button>
+      )}
+      {admin && (
+        <Button
+          variant="outline"
+          size="sm"
+          render={
+            <a
+              href={group ? `/api/export?group=${encodeURIComponent(group)}` : "/api/export"}
+            />
+          }
+        >
+          <Download className="size-4" /> CSV
+        </Button>
+      )}
+    </div>
+  );
+
   return (
     <div>
-      <PageHeader title={title} count={artists?.length} />
+      <PageHeader title={title} count={artists?.length} actions={actions} />
 
       {!group && groups.length > 0 && (
         <div className="mb-6 flex flex-wrap items-center gap-2">

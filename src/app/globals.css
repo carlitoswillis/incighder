@@ -85,3 +85,36 @@
     @apply bg-background text-foreground antialiased font-sans;
   }
 }
+
+/* Print: the one-sheet becomes a light document — remap the dark tokens to the
+   light palette, drop the app chrome, and let the page own the paper. */
+@media print {
+  .dark {
+    --background: #ffffff;
+    --foreground: #0b0f19;
+    --card: #ffffff;
+    --card-foreground: #0b0f19;
+    --primary: #0891b2;
+    --primary-foreground: #ffffff;
+    --secondary: #f1f5f9;
+    --secondary-foreground: #0f172a;
+    --muted: #f1f5f9;
+    --muted-foreground: #475569;
+    --accent: #f1f5f9;
+    --accent-foreground: #0f172a;
+    --border: #cbd5e1;
+    --input: #e2e8f0;
+    --ring: #06b6d4;
+  }
+  header,
+  .print-hidden {
+    display: none !important;
+  }
+  main {
+    padding: 0 !important;
+    max-width: none !important;
+  }
+  body {
+    background: #ffffff !important;
+  }
+}

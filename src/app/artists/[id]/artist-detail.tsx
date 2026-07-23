@@ -252,6 +252,12 @@ function ArtistDetail() {
         </div>
         <div className="flex items-center gap-3">
           <ScoreBadge score={score} breakdown={breakdown} size="lg" />
+          <Button
+            variant="outline"
+            render={<Link href={`/artists/${artistId}/report`} />}
+          >
+            One-sheet
+          </Button>
           {admin && (
             <>
               <Button
