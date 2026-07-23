@@ -56,13 +56,22 @@ export function ArtistCard({
           {/* Image */}
           <div className="relative aspect-square w-full shrink-0 bg-secondary md:aspect-auto md:w-2/5 md:self-stretch">
             {image ? (
-              <Image
-                src={image}
-                alt={artist.name}
-                fill
-                sizes="(max-width: 768px) 100vw, 40vw"
-                className="object-cover"
-              />
+              image.startsWith("data:") ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={image}
+                  alt={artist.name}
+                  className="absolute inset-0 h-full w-full object-cover"
+                />
+              ) : (
+                <Image
+                  src={image}
+                  alt={artist.name}
+                  fill
+                  sizes="(max-width: 768px) 100vw, 40vw"
+                  className="object-cover"
+                />
+              )
             ) : (
               <div className="flex h-full min-h-56 items-center justify-center text-sm text-muted-foreground">
                 No image

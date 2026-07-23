@@ -39,6 +39,7 @@ CREATE TABLE IF NOT EXISTS artists (
     instagram_posts INTEGER NULL,
     instagram_verified BOOLEAN NULL,
     tiktok_followers BIGINT NULL,
+    twitch_followers BIGINT NULL,
     tiktok_likes BIGINT NULL,
     tiktok_video_count INTEGER NULL,
     x_followers BIGINT NULL,

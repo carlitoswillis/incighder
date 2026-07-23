@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import Image from "next/image";
+import { ArtistImage } from "@/components/artist-image";
 import Link from "next/link";
 import { toast } from "sonner";
 import { SiSpotify } from "react-icons/si";
@@ -24,6 +24,14 @@ import { GrowthSection } from "@/components/growth-section";
 
 const fieldClass =
   "flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm outline-none transition-[color,box-shadow] placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50";
+
+function imagesText(images: unknown): string {
+  if (!Array.isArray(images)) return "";
+  return images
+    .map((i: { url: string } | string) => (typeof i === "string" ? i : i.url))
+    .filter((u: string) => u && !u.startsWith("data:"))
+    .join(", ");
+}
 
 function parseGenres(genres: string | null): string[] {
   if (!genres) return [];
@@ -66,13 +74,7 @@ function ArtistDetail() {
         setForm({
           name: data.name || "",
           genres: data.genres || "",
-          images: Array.isArray(data.images)
-            ? data.images
-                .map((i: { url: string } | string) =>
-                  typeof i === "string" ? i : i.url,
-                )
-                .join(", ")
-            : "",
+          images: imagesText(data.images),
           external_urls: data.external_urls
             ? JSON.stringify(data.external_urls, null, 2)
             : "",
@@ -80,6 +82,7 @@ function ArtistDetail() {
           bio: data.bio || "",
           group_name: data.group_name || "",
         });
+        setInitialImages(imagesText(data.images));
       } catch (e) {
         setError(e instanceof Error ? e.message : String(e));
       } finally {
@@ -99,6 +102,29 @@ function ArtistDetail() {
     };
   }, [artist?.name]);
 
+  async function uploadPhoto(file: File) {
+    try {
+      const bmp = await createImageBitmap(file);
+      const max = 512;
+      const scale = Math.min(1, max / Math.max(bmp.width, bmp.height));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.round(bmp.width * scale);
+      canvas.height = Math.round(bmp.height * scale);
+      canvas.getContext("2d")!.drawImage(bmp, 0, 0, canvas.width, canvas.height);
+      const dataUri = canvas.toDataURL("image/jpeg", 0.85);
+      const r = await fetch(`/api/artists/${artistId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ images: [{ url: dataUri }] }),
+      });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      setArtist(await r.json());
+      toast.success("Photo updated");
+    } catch (e) {
+      toast.error(`Upload failed: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+
   async function togglePublic() {
     if (!artist) return;
     const next = artist.is_public ? 0 : 1;
@@ -116,6 +142,7 @@ function ArtistDetail() {
     }
   }
 
+  const [initialImages, setInitialImages] = useState("");
   const [fetchingBio, setFetchingBio] = useState(false);
   async function fetchBio() {
     setFetchingBio(true);
@@ -162,11 +189,15 @@ function ArtistDetail() {
           name: form.name,
           x_followers: form.x_followers,
           genres: form.genres.split(",").map((s) => s.trim()).filter(Boolean),
-          images: form.images
-            .split(",")
-            .map((s) => s.trim())
-            .filter(Boolean)
-            .map((url) => ({ url })),
+          ...(form.images !== initialImages
+            ? {
+                images: form.images
+                  .split(",")
+                  .map((s) => s.trim())
+                  .filter(Boolean)
+                  .map((url) => ({ url })),
+              }
+            : {}),
           external_urls: parsedUrls,
           bio: form.bio,
           group_name: form.group_name.trim() || null,
@@ -214,11 +245,10 @@ function ArtistDetail() {
       {/* Hero */}
       <div className="flex flex-col gap-6 rounded-xl bg-card p-6 ring-1 ring-foreground/10 sm:flex-row sm:items-center">
         {image && (
-          <Image
+          <ArtistImage
             src={image}
             alt={artist.name}
-            width={128}
-            height={128}
+            size={128}
             className="size-32 shrink-0 rounded-xl object-cover"
           />
         )}
@@ -260,6 +290,21 @@ function ArtistDetail() {
           </Button>
           {admin && (
             <>
+              <label className="cursor-pointer">
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) uploadPhoto(f);
+                    e.target.value = "";
+                  }}
+                />
+                <span className="inline-flex h-9 items-center rounded-md border border-input bg-transparent px-3 text-sm font-medium shadow-xs transition-colors hover:bg-accent hover:text-accent-foreground">
+                  Photo
+                </span>
+              </label>
               <Button
                 variant="outline"
                 onClick={togglePublic}

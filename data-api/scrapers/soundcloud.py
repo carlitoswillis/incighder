@@ -71,6 +71,7 @@ def fetch_soundcloud(profile_url: str) -> ScrapeResult:
             "soundcloud_username": user.get("username"),
             "soundcloud_followers": user.get("followers_count"),
             "soundcloud_track_count": user.get("track_count"),
+            "profile_pic_url": user.get("avatar_url"),
         }
         try:
             tracks = _api(f"/users/{user['id']}/tracks", cid, limit=20)

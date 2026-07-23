@@ -1,7 +1,7 @@
 "use client";
 
 import { use, useEffect, useState } from "react";
-import Image from "next/image";
+import { ArtistImage } from "@/components/artist-image";
 import Link from "next/link";
 import { ArrowLeft, Printer } from "lucide-react";
 
@@ -113,11 +113,10 @@ export default function ReportPage({
         {/* Identity */}
         <div className="mt-8 flex items-start gap-6">
           {image && (
-            <Image
+            <ArtistImage
               src={image}
               alt={artist.name}
-              width={112}
-              height={112}
+              size={112}
               className="size-28 shrink-0 rounded-lg object-cover"
             />
           )}

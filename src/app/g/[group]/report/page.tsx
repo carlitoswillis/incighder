@@ -1,7 +1,7 @@
 "use client";
 
 import { use, useEffect, useState } from "react";
-import Image from "next/image";
+import { ArtistImage } from "@/components/artist-image";
 import Link from "next/link";
 import { ArrowLeft, Printer } from "lucide-react";
 
@@ -115,11 +115,10 @@ export default function GroupReportPage({
                 >
                   <div className="flex w-56 shrink-0 items-center gap-3">
                     {a.images?.[0]?.url && (
-                      <Image
+                      <ArtistImage
                         src={a.images[0].url}
                         alt={a.name}
-                        width={40}
-                        height={40}
+                        size={40}
                         className="size-10 rounded-md object-cover"
                       />
                     )}

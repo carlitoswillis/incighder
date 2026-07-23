@@ -52,6 +52,8 @@ def fetch_instagram(handle_or_url: str) -> ScrapeResult:
                     "instagram_followers": user.get("edge_followed_by", {}).get("count"),
                     "instagram_posts": user.get("edge_owner_to_timeline_media", {}).get("count"),
                     "instagram_verified": user.get("is_verified"),
+                    # not a DB column — scrape_service uses it as an avatar fallback
+                    "profile_pic_url": user.get("profile_pic_url_hd") or user.get("profile_pic_url"),
                 })
         return ScrapeResult.failure(
             platform,

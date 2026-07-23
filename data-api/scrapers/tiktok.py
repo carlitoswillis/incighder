@@ -58,6 +58,8 @@ def fetch_tiktok(handle_or_url: str) -> ScrapeResult:
             "tiktok_followers": _to_int(stats.get("followerCount")),
             "tiktok_likes": _to_int(stats.get("heartCount") or stats.get("heart")),
             "tiktok_video_count": _to_int(stats.get("videoCount")),
+            "profile_pic_url": (info.get("user") or {}).get("avatarLarger")
+            or (info.get("user") or {}).get("avatarMedium"),
         })
     except (ValueError, KeyError, TypeError) as e:
         return ScrapeResult.failure(platform, f"parse error: {e}")

@@ -79,6 +79,9 @@ def fetch_youtube(url_or_handle: str, api_key: Optional[str]) -> ScrapeResult:
             "youtube_subscribers": _to_int(stats.get("subscriberCount")),
             "youtube_total_views": _to_int(stats.get("viewCount")),
             "youtube_video_count": _to_int(stats.get("videoCount")),
+            "profile_pic_url": ((ch.get("snippet", {}).get("thumbnails") or {}).get("high")
+                                or (ch.get("snippet", {}).get("thumbnails") or {}).get("default")
+                                or {}).get("url"),
         }
 
         # search.list's viewCount order is approximate, so fetch the top handful and

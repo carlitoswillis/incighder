@@ -38,6 +38,7 @@ export interface Artist {
   tiktok_followers?: number | null;
   tiktok_likes?: number | null;
   tiktok_video_count?: number | null;
+  twitch_followers?: number | null;
   x_followers?: number | null;
   social_links?: { [key: string]: string } | null;
   scrape_meta?: { [key: string]: ScrapeMetaEntry } | null;

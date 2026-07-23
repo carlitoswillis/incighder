@@ -15,18 +15,21 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urlparse
 
+import base64
+
 from scrapeArtistData import get_db_connection
 from scrapers.base import ScrapeResult
 from scrapers.instagram import fetch_instagram
 from scrapers.soundcloud import fetch_soundcloud
 from scrapers.spotify import fetch_spotify
 from scrapers.tiktok import fetch_tiktok
+from scrapers.twitch import fetch_twitch
 from scrapers.youtube import fetch_youtube
 
 CACHE_TTL = timedelta(hours=24)
 
 # Scraped platforms (X is manual-entry only, handled in the UI / edit form).
-PLATFORMS = ("spotify", "youtube", "soundcloud", "instagram", "tiktok")
+PLATFORMS = ("spotify", "youtube", "soundcloud", "instagram", "tiktok", "twitch")
 
 # artists columns a scraper is allowed to write (guards the UPDATE identifiers).
 ALLOWED_METRIC_COLUMNS = {
@@ -40,6 +43,7 @@ ALLOWED_METRIC_COLUMNS = {
     "soundcloud_top_track", "soundcloud_top_track_plays",
     "instagram_followers", "instagram_posts", "instagram_verified",
     "tiktok_followers", "tiktok_likes", "tiktok_video_count",
+    "twitch_followers",
 }
 
 # Columns each platform owns - nulled when its source link is removed. (spotify_id is
@@ -54,6 +58,7 @@ PLATFORM_COLUMNS = {
                    "soundcloud_top_track", "soundcloud_top_track_plays"],
     "instagram": ["instagram_followers", "instagram_posts", "instagram_verified"],
     "tiktok": ["tiktok_followers", "tiktok_likes", "tiktok_video_count"],
+    "twitch": ["twitch_followers"],
 }
 
 # The headline follower-type metric per platform, snapshotted for growth tracking.
@@ -63,6 +68,7 @@ PRIMARY_METRIC = {
     "soundcloud": "soundcloud_followers",
     "instagram": "instagram_followers",
     "tiktok": "tiktok_followers",
+    "twitch": "twitch_followers",
 }
 
 
@@ -77,7 +83,39 @@ def _dispatch(platform: str, link, artist: dict) -> ScrapeResult:
         return fetch_instagram(link)
     if platform == "tiktok":
         return fetch_tiktok(link)
+    if platform == "twitch":
+        return fetch_twitch(link)
     return ScrapeResult.failure(platform, "platform not implemented")
+
+
+# Avatar-fallback preference when an artist has no image: face-forward
+# platforms first.
+_AVATAR_PRIORITY = ("instagram", "tiktok", "twitch", "youtube", "soundcloud")
+
+
+def _has_image(value) -> bool:
+    if isinstance(value, str):
+        try:
+            value = json.loads(value)
+        except ValueError:
+            return bool(value)
+    return bool(value)
+
+
+def _download_avatar(url: str):
+    """Fetch a profile picture and inline it as a data URI (survives CDN URL
+    expiry, needs no file storage). Returns None on any failure — best-effort."""
+    try:
+        from scrapers.base import get_session, throttle
+        from urllib.parse import urlparse
+        throttle(urlparse(url).hostname)
+        r = get_session().get(url, timeout=15)
+        ctype = r.headers.get("Content-Type", "")
+        if r.status_code != 200 or not ctype.startswith("image/") or len(r.content) > 2_000_000:
+            return None
+        return f"data:{ctype.split(';')[0]};base64,{base64.b64encode(r.content).decode()}"
+    except Exception:
+        return None
 
 
 def _is_fresh(meta: dict, platform: str) -> bool:
@@ -155,15 +193,30 @@ def scrape_artist(artist_id: str, links: dict | None = None, force: bool = False
                     except Exception as e:  # a scraper should never raise, but isolate it
                         dispatched[platform] = ScrapeResult.failure(platform, str(e))
 
+        avatar_urls: dict = {}
         for platform, _link in to_scrape:
             res = dispatched[platform]
             results[platform] = res.to_dict()
             if res.ok:
+                pic = res.data.get("profile_pic_url")
+                if pic:
+                    avatar_urls[platform] = pic
                 updates.update({k: v for k, v in res.data.items()
                                 if k in ALLOWED_METRIC_COLUMNS})
             meta[platform] = {"last_scraped_at": res.scraped_at,
                               "status": "ok" if res.ok else "error",
                               "error": res.error}
+
+        # Avatar fallback: someone with no picture (manual adds — skaters, DJs)
+        # inherits their social profile pic. Never overwrites an existing image
+        # (Spotify baseline or a manual upload).
+        if "images" not in updates and not _has_image(artist.get("images")) and avatar_urls:
+            for platform in _AVATAR_PRIORITY:
+                if platform in avatar_urls:
+                    data_uri = _download_avatar(avatar_urls[platform])
+                    if data_uri:
+                        updates["images"] = json.dumps([{"url": data_uri}])
+                        break
 
         set_cols = list(updates.keys()) + ["social_links", "scrape_meta"]
         set_vals = list(updates.values()) + [json.dumps(merged_links), json.dumps(meta)]

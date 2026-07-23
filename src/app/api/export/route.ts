@@ -31,6 +31,7 @@ const COLUMNS: { header: string; pick: (a: RowDataPacket) => unknown }[] = [
   { header: "tiktok_followers", pick: (a) => a.tiktok_followers },
   { header: "tiktok_likes", pick: (a) => a.tiktok_likes },
   { header: "tiktok_videos", pick: (a) => a.tiktok_video_count },
+  { header: "twitch_followers", pick: (a) => a.twitch_followers },
   { header: "x_followers", pick: (a) => a.x_followers },
   { header: "spotify_url", pick: (a) => a.external_urls?.spotify },
   { header: "instagram_url", pick: (a) => a.social_links?.instagram },

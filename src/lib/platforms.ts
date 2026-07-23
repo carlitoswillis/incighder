@@ -5,6 +5,7 @@ import {
   SiSoundcloud,
   SiInstagram,
   SiTiktok,
+  SiTwitch,
   SiX,
 } from "react-icons/si";
 import type { Artist } from "./types";
@@ -15,6 +16,7 @@ export type PlatformKey =
   | "soundcloud"
   | "instagram"
   | "tiktok"
+  | "twitch"
   | "x";
 
 export interface PlatformMeta {
@@ -97,6 +99,15 @@ export const PLATFORMS: PlatformMeta[] = [
     linkField: "tiktok",
     metric: { field: "tiktok_followers", label: "Followers" },
     extra: { field: "tiktok_likes", label: "likes" },
+  },
+  {
+    key: "twitch",
+    label: "Twitch",
+    color: "#9146FF",
+    Icon: SiTwitch,
+    scraped: true,
+    linkField: "twitch",
+    metric: { field: "twitch_followers", label: "Followers" },
   },
   {
     key: "x",
