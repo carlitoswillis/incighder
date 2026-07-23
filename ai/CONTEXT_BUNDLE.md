@@ -1,5 +1,5 @@
 # AI Context Bundle
-Generated: Thu Jul 23 14:33:39 PDT 2026
+Generated: Thu Jul 23 14:41:00 PDT 2026
 
 ## ⚠️ Agent Navigation Guide
 1. Start with the **Current State** below to understand the focus.
@@ -152,6 +152,7 @@ The long-term aim is a single dashboard that scores artist traction from many si
 ---
 
 ## Recent Changes
+- **Artist groups (2026-07-23)**: `group_name` column + `/g/[group]` pages + `/api/groups`; main list = ungrouped only (roster separation à la glogang); shared `ArtistGrid` component behind home and group pages.
 - **Artist bio (2026-07-23)**: `bio`/`bio_source` columns; admin "Fetch from Last.fm" (native TS route, works without the data-api) with graceful "no bio" handling; manual bios via the edit form for non-recording artists (skaters/clients). About card shows to visitors when a bio exists.
 - **Admin gate + visitor curation (2026-07-23)**: passphrase login (`/login`, `ADMIN_PASSWORDS` comma-separated — one each for Carlitos/Adam; HMAC cookie via `AUTH_SECRET`, `src/lib/auth.ts`). All mutating + data-api proxy routes 401 without the cookie; visitors see only `artists.is_public = 1` (list/detail/link-preview all filtered), with an admin Public/Private toggle on the detail page. Admin-only UI: Discover/Manual/Bulk nav, Add-artist, edit/delete/scrape, sources panel. The tunneled data-api now requires `DATA_API_SECRET` (header `X-Data-Api-Secret`, `/health` exempt). NOT a user system by design — swap `passwordOk()` for real auth when Manager mode needs it; the `isAdmin()` guards stay.
 - **Live deploy + self-healing tunnel (2026-07-23)**: site is LIVE at **incighder.vercel.app** (Vercel project recreated, GitHub-connected, `DATABASE_URL` in prod+preview) backed by **TiDB Cloud Serverless** (all data migrated: artists + growth snapshots). New **`./go_live.sh`**: starts data-api + cloudflared quick tunnel and publishes the tunnel URL to `app_config.data_api_url` in the shared DB; `getDataApiUrl()` (`src/lib/data-api.ts`) resolves it there in production (30s cache) so new tunnels need no redeploy. data-api `/health` + `/api/data-api-status` + amber offline banner in `app-shell` when the home server is unreachable (browse/edit still work — only scrape/refresh/discover pause).
@@ -191,7 +192,6 @@ PURPOSE: Tracks active work and backlog. AI agents should update this after comp
 ## Backlog
 - [ ] Add twitch?
 - [ ] data export (select multiple people, or just one person, or groups)
-- [ ] maybe a /glogang page that tracks skaters and their djs accounts (instead of artists) and that way itll keep their data separate?
 
 ### Manager-platform direction (from the 2026-07 Adam/ChatGPT conversation — "Manager Analytics Platform")
 Strategic frame: two complementary products. **Incighder Discover** = today's app (public data, A&Rs/labels). **Incighder Manager** = artist teams connecting their own accounts (official APIs + manual input — "aggregation without replacement", built *with* platforms not against them). Manager-side first-party data could later enrich Discover. The daily-open question that defines the product: "how are all my artists performing across every platform?" — a story no single platform dashboard can tell.
@@ -217,6 +217,7 @@ Strategic frame: two complementary products. **Incighder Discover** = today's ap
 - [ ] Playlist / chart-placement tracking — competitor table-stakes we lack (see `COMPETITORS.md`)
 
 ## Completed
+- [x] Artist groups (2026-07-23): `group_name` roster separation — grouped artists leave the main list and live at `/g/<name>` (public URL, is_public-respecting); group chips on home via `/api/groups`; `?all=1` keeps bulk tools whole-roster; Group field in edit form. Generalizes the "/glogang page" idea and pre-builds group export + Manager rosters.
 - [x] Artist bio (2026-07-23): native TS `/api/bio` (Last.fm `artist.getInfo`, admin-only) + editable bio in the edit form (`bio_source` lastfm|manual) + About card on artist pages (visitor-visible). Later: AI-synthesized multi-source summary.
 - [x] Login/data gate: passphrase admin sessions + `is_public` visitor curation + tunnel shared secret (2026-07-23) — closes "put some functionality behind gates"
 - [x] **Data-wipe fix + hosted-DB/deploy readiness (2026-07-23)**: idempotent `apply_schema.py` (`--reset` gated), `DATABASE_URL`+TLS support across Next/scripts/Python, centralized pool config, env-driven ports, `DEPLOY.md` + `.env.example`
@@ -787,23 +788,23 @@ Strategic frame: two complementary products. **Incighder Discover** = today's ap
 
 ## 5. Recent Git Changes (Summary)
 ```text
+bee0ef0 feat: artist groups — roster separation + /g/[group] pages
+ddb78ef docs: bio feature recorded; backlog items checked off
 d747829 feat: artist bio — Last.fm fetch (native TS /api/bio) + manual editing + About section
 56e8309 docs: record admin gate in project state; check off gating backlog items
 8d5c97e feat: passphrase admin gate, is_public visitor curation, tunnel shared secret
-3e8f2a3 feat: go_live.sh self-healing tunnel + offline banner; live features discover data-api via DB
-94bc68a docs: backlog — manager-platform direction from Adam conversation (events/campaign tracking, AI digest, official integrations, CRM, goals)
 ```
 
 ## 6. Active Diff
 ```diff
 diff --git a/ai/CONTEXT_BUNDLE.md b/ai/CONTEXT_BUNDLE.md
-index 065962d..1e7d388 100644
+index 44c098d..78a7614 100644
 --- a/ai/CONTEXT_BUNDLE.md
 +++ b/ai/CONTEXT_BUNDLE.md
 @@ -1,5 +1,5 @@
  # AI Context Bundle
--Generated: Thu Jul 23 14:26:04 PDT 2026
-+Generated: Thu Jul 23 14:33:39 PDT 2026
+-Generated: Thu Jul 23 14:33:39 PDT 2026
++Generated: Thu Jul 23 14:41:00 PDT 2026
  
  ## ⚠️ Agent Navigation Guide
  1. Start with the **Current State** below to understand the focus.
@@ -811,89 +812,89 @@ index 065962d..1e7d388 100644
  ---
  
  ## Recent Changes
-+- **Artist bio (2026-07-23)**: `bio`/`bio_source` columns; admin "Fetch from Last.fm" (native TS route, works without the data-api) with graceful "no bio" handling; manual bios via the edit form for non-recording artists (skaters/clients). About card shows to visitors when a bio exists.
++- **Artist groups (2026-07-23)**: `group_name` column + `/g/[group]` pages + `/api/groups`; main list = ungrouped only (roster separation à la glogang); shared `ArtistGrid` component behind home and group pages.
+ - **Artist bio (2026-07-23)**: `bio`/`bio_source` columns; admin "Fetch from Last.fm" (native TS route, works without the data-api) with graceful "no bio" handling; manual bios via the edit form for non-recording artists (skaters/clients). About card shows to visitors when a bio exists.
  - **Admin gate + visitor curation (2026-07-23)**: passphrase login (`/login`, `ADMIN_PASSWORDS` comma-separated — one each for Carlitos/Adam; HMAC cookie via `AUTH_SECRET`, `src/lib/auth.ts`). All mutating + data-api proxy routes 401 without the cookie; visitors see only `artists.is_public = 1` (list/detail/link-preview all filtered), with an admin Public/Private toggle on the detail page. Admin-only UI: Discover/Manual/Bulk nav, Add-artist, edit/delete/scrape, sources panel. The tunneled data-api now requires `DATA_API_SECRET` (header `X-Data-Api-Secret`, `/health` exempt). NOT a user system by design — swap `passwordOk()` for real auth when Manager mode needs it; the `isAdmin()` guards stay.
  - **Live deploy + self-healing tunnel (2026-07-23)**: site is LIVE at **incighder.vercel.app** (Vercel project recreated, GitHub-connected, `DATABASE_URL` in prod+preview) backed by **TiDB Cloud Serverless** (all data migrated: artists + growth snapshots). New **`./go_live.sh`**: starts data-api + cloudflared quick tunnel and publishes the tunnel URL to `app_config.data_api_url` in the shared DB; `getDataApiUrl()` (`src/lib/data-api.ts`) resolves it there in production (30s cache) so new tunnels need no redeploy. data-api `/health` + `/api/data-api-status` + amber offline banner in `app-shell` when the home server is unreachable (browse/edit still work — only scrape/refresh/discover pause).
- - **Data-wipe bug fixed (2026-07-23)**: the repeated "DB lost everything" incidents were self-inflicted — Docker-era `start_dev.sh` ran `docker-compose down --volumes` (deleted the data volume), and post-migration `apply_schema.py` still dropped all tables on every dev start. `schema.sql` is now `CREATE TABLE IF NOT EXISTS`, `apply_schema.py` is idempotent, and destructive resets require `--reset` + typed confirmation (`APPLY_SCHEMA_RESET_CONFIRM=yes` non-interactively).
-@@ -188,7 +189,6 @@ PURPOSE: Tracks active work and backlog. AI agents should update this after comp
- - (nothing in progress — pick next from Backlog)
- 
+@@ -191,7 +192,6 @@ PURPOSE: Tracks active work and backlog. AI agents should update this after comp
  ## Backlog
--- [ ] Add a bio section (scraped from spotify or last fm idc) and make it editable for the cases where people have no bio (for non recording artsts like upcoming clients, glogang skaters etc)
  - [ ] Add twitch?
  - [ ] data export (select multiple people, or just one person, or groups)
- - [ ] maybe a /glogang page that tracks skaters and their djs accounts (instead of artists) and that way itll keep their data separate?
-@@ -208,7 +208,6 @@ Strategic frame: two complementary products. **Incighder Discover** = today's ap
-   - **Migration leftovers**: dead selenium scripts (`followerCounts.py`, `artistSoundCloudScrape.py`); no DB migration framework yet (though schema apply is now idempotent — new columns still need hand-run ALTERs).
- - [ ] Prioritize the most resume-impressive additions next (this is a portfolio/interview piece — weigh features by how well they demonstrate engineering depth, not just product value)
- - [ ] discover feature should prioritize smaller artists that have super high match to the search
--- [ ] ADD A BIO. BIOGRAPHY section for artists (v1: single source — Last.fm `artist.getInfo`; later: AI-synthesized summary across all sources)
- - [ ] Top youtube video embedded in the artist page like as a hero under or over the stats idk yet
- - [ ] Export artist data (CSV / JSON)
- - [ ] Discovery seeded from an already-tracked artist (in-app, not just the `/discover` search box)
-@@ -218,6 +217,7 @@ Strategic frame: two complementary products. **Incighder Discover** = today's ap
+-- [ ] maybe a /glogang page that tracks skaters and their djs accounts (instead of artists) and that way itll keep their data separate?
+ 
+ ### Manager-platform direction (from the 2026-07 Adam/ChatGPT conversation — "Manager Analytics Platform")
+ Strategic frame: two complementary products. **Incighder Discover** = today's app (public data, A&Rs/labels). **Incighder Manager** = artist teams connecting their own accounts (official APIs + manual input — "aggregation without replacement", built *with* platforms not against them). Manager-side first-party data could later enrich Discover. The daily-open question that defines the product: "how are all my artists performing across every platform?" — a story no single platform dashboard can tell.
+@@ -217,6 +217,7 @@ Strategic frame: two complementary products. **Incighder Discover** = today's ap
  - [ ] Playlist / chart-placement tracking — competitor table-stakes we lack (see `COMPETITORS.md`)
  
  ## Completed
-+- [x] Artist bio (2026-07-23): native TS `/api/bio` (Last.fm `artist.getInfo`, admin-only) + editable bio in the edit form (`bio_source` lastfm|manual) + About card on artist pages (visitor-visible). Later: AI-synthesized multi-source summary.
++- [x] Artist groups (2026-07-23): `group_name` roster separation — grouped artists leave the main list and live at `/g/<name>` (public URL, is_public-respecting); group chips on home via `/api/groups`; `?all=1` keeps bulk tools whole-roster; Group field in edit form. Generalizes the "/glogang page" idea and pre-builds group export + Manager rosters.
+ - [x] Artist bio (2026-07-23): native TS `/api/bio` (Last.fm `artist.getInfo`, admin-only) + editable bio in the edit form (`bio_source` lastfm|manual) + About card on artist pages (visitor-visible). Later: AI-synthesized multi-source summary.
  - [x] Login/data gate: passphrase admin sessions + `is_public` visitor curation + tunnel shared secret (2026-07-23) — closes "put some functionality behind gates"
  - [x] **Data-wipe fix + hosted-DB/deploy readiness (2026-07-23)**: idempotent `apply_schema.py` (`--reset` gated), `DATABASE_URL`+TLS support across Next/scripts/Python, centralized pool config, env-driven ports, `DEPLOY.md` + `.env.example`
- - [x] **De-dockerize + flatten for Vercel (2026-06-29)**: removed Docker entirely (run natively via `./start_dev.sh`); **Postgres → MySQL 8.4** (`mysql2`/`PyMySQL`, `?` placeholders, `ON DUPLICATE KEY UPDATE`, update-then-SELECT in place of `RETURNING`); **flattened** the Next app from `incighder/incighder/` to the repo root; **dropped Playwright/Chromium** — all scrapers HTTP-only (TikTok rehydration blob, IG `web_profile_info` + `IG_SESSIONID` cookie, Spotify monthly listeners via **scrape.do** render API `SCRAPE_DO_TOKEN`); **Ollama → Gemini** (`gemini-2.5-flash`, `GOOGLE_AI_API_KEY`) in `ai_verify.py`; **Spotify search ported to a native TS route** (no data-api); remaining proxy routes parameterized via `DATA_API_URL`. data-api on :5050 (AirPlay owns 5000), `OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES` for macOS thread-fork safety.
-@@ -787,113 +787,12 @@ Strategic frame: two complementary products. **Incighder Discover** = today's ap
+@@ -787,113 +788,12 @@ Strategic frame: two complementary products. **Incighder Discover** = today's ap
  
  ## 5. Recent Git Changes (Summary)
  ```text
-+d747829 feat: artist bio — Last.fm fetch (native TS /api/bio) + manual editing + About section
-+56e8309 docs: record admin gate in project state; check off gating backlog items
++bee0ef0 feat: artist groups — roster separation + /g/[group] pages
++ddb78ef docs: bio feature recorded; backlog items checked off
+ d747829 feat: artist bio — Last.fm fetch (native TS /api/bio) + manual editing + About section
+ 56e8309 docs: record admin gate in project state; check off gating backlog items
  8d5c97e feat: passphrase admin gate, is_public visitor curation, tunnel shared secret
- 3e8f2a3 feat: go_live.sh self-healing tunnel + offline banner; live features discover data-api via DB
- 94bc68a docs: backlog — manager-platform direction from Adam conversation (events/campaign tracking, AI digest, official integrations, CRM, goals)
--37ecdde fix: stop wiping the DB on every dev start; single DATABASE_URL for hosted MySQL; env-driven ports
--ce05300 feat: refresh artist snapshot on dev start, fail gracefully
+-3e8f2a3 feat: go_live.sh self-healing tunnel + offline banner; live features discover data-api via DB
+-94bc68a docs: backlog — manager-platform direction from Adam conversation (events/campaign tracking, AI digest, official integrations, CRM, goals)
  ```
  
  ## 6. Active Diff
  ```diff
 -diff --git a/ai/CONTEXT_BUNDLE.md b/ai/CONTEXT_BUNDLE.md
--index 51bda66..8af0afc 100644
+-index 065962d..1e7d388 100644
 ---- a/ai/CONTEXT_BUNDLE.md
 -+++ b/ai/CONTEXT_BUNDLE.md
 -@@ -1,5 +1,5 @@
 - # AI Context Bundle
---Generated: Thu Jul 23 13:23:21 PDT 2026
--+Generated: Thu Jul 23 14:26:04 PDT 2026
+--Generated: Thu Jul 23 14:26:04 PDT 2026
+-+Generated: Thu Jul 23 14:33:39 PDT 2026
 - 
 - ## ⚠️ Agent Navigation Guide
 - 1. Start with the **Current State** below to understand the focus.
--@@ -152,6 +152,8 @@ The long-term aim is a single dashboard that scores artist traction from many si
+-@@ -152,6 +152,7 @@ The long-term aim is a single dashboard that scores artist traction from many si
 - ---
 - 
 - ## Recent Changes
--+- **Admin gate + visitor curation (2026-07-23)**: passphrase login (`/login`, `ADMIN_PASSWORDS` comma-separated — one each for Carlitos/Adam; HMAC cookie via `AUTH_SECRET`, `src/lib/auth.ts`). All mutating + data-api proxy routes 401 without the cookie; visitors see only `artists.is_public = 1` (list/detail/link-preview all filtered), with an admin Public/Private toggle on the detail page. Admin-only UI: Discover/Manual/Bulk nav, Add-artist, edit/delete/scrape, sources panel. The tunneled data-api now requires `DATA_API_SECRET` (header `X-Data-Api-Secret`, `/health` exempt). NOT a user system by design — swap `passwordOk()` for real auth when Manager mode needs it; the `isAdmin()` guards stay.
--+- **Live deploy + self-healing tunnel (2026-07-23)**: site is LIVE at **incighder.vercel.app** (Vercel project recreated, GitHub-connected, `DATABASE_URL` in prod+preview) backed by **TiDB Cloud Serverless** (all data migrated: artists + growth snapshots). New **`./go_live.sh`**: starts data-api + cloudflared quick tunnel and publishes the tunnel URL to `app_config.data_api_url` in the shared DB; `getDataApiUrl()` (`src/lib/data-api.ts`) resolves it there in production (30s cache) so new tunnels need no redeploy. data-api `/health` + `/api/data-api-status` + amber offline banner in `app-shell` when the home server is unreachable (browse/edit still work — only scrape/refresh/discover pause).
+-+- **Artist bio (2026-07-23)**: `bio`/`bio_source` columns; admin "Fetch from Last.fm" (native TS route, works without the data-api) with graceful "no bio" handling; manual bios via the edit form for non-recording artists (skaters/clients). About card shows to visitors when a bio exists.
+- - **Admin gate + visitor curation (2026-07-23)**: passphrase login (`/login`, `ADMIN_PASSWORDS` comma-separated — one each for Carlitos/Adam; HMAC cookie via `AUTH_SECRET`, `src/lib/auth.ts`). All mutating + data-api proxy routes 401 without the cookie; visitors see only `artists.is_public = 1` (list/detail/link-preview all filtered), with an admin Public/Private toggle on the detail page. Admin-only UI: Discover/Manual/Bulk nav, Add-artist, edit/delete/scrape, sources panel. The tunneled data-api now requires `DATA_API_SECRET` (header `X-Data-Api-Secret`, `/health` exempt). NOT a user system by design — swap `passwordOk()` for real auth when Manager mode needs it; the `isAdmin()` guards stay.
+- - **Live deploy + self-healing tunnel (2026-07-23)**: site is LIVE at **incighder.vercel.app** (Vercel project recreated, GitHub-connected, `DATABASE_URL` in prod+preview) backed by **TiDB Cloud Serverless** (all data migrated: artists + growth snapshots). New **`./go_live.sh`**: starts data-api + cloudflared quick tunnel and publishes the tunnel URL to `app_config.data_api_url` in the shared DB; `getDataApiUrl()` (`src/lib/data-api.ts`) resolves it there in production (30s cache) so new tunnels need no redeploy. data-api `/health` + `/api/data-api-status` + amber offline banner in `app-shell` when the home server is unreachable (browse/edit still work — only scrape/refresh/discover pause).
 - - **Data-wipe bug fixed (2026-07-23)**: the repeated "DB lost everything" incidents were self-inflicted — Docker-era `start_dev.sh` ran `docker-compose down --volumes` (deleted the data volume), and post-migration `apply_schema.py` still dropped all tables on every dev start. `schema.sql` is now `CREATE TABLE IF NOT EXISTS`, `apply_schema.py` is idempotent, and destructive resets require `--reset` + typed confirmation (`APPLY_SCHEMA_RESET_CONFIRM=yes` non-interactively).
-- - **Single `DATABASE_URL` for the whole stack (2026-07-23)**: `mysql://user:pass@host:port/db?sslmode=require` understood by Next (`src/lib/db.ts` `getPool()` — one shared mysql2 pool replacing 4 duplicates), the node scripts (`scripts/db-config.mjs`, loads root `.env`), and Python (`_db_config()` in `scrapeArtistData.py`, PyMySQL TLS via certifi). `DB_*` vars still fill gaps; `DB_SSL=true` forces TLS. Enables free hosted MySQL (TiDB Serverless/Aiven) for the Vercel deploy — see `DEPLOY.md` + `.env.example`.
-- - **Port-agnostic (2026-07-23)**: `DATA_API_PORT` (default 5050) and `WEB_PORT` (default 3000) drive `start_dev.sh`, `src/lib/data-api.ts`, and app.py's dev server (`PORT` also honored for cloud hosts). `start_dev.sh` skips local MySQL when `DATABASE_URL` is set.
--@@ -186,17 +188,18 @@ PURPOSE: Tracks active work and backlog. AI agents should update this after comp
+-@@ -188,7 +189,6 @@ PURPOSE: Tracks active work and backlog. AI agents should update this after comp
 - - (nothing in progress — pick next from Backlog)
 - 
 - ## Backlog
--+- [ ] Add a bio section (scraped from spotify or last fm idc) and make it editable for the cases where people have no bio (for non recording artsts like upcoming clients, glogang skaters etc)
--+- [ ] Add twitch?
--+- [ ] data export (select multiple people, or just one person, or groups)
--+- [ ] maybe a /glogang page that tracks skaters and their djs accounts (instead of artists) and that way itll keep their data separate?
+--- [ ] Add a bio section (scraped from spotify or last fm idc) and make it editable for the cases where people have no bio (for non recording artsts like upcoming clients, glogang skaters etc)
+- - [ ] Add twitch?
+- - [ ] data export (select multiple people, or just one person, or groups)
+- - [ ] maybe a /glogang page that tracks skaters and their djs accounts (instead of artists) and that way itll keep their data separate?
+-@@ -208,7 +208,6 @@ Strategic frame: two complementary products. **Incighder Discover** = today's ap
+-   - **Migration leftovers**: dead selenium scripts (`followerCounts.py`, `artistSoundCloudScrape.py`); no DB migration framework yet (though schema apply is now idempotent — new columns still need hand-run ALTERs).
+- - [ ] Prioritize the most resume-impressive additions next (this is a portfolio/interview piece — weigh features by how well they demonstrate engineering depth, not just product value)
+- - [ ] discover feature should prioritize smaller artists that have super high match to the search
+--- [ ] ADD A BIO. BIOGRAPHY section for artists (v1: single source — Last.fm `artist.getInfo`; later: AI-synthesized summary across all sources)
+- - [ ] Top youtube video embedded in the artist page like as a hero under or over the stats idk yet
+- - [ ] Export artist data (CSV / JSON)
+- - [ ] Discovery seeded from an already-tracked artist (in-app, not just the `/discover` search box)
+-@@ -218,6 +217,7 @@ Strategic frame: two complementary products. **Incighder Discover** = today's ap
+- - [ ] Playlist / chart-placement tracking — competitor table-stakes we lack (see `COMPETITORS.md`)
 - 
-- ### Manager-platform direction (from the 2026-07 Adam/ChatGPT conversation — "Manager Analytics Platform")
-- Strategic frame: two complementary products. **Incighder Discover** = today's app (public data, A&Rs/labels). **Incighder Manager** = artist teams connecting their own accounts (official APIs + manual input — "aggregation without replacement", built *with* platforms not against them). Manager-side first-party data could later enrich Discover. The daily-open question that defines the product: "how are all my artists performing across every platform?" — a story no single platform dashboard can tell.
---- [ ] **Events/campaign tracking**: an `events` table (release, reel, feature, announcement) overlaid on `metric_snapshots` timelines → "this release drove +12% IG followers, +8% Spotify listeners, playlist adds from these 3 playlists". `metric_snapshots` is already the foundation; this is the highest-leverage steal.
--+- [ ] **Events/campaign tracking**: an `events` table (release, reel, post, feature, announcement) overlaid on `metric_snapshots` timelines → "this release drove +12% IG followers, +8% Spotify listeners, playlist adds from these 3 playlists". `metric_snapshots` is already the foundation; this is the highest-leverage steal.
-- - [ ] **AI weekly digest**: Gemini summary over snapshot deltas ("follower growth slowed 28% this week"; "3 platforms spiked after Friday's release") — pairs with the existing change-alerts backlog item; could be a cross-artist morning digest view.
-- - [ ] **Official integrations tier** (Manager mode): connect Spotify for Artists / Meta login / YouTube Studio / TikTok Business per artist for private stats the scrapers can't see; import priority = official API > CSV import > manual entry (manual is fallback only — managers with 10-20 artists won't type numbers).
-- - [ ] **Team CRM + notes**: per-artist contacts (playlist curators, journalists, producers, label) and internal team notes.
-- - [ ] **Goal tracking / release planning**: targets per metric with progress against the snapshot history.
---- [ ] Add twitch?
---- [ ] login?
---- [ ] data export (select multiple people, or just one person, or groups)
-- - [ ] **[DEEP TECH DEBT] Scraping & data-api architecture is fragile post-migration.** The 2026-06-28/29 de-dockerize + MySQL + de-Chromium pass shipped working but accrued real debt that will bite on deployment:
--   - **Datacenter-IP blocking**: scrapers now use plain HTTP (no browser). That runs fine from a laptop but Instagram/TikTok/Spotify aggressively block cloud/serverless IPs — these scrapers will largely fail if the data-api ever runs on Vercel/Railway/etc. Needs a deliberate strategy: residential/rotating proxy, official APIs where they exist, and honest graceful degradation + alerting when a source goes dark.
+- ## Completed
+-+- [x] Artist bio (2026-07-23): native TS `/api/bio` (Last.fm `artist.getInfo`, admin-only) + editable bio in the edit form (`bio_source` lastfm|manual) + About card on artist pages (visitor-visible). Later: AI-synthesized multi-source summary.
+- - [x] Login/data gate: passphrase admin sessions + `is_public` visitor curation + tunnel shared secret (2026-07-23) — closes "put some functionality behind gates"
+- - [x] **Data-wipe fix + hosted-DB/deploy readiness (2026-07-23)**: idempotent `apply_schema.py` (`--reset` gated), `DATABASE_URL`+TLS support across Next/scripts/Python, centralized pool config, env-driven ports, `DEPLOY.md` + `.env.example`
+- - [x] **De-dockerize + flatten for Vercel (2026-06-29)**: removed Docker entirely (run natively via `./start_dev.sh`); **Postgres → MySQL 8.4** (`mysql2`/`PyMySQL`, `?` placeholders, `ON DUPLICATE KEY UPDATE`, update-then-SELECT in place of `RETURNING`); **flattened** the Next app from `incighder/incighder/` to the repo root; **dropped Playwright/Chromium** — all scrapers HTTP-only (TikTok rehydration blob, IG `web_profile_info` + `IG_SESSIONID` cookie, Spotify monthly listeners via **scrape.do** render API `SCRAPE_DO_TOKEN`); **Ollama → Gemini** (`gemini-2.5-flash`, `GOOGLE_AI_API_KEY`) in `ai_verify.py`; **Spotify search ported to a native TS route** (no data-api); remaining proxy routes parameterized via `DATA_API_URL`. data-api on :5050 (AirPlay owns 5000), `OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES` for macOS thread-fork safety.
+-@@ -787,113 +787,12 @@ Strategic frame: two complementary products. **Incighder Discover** = today's ap
+- 
+- ## 5. Recent Git Changes (Summary)
+- ```text
+-+d747829 feat: artist bio — Last.fm fetch (native TS /api/bio) + manual editing + About section
+-+56e8309 docs: record admin gate in project state; check off gating backlog items
+- 8d5c97e feat: passphrase admin gate, is_public visitor curation, tunnel shared secret
 ```

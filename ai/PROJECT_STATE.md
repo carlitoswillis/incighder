@@ -47,6 +47,7 @@ The long-term aim is a single dashboard that scores artist traction from many si
 ---
 
 ## Recent Changes
+- **Artist groups (2026-07-23)**: `group_name` column + `/g/[group]` pages + `/api/groups`; main list = ungrouped only (roster separation à la glogang); shared `ArtistGrid` component behind home and group pages.
 - **Artist bio (2026-07-23)**: `bio`/`bio_source` columns; admin "Fetch from Last.fm" (native TS route, works without the data-api) with graceful "no bio" handling; manual bios via the edit form for non-recording artists (skaters/clients). About card shows to visitors when a bio exists.
 - **Admin gate + visitor curation (2026-07-23)**: passphrase login (`/login`, `ADMIN_PASSWORDS` comma-separated — one each for Carlitos/Adam; HMAC cookie via `AUTH_SECRET`, `src/lib/auth.ts`). All mutating + data-api proxy routes 401 without the cookie; visitors see only `artists.is_public = 1` (list/detail/link-preview all filtered), with an admin Public/Private toggle on the detail page. Admin-only UI: Discover/Manual/Bulk nav, Add-artist, edit/delete/scrape, sources panel. The tunneled data-api now requires `DATA_API_SECRET` (header `X-Data-Api-Secret`, `/health` exempt). NOT a user system by design — swap `passwordOk()` for real auth when Manager mode needs it; the `isAdmin()` guards stay.
 - **Live deploy + self-healing tunnel (2026-07-23)**: site is LIVE at **incighder.vercel.app** (Vercel project recreated, GitHub-connected, `DATABASE_URL` in prod+preview) backed by **TiDB Cloud Serverless** (all data migrated: artists + growth snapshots). New **`./go_live.sh`**: starts data-api + cloudflared quick tunnel and publishes the tunnel URL to `app_config.data_api_url` in the shared DB; `getDataApiUrl()` (`src/lib/data-api.ts`) resolves it there in production (30s cache) so new tunnels need no redeploy. data-api `/health` + `/api/data-api-status` + amber offline banner in `app-shell` when the home server is unreachable (browse/edit still work — only scrape/refresh/discover pause).
@@ -86,7 +87,6 @@ PURPOSE: Tracks active work and backlog. AI agents should update this after comp
 ## Backlog
 - [ ] Add twitch?
 - [ ] data export (select multiple people, or just one person, or groups)
-- [ ] maybe a /glogang page that tracks skaters and their djs accounts (instead of artists) and that way itll keep their data separate?
 
 ### Manager-platform direction (from the 2026-07 Adam/ChatGPT conversation — "Manager Analytics Platform")
 Strategic frame: two complementary products. **Incighder Discover** = today's app (public data, A&Rs/labels). **Incighder Manager** = artist teams connecting their own accounts (official APIs + manual input — "aggregation without replacement", built *with* platforms not against them). Manager-side first-party data could later enrich Discover. The daily-open question that defines the product: "how are all my artists performing across every platform?" — a story no single platform dashboard can tell.
@@ -112,6 +112,7 @@ Strategic frame: two complementary products. **Incighder Discover** = today's ap
 - [ ] Playlist / chart-placement tracking — competitor table-stakes we lack (see `COMPETITORS.md`)
 
 ## Completed
+- [x] Artist groups (2026-07-23): `group_name` roster separation — grouped artists leave the main list and live at `/g/<name>` (public URL, is_public-respecting); group chips on home via `/api/groups`; `?all=1` keeps bulk tools whole-roster; Group field in edit form. Generalizes the "/glogang page" idea and pre-builds group export + Manager rosters.
 - [x] Artist bio (2026-07-23): native TS `/api/bio` (Last.fm `artist.getInfo`, admin-only) + editable bio in the edit form (`bio_source` lastfm|manual) + About card on artist pages (visitor-visible). Later: AI-synthesized multi-source summary.
 - [x] Login/data gate: passphrase admin sessions + `is_public` visitor curation + tunnel shared secret (2026-07-23) — closes "put some functionality behind gates"
 - [x] **Data-wipe fix + hosted-DB/deploy readiness (2026-07-23)**: idempotent `apply_schema.py` (`--reset` gated), `DATABASE_URL`+TLS support across Next/scripts/Python, centralized pool config, env-driven ports, `DEPLOY.md` + `.env.example`
