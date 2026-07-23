@@ -7,6 +7,8 @@ export interface ScrapeMetaEntry {
 export interface Artist {
   id: string;
   name: string;
+  /** 1 = shown to non-admin visitors of the deployed site. */
+  is_public?: number | null;
   followers: number | null;
   popularity: number | null;
   genres: string | null;

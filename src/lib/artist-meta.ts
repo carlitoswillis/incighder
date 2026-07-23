@@ -9,13 +9,14 @@ export interface ArtistMeta {
   name: string;
   image: string | null;
   genres: string[];
+  isPublic: boolean;
 }
 
 /** Minimal artist fields for link-preview / tab metadata. null if not found. */
 export async function getArtistMeta(id: string): Promise<ArtistMeta | null> {
   try {
     const [rows] = await pool.query<RowDataPacket[]>(
-      "SELECT name, images, genres FROM artists WHERE id = ?",
+      "SELECT name, images, genres, is_public FROM artists WHERE id = ?",
       [id],
     );
     if (!rows.length) return null;
@@ -35,7 +36,7 @@ export async function getArtistMeta(id: string): Promise<ArtistMeta | null> {
       .map((s: string) => s.trim())
       .filter(Boolean);
 
-    return { name: row.name, image, genres };
+    return { name: row.name, image, genres, isPublic: Boolean(row.is_public) };
   } catch (e) {
     console.error("getArtistMeta failed:", e);
     return null;

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { getArtistMeta } from "@/lib/artist-meta";
+import { isAdmin } from "@/lib/auth";
 import ArtistDetail from "./artist-detail";
 
 type Params = { params: Promise<{ id: string }> };
@@ -9,7 +10,8 @@ type Params = { params: Promise<{ id: string }> };
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const { id } = await params;
   const artist = await getArtistMeta(id);
-  if (!artist) return { title: "Artist" };
+  // Don't leak private artists' names/images through link previews.
+  if (!artist || (!artist.isPublic && !(await isAdmin()))) return { title: "Artist" };
 
   const description = artist.genres.length
     ? `${artist.name} — ${artist.genres.slice(0, 3).join(", ")} · traction across Spotify, YouTube, SoundCloud & socials.`

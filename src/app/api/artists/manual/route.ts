@@ -2,10 +2,12 @@ import { NextResponse } from 'next/server';
 import { RowDataPacket } from 'mysql2/promise';
 import crypto from 'crypto';
 import { getPool } from '@/lib/db';
+import { isAdmin } from "@/lib/auth";
 
 const pool = getPool();
 
 export async function POST(request: Request) {
+  if (!(await isAdmin())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   try {
     const artistData = await request.json();
     const { name } = artistData;

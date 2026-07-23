@@ -6,7 +6,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { toast } from "sonner";
 import { SiSpotify } from "react-icons/si";
-import { ArrowLeft, ExternalLink, Pencil, Trash2 } from "lucide-react";
+import { ArrowLeft, ExternalLink, Eye, EyeOff, Pencil, Trash2 } from "lucide-react";
 
 import type { Artist } from "@/lib/types";
 import { calculateArtistScore } from "@/utils/score";
@@ -18,6 +18,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ScoreBadge } from "@/components/score-badge";
 import { MetricGrid } from "@/components/metric-grid";
 import { SourcesPanel } from "@/components/sources-panel";
+import { useAdmin } from "@/components/admin-context";
 import { DeleteArtistDialog } from "@/components/delete-artist-dialog";
 import { GrowthSection } from "@/components/growth-section";
 
@@ -36,6 +37,7 @@ function ArtistDetail() {
   const params = useParams();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { admin } = useAdmin();
   const artistId = params.id as string;
 
   const [artist, setArtist] = useState<Artist | null>(null);
@@ -92,6 +94,23 @@ function ArtistDetail() {
       document.title = "Incighder — Artist Traction Insights";
     };
   }, [artist?.name]);
+
+  async function togglePublic() {
+    if (!artist) return;
+    const next = artist.is_public ? 0 : 1;
+    try {
+      const r = await fetch(`/api/artists/${artistId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ is_public: next }),
+      });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      setArtist(await r.json());
+      toast.success(next ? "Now visible to visitors" : "Now hidden from visitors");
+    } catch (e) {
+      toast.error(`Failed to update visibility: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
@@ -200,17 +219,33 @@ function ArtistDetail() {
         </div>
         <div className="flex items-center gap-3">
           <ScoreBadge score={score} breakdown={breakdown} size="lg" />
-          <Button variant="outline" onClick={() => setShowEdit((v) => !v)}>
-            <Pencil /> Edit
-          </Button>
-          <Button
-            variant="destructive"
-            size="icon"
-            onClick={() => setDeleteOpen(true)}
-            aria-label="Remove artist"
-          >
-            <Trash2 />
-          </Button>
+          {admin && (
+            <>
+              <Button
+                variant="outline"
+                onClick={togglePublic}
+                title={
+                  artist.is_public
+                    ? "Visible to visitors — click to make private"
+                    : "Hidden from visitors — click to make public"
+                }
+              >
+                {artist.is_public ? <Eye /> : <EyeOff />}
+                {artist.is_public ? "Public" : "Private"}
+              </Button>
+              <Button variant="outline" onClick={() => setShowEdit((v) => !v)}>
+                <Pencil /> Edit
+              </Button>
+              <Button
+                variant="destructive"
+                size="icon"
+                onClick={() => setDeleteOpen(true)}
+                aria-label="Remove artist"
+              >
+                <Trash2 />
+              </Button>
+            </>
+          )}
         </div>
       </div>
 
@@ -295,7 +330,7 @@ function ArtistDetail() {
       />
 
       {/* Sources */}
-      <SourcesPanel artist={artist} onScraped={setArtist} />
+      {admin && <SourcesPanel artist={artist} onScraped={setArtist} />}
 
       <DeleteArtistDialog
         open={deleteOpen}

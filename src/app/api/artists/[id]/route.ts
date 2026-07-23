@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { RowDataPacket, ResultSetHeader } from 'mysql2/promise';
 import fallbackArtists from '@/data/artists-fallback.json';
 import { getPool } from '@/lib/db';
+import { isAdmin } from '@/lib/auth';
 
 const pool = getPool();
 
@@ -11,21 +12,24 @@ const UPDATABLE_COLUMNS = new Set([
   'name', 'followers', 'popularity', 'genres', 'images', 'external_urls',
   'monthly_listeners', 'spotify_id', 'youtube_id',
   'top_track_id', 'top_track_name', 'top_track_popularity', 'x_followers',
+  'is_public',
 ]);
 
 export async function GET(request: Request, context: { params: Promise<{ id: string }> }) {
   const { id } = await context.params;
+  const admin = await isAdmin();
   try {
     const [rows] = await pool.query<RowDataPacket[]>('SELECT * FROM artists WHERE id = ?', [id]);
-    if (rows.length === 0) {
+    // Visitors only see curated artists; private ones 404 as if absent.
+    if (rows.length === 0 || (!admin && !rows[0].is_public)) {
       return NextResponse.json({ error: 'Artist not found' }, { status: 404 });
     }
     return NextResponse.json(rows[0]);
   } catch (error) {
     // No reachable MySQL (e.g. serverless deploy) — fall back to the snapshot.
     console.error('Error fetching artist; serving JSON fallback:', error);
-    const match = (fallbackArtists as { id: string }[]).find((a) => a.id === id);
-    if (!match) {
+    const match = (fallbackArtists as { id: string; is_public?: number }[]).find((a) => a.id === id);
+    if (!match || (!admin && !match.is_public)) {
       return NextResponse.json({ error: 'Artist not found' }, { status: 404 });
     }
     return NextResponse.json(match);
@@ -33,6 +37,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
 }
 
 export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
+  if (!(await isAdmin())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { id } = await context.params;
   const updatedFields: Record<string, unknown> = await request.json();
 
@@ -115,6 +120,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
 }
 
 export async function DELETE(request: Request, context: { params: Promise<{ id: string }> }) {
+  if (!(await isAdmin())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { id } = await context.params;
 
   try {

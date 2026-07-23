@@ -1,6 +1,9 @@
 CREATE TABLE IF NOT EXISTS artists (
     id VARCHAR(255) PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
+    -- Visitor curation: only rows with is_public = 1 are shown to
+    -- non-admin visitors of the deployed site.
+    is_public TINYINT(1) NOT NULL DEFAULT 0,
     followers INTEGER NULL,
     popularity INTEGER NULL,
     genres TEXT NULL,

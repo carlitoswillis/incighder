@@ -11,6 +11,19 @@ import { getPool } from "@/lib/db";
 
 const DEFAULT_URL = `http://127.0.0.1:${process.env.DATA_API_PORT || "5050"}`;
 
+// The tunnel makes the data-api publicly reachable, so every proxy call
+// carries a shared secret the Flask side verifies (DATA_API_SECRET in .env on
+// both ends). No secret configured = header omitted (open local dev).
+export function dataApiHeaders(
+  extra: Record<string, string> = {},
+): Record<string, string> {
+  const h = { ...extra };
+  if (process.env.DATA_API_SECRET) {
+    h["X-Data-Api-Secret"] = process.env.DATA_API_SECRET;
+  }
+  return h;
+}
+
 let cached: { url: string; at: number } | null = null;
 const TTL_MS = 30_000;
 

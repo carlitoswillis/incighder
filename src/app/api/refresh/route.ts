@@ -1,17 +1,19 @@
 import { NextResponse } from "next/server";
-import { getDataApiUrl } from "@/lib/data-api";
+import { getDataApiUrl, dataApiHeaders } from "@/lib/data-api";
+import { isAdmin } from "@/lib/auth";
 
 // Discover (web search + LLM verify) + scrape (Playwright + throttle) per artist
 // is slow, so allow a long run. The client refreshes one artist at a time.
 export const maxDuration = 120;
 
 export async function POST(request: Request) {
+  if (!(await isAdmin())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const body = await request.json();
 
   try {
     const response = await fetch(`${await getDataApiUrl()}/refresh_artist`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: dataApiHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify(body),
     });
 

@@ -3,10 +3,11 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Menu, Plus } from "lucide-react";
+import { Lock, LogOut, Menu, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { DataApiStatusBanner } from "@/components/data-api-status-banner";
+import { AdminProvider, useAdmin } from "@/components/admin-context";
 import {
   Sheet,
   SheetContent,
@@ -19,9 +20,9 @@ import {
 const NAV = [
   { href: "/", label: "Artists" },
   { href: "/table", label: "Table" },
-  { href: "/discover", label: "Discover" },
-  { href: "/artists/add", label: "Manual" },
-  { href: "/artists/bulk", label: "Bulk" },
+  { href: "/discover", label: "Discover", admin: true },
+  { href: "/artists/add", label: "Manual", admin: true },
+  { href: "/artists/bulk", label: "Bulk", admin: true },
 ];
 
 function isActive(pathname: string, href: string) {
@@ -29,8 +30,23 @@ function isActive(pathname: string, href: string) {
 }
 
 export function AppShell({ children }: { children: React.ReactNode }) {
+  return (
+    <AdminProvider>
+      <Shell>{children}</Shell>
+    </AdminProvider>
+  );
+}
+
+function Shell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const { admin } = useAdmin();
+  const nav = NAV.filter((item) => !item.admin || admin);
+
+  async function signOut() {
+    await fetch("/api/auth/logout", { method: "POST" });
+    window.location.href = "/";
+  }
 
   return (
     <div className="min-h-screen">
@@ -57,7 +73,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 </SheetTitle>
               </SheetHeader>
               <nav className="flex flex-col gap-1 px-2">
-                {NAV.map((item) => (
+                {nav.map((item) => (
                   <SheetClose
                     key={item.href}
                     render={<Link href={item.href} />}
@@ -85,7 +101,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
           {/* Desktop nav */}
           <nav className="hidden items-center gap-1 text-sm md:flex">
-            {NAV.map((item) => (
+            {nav.map((item) => (
               <Link
                 key={item.href}
                 href={item.href}
@@ -101,14 +117,33 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             ))}
           </nav>
 
-          <Button
-            render={<Link href="/search_spotify" />}
-            size="sm"
-            className="ml-auto"
-          >
-            <Plus className="size-4" />
-            <span className="hidden sm:inline">Add artist</span>
-          </Button>
+          <div className="ml-auto flex items-center gap-2">
+            {admin && (
+              <Button render={<Link href="/search_spotify" />} size="sm">
+                <Plus className="size-4" />
+                <span className="hidden sm:inline">Add artist</span>
+              </Button>
+            )}
+            {admin ? (
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                aria-label="Sign out"
+                onClick={signOut}
+              >
+                <LogOut />
+              </Button>
+            ) : (
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                aria-label="Admin sign in"
+                render={<Link href="/login" />}
+              >
+                <Lock />
+              </Button>
+            )}
+          </div>
         </div>
       </header>
       <DataApiStatusBanner />

@@ -20,6 +20,7 @@ import {
   DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
 import { DeleteArtistDialog } from "@/components/delete-artist-dialog";
+import { useAdmin } from "@/components/admin-context";
 
 function parseGenres(genres: string | null): string[] {
   if (!genres) return [];
@@ -36,6 +37,7 @@ export function ArtistCard({
   artist: Artist;
   onDeleted: (id: string) => void;
 }) {
+  const { admin } = useAdmin();
   const [confirmOpen, setConfirmOpen] = useState(false);
 
   const genres = parseGenres(artist.genres);
@@ -115,12 +117,14 @@ export function ArtistCard({
                         <SiSpotify /> Spotify
                       </DropdownMenuItem>
                     )}
-                    <DropdownMenuItem
-                      variant="destructive"
-                      onClick={() => setConfirmOpen(true)}
-                    >
-                      <Trash2 /> Remove
-                    </DropdownMenuItem>
+                    {admin && (
+                      <DropdownMenuItem
+                        variant="destructive"
+                        onClick={() => setConfirmOpen(true)}
+                      >
+                        <Trash2 /> Remove
+                      </DropdownMenuItem>
+                    )}
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>

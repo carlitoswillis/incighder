@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server';
-import { getDataApiUrl } from "@/lib/data-api";
+import { getDataApiUrl, dataApiHeaders } from "@/lib/data-api";
+import { isAdmin } from "@/lib/auth";
 
 export async function GET(request: Request) {
+  if (!(await isAdmin())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { searchParams } = new URL(request.url);
   const query = searchParams.get('q');
 
@@ -12,6 +14,7 @@ export async function GET(request: Request) {
   try {
     const response = await fetch(
       `${await getDataApiUrl()}/similar_artists?q=${encodeURIComponent(query)}`,
+      { headers: dataApiHeaders() },
     );
 
     if (!response.ok) {

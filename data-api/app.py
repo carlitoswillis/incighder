@@ -19,6 +19,18 @@ from scrapers.base import shutdown as _scraper_shutdown
 app = Flask(__name__)
 atexit.register(_scraper_shutdown)
 
+@app.before_request
+def _require_shared_secret():
+    """The cloudflared tunnel makes this API publicly reachable, so every
+    request (except the liveness probe) must present the shared secret the
+    Next.js proxies send. No DATA_API_SECRET configured = open (local dev)."""
+    secret = os.getenv('DATA_API_SECRET')
+    if not secret or request.path == '/health':
+        return None
+    if request.headers.get('X-Data-Api-Secret') != secret:
+        return jsonify({'error': 'unauthorized'}), 401
+
+
 @app.route('/health', methods=['GET'])
 def health():
     """Liveness probe — the deployed site pings this to show the 'home data
