@@ -106,12 +106,13 @@ Strategic frame: two complementary products. **Incighder Discover** = today's ap
 - [ ] discover feature should prioritize smaller artists that have super high match to the search
 - [ ] Top youtube video embedded in the artist page like as a hero under or over the stats idk yet
 - [ ] Discovery seeded from an already-tracked artist (in-app, not just the `/discover` search box)
-- [ ] Weighted cross-platform traction score
 - [ ] Robust history charts (currently sparse — often only 2 points until more scans accrue)
 - [ ] Change/threshold alerts (notify when a metric jumps X%) — `metric_snapshots` is the foundation; pairs with scheduled auto-scrape. Closes a gap vs competitors (see `COMPETITORS.md`)
 - [ ] Playlist / chart-placement tracking — competitor table-stakes we lack (see `COMPETITORS.md`)
 
 ## Completed
+- [x] Weighted cross-platform traction score (2026-07-23): Reach (≤100, log total audience across all platforms) + Breadth (≤25) + **Momentum** (≤50, median weekly growth % from `metric_snapshots`, server-attached as `momentum_wk_pct` via `src/lib/momentum.ts`) + Spotify popularity (≤25). IG-only members score meaningfully; breakdown tooltip explains every point.
+- [x] Hide unlinked platforms (2026-07-23): `platformHasPresence()` filters cards + metric grid (SourcesPanel still lists all for linking); Spotify presence requires a real identity, not manual-insert zeros.
 - [x] Twitch platform (2026-07-23): `scrapers/twitch.py` via the twitch.tv web GQL Client-ID (no API keys), `twitch_followers` + growth snapshots + UI/CSV. Maino Da Plug tracked (6.9K followers).
 - [x] Photos (2026-07-23): admin uploads (client-downscaled 512px JPEG → data-URI in `images`; `ArtistImage` renders both data: and CDN srcs) + **social-avatar fallback** — scrapers emit `profile_pic_url` (IG > TikTok > Twitch > YT > SC priority), scrape inlines it (≤400KB cap) when no image exists. Whole glogang roster has faces except daniel/brandon (IG anonymous-lookup blocks).
 - [x] Data export (2026-07-23): `/api/export` CSV (roster/group/all/ids, admin) + printable traction one-sheets `/artists/[id]/report` and `/g/[group]/report` (print CSS flips dark tokens to the light palette); `/api/history` ported to native TS (metric_snapshots read directly — growth works without the data-api)
