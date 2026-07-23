@@ -1,5 +1,5 @@
 # AI Context Bundle
-Generated: Thu Jul 23 13:19:42 PDT 2026
+Generated: Thu Jul 23 13:23:21 PDT 2026
 
 ## ⚠️ Agent Navigation Guide
 1. Start with the **Current State** below to understand the focus.
@@ -186,6 +186,14 @@ PURPOSE: Tracks active work and backlog. AI agents should update this after comp
 - (nothing in progress — pick next from Backlog)
 
 ## Backlog
+
+### Manager-platform direction (from the 2026-07 Adam/ChatGPT conversation — "Manager Analytics Platform")
+Strategic frame: two complementary products. **Incighder Discover** = today's app (public data, A&Rs/labels). **Incighder Manager** = artist teams connecting their own accounts (official APIs + manual input — "aggregation without replacement", built *with* platforms not against them). Manager-side first-party data could later enrich Discover. The daily-open question that defines the product: "how are all my artists performing across every platform?" — a story no single platform dashboard can tell.
+- [ ] **Events/campaign tracking**: an `events` table (release, reel, feature, announcement) overlaid on `metric_snapshots` timelines → "this release drove +12% IG followers, +8% Spotify listeners, playlist adds from these 3 playlists". `metric_snapshots` is already the foundation; this is the highest-leverage steal.
+- [ ] **AI weekly digest**: Gemini summary over snapshot deltas ("follower growth slowed 28% this week"; "3 platforms spiked after Friday's release") — pairs with the existing change-alerts backlog item; could be a cross-artist morning digest view.
+- [ ] **Official integrations tier** (Manager mode): connect Spotify for Artists / Meta login / YouTube Studio / TikTok Business per artist for private stats the scrapers can't see; import priority = official API > CSV import > manual entry (manual is fallback only — managers with 10-20 artists won't type numbers).
+- [ ] **Team CRM + notes**: per-artist contacts (playlist curators, journalists, producers, label) and internal team notes.
+- [ ] **Goal tracking / release planning**: targets per metric with progress against the snapshot history.
 - [ ] Add twitch?
 - [ ] login?
 - [ ] data export (select multiple people, or just one person, or groups)
@@ -774,113 +782,113 @@ PURPOSE: Tracks active work and backlog. AI agents should update this after comp
 
 ## 5. Recent Git Changes (Summary)
 ```text
+37ecdde fix: stop wiping the DB on every dev start; single DATABASE_URL for hosted MySQL; env-driven ports
 ce05300 feat: refresh artist snapshot on dev start, fail gracefully
 fa8a449 feat: JSON fallback for GET /api/artists/[id]
 8c656f0 feat: JSON fallback for /api/artists + two-way DB sync
 085b49b Fix React Server Components CVE vulnerabilities (#15)
-e5696fb flatten for vercel
 ```
 
 ## 6. Active Diff
 ```diff
-diff --git a/ai/AGENTS.md b/ai/AGENTS.md
-index bb1544b..ef246b3 100644
---- a/ai/AGENTS.md
-+++ b/ai/AGENTS.md
-@@ -9,7 +9,7 @@ PURPOSE: This is the authoritative rulebook for AI assistants. It defines the 'h
- ## Architecture Constraints
- - **Flat app, native run**: The Next.js app lives at the repo root (run `npm` there, not a subdir). Bring up the full stack with **`./start_dev.sh`** (MySQL + venv gunicorn data-api on :5050 + `npm run dev` on :3000). No Docker.
- - **Two halves, collapsing**: Native TS routes own DB access (`mysql2`) and Spotify search; the rest still proxy to the Python `data-api` via `DATA_API_URL` (`src/lib/data-api.ts`). Direction: keep porting API-call endpoints into TS so the app stays flat/Vercel-deployable. See `ARCHITECTURE.md` for the route map.
--- **Database**: MySQL 8.4 is the source of truth. `data-api/schema.sql` (MySQL DDL) is the master schema; apply it via `./.venv/bin/python apply_schema.py` from `data-api/` (drop-and-recreate). `mysql2` (Node) / `PyMySQL` (Python); `?` placeholders, no `RETURNING`.
-+- **Database**: MySQL is the source of truth (local 8.4 or a hosted MySQL via `DATABASE_URL` — see `DEPLOY.md`). `data-api/schema.sql` (MySQL DDL) is the master schema; apply it via `./.venv/bin/python apply_schema.py` from `data-api/` — **idempotent** (`CREATE TABLE IF NOT EXISTS`), safe on every boot. A destructive rebuild requires `--reset` + typed confirmation; NEVER call `--reset` from scripts. `mysql2` (Node) / `PyMySQL` (Python); `?` placeholders, no `RETURNING`. DB config is centralized: `src/lib/db.ts` (`getPool()`), `scripts/db-config.mjs`, and `_db_config()` in `data-api/scrapeArtistData.py` — never hand-roll a new pool/connection config.
- - **Browser-free scraping**: No Playwright/Chromium. All scrapers are HTTP. Spotify monthly listeners renders via the **scrape.do** API (`SCRAPE_DO_TOKEN`); Instagram uses the `IG_SESSIONID` cookie. AI verification uses **Google Gemini** (`gemini-2.5-flash`, `GOOGLE_AI_API_KEY`).
- - **Best-Effort Scraping**: Scrapers are isolated and partial-by-design; one platform failing must never block the others. Respect the 24h cache TTL.
- - **Markdown Persistence**: All state must be tracked in `ai/*.md`.
-diff --git a/ai/ARCHITECTURE.md b/ai/ARCHITECTURE.md
-index a4330e3..67e11c2 100644
---- a/ai/ARCHITECTURE.md
-+++ b/ai/ARCHITECTURE.md
-@@ -33,10 +33,11 @@ Incighder aggregates and visualizes artist audience metrics from music and socia
- - **Role**: Source of truth for all artist metrics and history. Local install via Homebrew `mysql@8.4`; DB `incighder`, user `incighder`.
- - **Master schema**: `data-api/schema.sql` (MySQL DDL — `JSON` columns, `AUTO_INCREMENT`, `TIMESTAMP DEFAULT CURRENT_TIMESTAMP`, table-level `FOREIGN KEY`s on InnoDB). Tables: `artists`, `albums`, `tracks`, `metric_snapshots`.
- - **Growth tracking**: `metric_snapshots(artist_id, platform, account_key, value, captured_at)`. `account_key` ties a point to the specific linked profile so account switches start a fresh timeline. Big counts are `BIGINT`.
--- **Applying schema**: `./.venv/bin/python apply_schema.py` from `data-api/` (drop-and-recreate; `start_dev.sh` runs it on boot). There is no incremental-migration framework yet (see tech-debt backlog).
-+- **Applying schema**: `./.venv/bin/python apply_schema.py` from `data-api/` — **idempotent** (`CREATE TABLE IF NOT EXISTS`; existing data untouched), so `start_dev.sh` safely runs it on every boot. Destructive rebuild: `apply_schema.py --reset` (interactive confirmation, or `APPLY_SCHEMA_RESET_CONFIRM=yes`). History: the old drop-and-recreate default silently wiped all data on every dev start — that was the recurring "DB lost everything" bug. There is no incremental-migration framework yet (see tech-debt backlog).
-+- **Connection config (all three runtimes)**: `DATABASE_URL` (`mysql://user:pass@host:port/db?sslmode=require`) wins; `DB_HOST`/`DB_PORT`/`DB_USER`/`DB_PASSWORD`/`DB_NAME`/`DB_SSL` fill gaps; defaults target local MySQL. Implemented once per runtime: `src/lib/db.ts` (`getPool()` — single shared mysql2 pool), `scripts/db-config.mjs`, `_db_config()` in `data-api/scrapeArtistData.py` (PyMySQL, TLS via certifi). Point `DATABASE_URL` at a hosted MySQL (TiDB Serverless/Aiven) and the whole stack follows — see `DEPLOY.md`.
- 
- ### 4. Running it (native, no Docker)
--- **`./start_dev.sh`** (repo root): starts MySQL 8.4, sets up the Python venv + installs deps on first run, applies the schema, launches the data-api (gunicorn :5050, with `OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES` for macOS thread-fork safety), then `npm run dev` (frontend :3000).
-+- **`./start_dev.sh`** (repo root): starts MySQL 8.4 (skipped when `DATABASE_URL` is set), sets up the Python venv + installs deps on first run, ensures the schema, launches the data-api (gunicorn `:$DATA_API_PORT`, default 5050, with `OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES` for macOS thread-fork safety), then `npm run dev` (frontend `:$WEB_PORT`, default 3000). Ports are env-overridable: `DATA_API_PORT=8080 WEB_PORT=4000 ./start_dev.sh`.
- - Frontend alone: `npm run dev` at the repo root. Data-api alone: venv gunicorn in `data-api/`.
- 
- ### 5. Scheduler (auto-scrape worker — `data-api/scheduler.py`)
-@@ -50,7 +51,7 @@ Incighder aggregates and visualizes artist audience metrics from music and socia
- 5. **Display**: Next.js reads MySQL via `mysql2` and renders dashboard, table, detail, sparklines, history.
- 
- ## Deployment (Vercel)
--The frontend is Vercel-ready as a single flat project. To actually deploy: point `DB_*` env at a **hosted MySQL**, and either host the `data-api` somewhere public and set `DATA_API_URL`, or continue porting its endpoints into native TS routes (Spotify search already is). Note scrapers may be IP-blocked from datacenter ranges — see the deep tech-debt item in `PROJECT_STATE.md`.
-+See **`DEPLOY.md`** (repo root) for the step-by-step. Shape: Vercel hosts the flat Next app with `DATABASE_URL` pointed at a free hosted MySQL (TiDB Serverless/Aiven) — full read/write deployed, with the committed JSON snapshot as read-only fallback when no DB is reachable. The `data-api` stays local (residential IP scrapes more reliably than datacenter ranges) writing to the same hosted DB; a cloudflared tunnel + `DATA_API_URL` in Vercel lets the deployed site trigger live operations. Long-term direction remains porting proxy endpoints into TS routes.
- 
- ## AI Workspace Substrate
- - **State & vision**: `ai/PROJECT_STATE.md` (read first).
 diff --git a/ai/CONTEXT_BUNDLE.md b/ai/CONTEXT_BUNDLE.md
-index cdd56c7..c4d4a3c 100644
+index a5c5d29..cc3f0cc 100644
 --- a/ai/CONTEXT_BUNDLE.md
 +++ b/ai/CONTEXT_BUNDLE.md
 @@ -1,5 +1,5 @@
  # AI Context Bundle
--Generated: Mon Jun 29 00:55:44 PDT 2026
-+Generated: Thu Jul 23 13:19:42 PDT 2026
+-Generated: Thu Jul 23 13:19:42 PDT 2026
++Generated: Thu Jul 23 13:23:21 PDT 2026
  
  ## ⚠️ Agent Navigation Guide
  1. Start with the **Current State** below to understand the focus.
-@@ -19,7 +19,7 @@ PURPOSE: This is the authoritative rulebook for AI assistants. It defines the 'h
- ## Architecture Constraints
- - **Flat app, native run**: The Next.js app lives at the repo root (run `npm` there, not a subdir). Bring up the full stack with **`./start_dev.sh`** (MySQL + venv gunicorn data-api on :5050 + `npm run dev` on :3000). No Docker.
- - **Two halves, collapsing**: Native TS routes own DB access (`mysql2`) and Spotify search; the rest still proxy to the Python `data-api` via `DATA_API_URL` (`src/lib/data-api.ts`). Direction: keep porting API-call endpoints into TS so the app stays flat/Vercel-deployable. See `ARCHITECTURE.md` for the route map.
--- **Database**: MySQL 8.4 is the source of truth. `data-api/schema.sql` (MySQL DDL) is the master schema; apply it via `./.venv/bin/python apply_schema.py` from `data-api/` (drop-and-recreate). `mysql2` (Node) / `PyMySQL` (Python); `?` placeholders, no `RETURNING`.
-+- **Database**: MySQL is the source of truth (local 8.4 or a hosted MySQL via `DATABASE_URL` — see `DEPLOY.md`). `data-api/schema.sql` (MySQL DDL) is the master schema; apply it via `./.venv/bin/python apply_schema.py` from `data-api/` — **idempotent** (`CREATE TABLE IF NOT EXISTS`), safe on every boot. A destructive rebuild requires `--reset` + typed confirmation; NEVER call `--reset` from scripts. `mysql2` (Node) / `PyMySQL` (Python); `?` placeholders, no `RETURNING`. DB config is centralized: `src/lib/db.ts` (`getPool()`), `scripts/db-config.mjs`, and `_db_config()` in `data-api/scrapeArtistData.py` — never hand-roll a new pool/connection config.
- - **Browser-free scraping**: No Playwright/Chromium. All scrapers are HTTP. Spotify monthly listeners renders via the **scrape.do** API (`SCRAPE_DO_TOKEN`); Instagram uses the `IG_SESSIONID` cookie. AI verification uses **Google Gemini** (`gemini-2.5-flash`, `GOOGLE_AI_API_KEY`).
- - **Best-Effort Scraping**: Scrapers are isolated and partial-by-design; one platform failing must never block the others. Respect the 24h cache TTL.
- - **Markdown Persistence**: All state must be tracked in `ai/*.md`.
-@@ -75,10 +75,11 @@ Incighder aggregates and visualizes artist audience metrics from music and socia
- - **Role**: Source of truth for all artist metrics and history. Local install via Homebrew `mysql@8.4`; DB `incighder`, user `incighder`.
- - **Master schema**: `data-api/schema.sql` (MySQL DDL — `JSON` columns, `AUTO_INCREMENT`, `TIMESTAMP DEFAULT CURRENT_TIMESTAMP`, table-level `FOREIGN KEY`s on InnoDB). Tables: `artists`, `albums`, `tracks`, `metric_snapshots`.
- - **Growth tracking**: `metric_snapshots(artist_id, platform, account_key, value, captured_at)`. `account_key` ties a point to the specific linked profile so account switches start a fresh timeline. Big counts are `BIGINT`.
--- **Applying schema**: `./.venv/bin/python apply_schema.py` from `data-api/` (drop-and-recreate; `start_dev.sh` runs it on boot). There is no incremental-migration framework yet (see tech-debt backlog).
-+- **Applying schema**: `./.venv/bin/python apply_schema.py` from `data-api/` — **idempotent** (`CREATE TABLE IF NOT EXISTS`; existing data untouched), so `start_dev.sh` safely runs it on every boot. Destructive rebuild: `apply_schema.py --reset` (interactive confirmation, or `APPLY_SCHEMA_RESET_CONFIRM=yes`). History: the old drop-and-recreate default silently wiped all data on every dev start — that was the recurring "DB lost everything" bug. There is no incremental-migration framework yet (see tech-debt backlog).
-+- **Connection config (all three runtimes)**: `DATABASE_URL` (`mysql://user:pass@host:port/db?sslmode=require`) wins; `DB_HOST`/`DB_PORT`/`DB_USER`/`DB_PASSWORD`/`DB_NAME`/`DB_SSL` fill gaps; defaults target local MySQL. Implemented once per runtime: `src/lib/db.ts` (`getPool()` — single shared mysql2 pool), `scripts/db-config.mjs`, `_db_config()` in `data-api/scrapeArtistData.py` (PyMySQL, TLS via certifi). Point `DATABASE_URL` at a hosted MySQL (TiDB Serverless/Aiven) and the whole stack follows — see `DEPLOY.md`.
+@@ -186,6 +186,14 @@ PURPOSE: Tracks active work and backlog. AI agents should update this after comp
+ - (nothing in progress — pick next from Backlog)
  
- ### 4. Running it (native, no Docker)
--- **`./start_dev.sh`** (repo root): starts MySQL 8.4, sets up the Python venv + installs deps on first run, applies the schema, launches the data-api (gunicorn :5050, with `OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES` for macOS thread-fork safety), then `npm run dev` (frontend :3000).
-+- **`./start_dev.sh`** (repo root): starts MySQL 8.4 (skipped when `DATABASE_URL` is set), sets up the Python venv + installs deps on first run, ensures the schema, launches the data-api (gunicorn `:$DATA_API_PORT`, default 5050, with `OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES` for macOS thread-fork safety), then `npm run dev` (frontend `:$WEB_PORT`, default 3000). Ports are env-overridable: `DATA_API_PORT=8080 WEB_PORT=4000 ./start_dev.sh`.
- - Frontend alone: `npm run dev` at the repo root. Data-api alone: venv gunicorn in `data-api/`.
+ ## Backlog
++
++### Manager-platform direction (from the 2026-07 Adam/ChatGPT conversation — "Manager Analytics Platform")
++Strategic frame: two complementary products. **Incighder Discover** = today's app (public data, A&Rs/labels). **Incighder Manager** = artist teams connecting their own accounts (official APIs + manual input — "aggregation without replacement", built *with* platforms not against them). Manager-side first-party data could later enrich Discover. The daily-open question that defines the product: "how are all my artists performing across every platform?" — a story no single platform dashboard can tell.
++- [ ] **Events/campaign tracking**: an `events` table (release, reel, feature, announcement) overlaid on `metric_snapshots` timelines → "this release drove +12% IG followers, +8% Spotify listeners, playlist adds from these 3 playlists". `metric_snapshots` is already the foundation; this is the highest-leverage steal.
++- [ ] **AI weekly digest**: Gemini summary over snapshot deltas ("follower growth slowed 28% this week"; "3 platforms spiked after Friday's release") — pairs with the existing change-alerts backlog item; could be a cross-artist morning digest view.
++- [ ] **Official integrations tier** (Manager mode): connect Spotify for Artists / Meta login / YouTube Studio / TikTok Business per artist for private stats the scrapers can't see; import priority = official API > CSV import > manual entry (manual is fallback only — managers with 10-20 artists won't type numbers).
++- [ ] **Team CRM + notes**: per-artist contacts (playlist curators, journalists, producers, label) and internal team notes.
++- [ ] **Goal tracking / release planning**: targets per metric with progress against the snapshot history.
+ - [ ] Add twitch?
+ - [ ] login?
+ - [ ] data export (select multiple people, or just one person, or groups)
+@@ -774,113 +782,12 @@ PURPOSE: Tracks active work and backlog. AI agents should update this after comp
  
- ### 5. Scheduler (auto-scrape worker — `data-api/scheduler.py`)
-@@ -92,7 +93,7 @@ Incighder aggregates and visualizes artist audience metrics from music and socia
- 5. **Display**: Next.js reads MySQL via `mysql2` and renders dashboard, table, detail, sparklines, history.
+ ## 5. Recent Git Changes (Summary)
+ ```text
++37ecdde fix: stop wiping the DB on every dev start; single DATABASE_URL for hosted MySQL; env-driven ports
+ ce05300 feat: refresh artist snapshot on dev start, fail gracefully
+ fa8a449 feat: JSON fallback for GET /api/artists/[id]
+ 8c656f0 feat: JSON fallback for /api/artists + two-way DB sync
+ 085b49b Fix React Server Components CVE vulnerabilities (#15)
+-e5696fb flatten for vercel
+ ```
  
- ## Deployment (Vercel)
--The frontend is Vercel-ready as a single flat project. To actually deploy: point `DB_*` env at a **hosted MySQL**, and either host the `data-api` somewhere public and set `DATA_API_URL`, or continue porting its endpoints into native TS routes (Spotify search already is). Note scrapers may be IP-blocked from datacenter ranges — see the deep tech-debt item in `PROJECT_STATE.md`.
-+See **`DEPLOY.md`** (repo root) for the step-by-step. Shape: Vercel hosts the flat Next app with `DATABASE_URL` pointed at a free hosted MySQL (TiDB Serverless/Aiven) — full read/write deployed, with the committed JSON snapshot as read-only fallback when no DB is reachable. The `data-api` stays local (residential IP scrapes more reliably than datacenter ranges) writing to the same hosted DB; a cloudflared tunnel + `DATA_API_URL` in Vercel lets the deployed site trigger live operations. Long-term direction remains porting proxy endpoints into TS routes.
- 
- ## AI Workspace Substrate
- - **State & vision**: `ai/PROJECT_STATE.md` (read first).
-@@ -106,8 +107,8 @@ The frontend is Vercel-ready as a single flat project. To actually deploy: point
- 
- PURPOSE: High-level summary of the system's current focus, the product vision, and recent changes — the single place an agent reads first to avoid drift. (Absorbs the former `GOALS.md`.)
- 
--## Last Updated: 2026-06-29
--## Current Focus: **Flattened & Vercel-ready.** Migrated off Docker to a native run (`./start_dev.sh`); Postgres→MySQL 8.4; flattened the Next app out of `incighder/incighder/` to the repo root; dropped Playwright/Chromium (all scrapers now HTTP — Spotify monthly listeners via the scrape.do render API, Instagram via the `IG_SESSIONID` cookie); Ollama→Gemini (`gemini-2.5-flash`) for AI verify; Spotify search ported to a native TS route. Next: keep collapsing the remaining `data-api` proxy endpoints into TS routes, and stand up a hosted MySQL + public `data-api` (or finish the TS port) for an actual Vercel deploy. Backlog: deep scraping/deploy tech debt (below), artist bio, data export, change alerts.
-+## Last Updated: 2026-07-23
-+## Current Focus: **Deploy-ready with hosted DB.** Killed the recurring data-wipe bug (apply_schema was drop-and-recreate and ran on every dev start — now idempotent, `--reset` gated behind confirmation). Whole stack now takes a single `DATABASE_URL` (mysql://...?sslmode=require, TLS supported) so a free hosted MySQL (TiDB Serverless/Aiven) becomes the wipe-proof source of truth for both local dev and the Vercel deploy; DB config centralized (`src/lib/db.ts`, `scripts/db-config.mjs`, `_db_config()`). Ports env-driven (`DATA_API_PORT`/`WEB_PORT`). See `DEPLOY.md`. Next: create the hosted DB + set Vercel env vars; keep collapsing `data-api` proxy endpoints into TS routes. Backlog: deep scraping/deploy tech debt (below), artist bio, data export, change alerts.
- 
- ## Project Goal
- Build a data application that gives A&Rs, labels, and artists a **holistic view of an artist's online traction and growth potential** by aggregating public metrics across music and social platforms — Spotify, YouTube, SoundCloud, Instagram, TikTok, and X — and tracking how they move over time.
-@@ -151,6 +152,9 @@ The long-term aim is a single dashboard that scores artist traction from many si
- ---
- 
- ## Recent Changes
-+- **Data-wipe bug fixed (2026-07-23)**: the repeated "DB lost everything" incidents were self-inflicted — Docker-era `start_dev.sh` ran `docker-compose down --volumes` (deleted the data volume), and post-migration `apply_schema.py` still dropped all tables on every dev start. `schema.sql` is now `CREATE TABLE IF NOT EXISTS`, `apply_schema.py` is idempotent, and destructive resets require `--reset` + typed confirmation (`APPLY_SCHEMA_RESET_CONFIRM=yes` non-interactively).
-+- **Single `DATABASE_URL` for the whole stack (2026-07-23)**: `mysql://user:pass@host:port/db?sslmode=require` understood by Next (`src/lib/db.ts` `getPool()` — one shared mysql2 pool replacing 4 duplicates), the node scripts (`scripts/db-config.mjs`, loads root `.env`), and Python (`_db_config()` in `scrapeArtistData.py`, PyMySQL TLS via certifi). `DB_*` vars still fill gaps; `DB_SSL=true` forces TLS. Enables free hosted MySQL (TiDB Serverless/Aiven) for the Vercel deploy — see `DEPLOY.md` + `.env.example`.
+ ## 6. Active Diff
+ ```diff
+-diff --git a/ai/AGENTS.md b/ai/AGENTS.md
+-index bb1544b..ef246b3 100644
+---- a/ai/AGENTS.md
+-+++ b/ai/AGENTS.md
+-@@ -9,7 +9,7 @@ PURPOSE: This is the authoritative rulebook for AI assistants. It defines the 'h
+- ## Architecture Constraints
+- - **Flat app, native run**: The Next.js app lives at the repo root (run `npm` there, not a subdir). Bring up the full stack with **`./start_dev.sh`** (MySQL + venv gunicorn data-api on :5050 + `npm run dev` on :3000). No Docker.
+- - **Two halves, collapsing**: Native TS routes own DB access (`mysql2`) and Spotify search; the rest still proxy to the Python `data-api` via `DATA_API_URL` (`src/lib/data-api.ts`). Direction: keep porting API-call endpoints into TS so the app stays flat/Vercel-deployable. See `ARCHITECTURE.md` for the route map.
+--- **Database**: MySQL 8.4 is the source of truth. `data-api/schema.sql` (MySQL DDL) is the master schema; apply it via `./.venv/bin/python apply_schema.py` from `data-api/` (drop-and-recreate). `mysql2` (Node) / `PyMySQL` (Python); `?` placeholders, no `RETURNING`.
+-+- **Database**: MySQL is the source of truth (local 8.4 or a hosted MySQL via `DATABASE_URL` — see `DEPLOY.md`). `data-api/schema.sql` (MySQL DDL) is the master schema; apply it via `./.venv/bin/python apply_schema.py` from `data-api/` — **idempotent** (`CREATE TABLE IF NOT EXISTS`), safe on every boot. A destructive rebuild requires `--reset` + typed confirmation; NEVER call `--reset` from scripts. `mysql2` (Node) / `PyMySQL` (Python); `?` placeholders, no `RETURNING`. DB config is centralized: `src/lib/db.ts` (`getPool()`), `scripts/db-config.mjs`, and `_db_config()` in `data-api/scrapeArtistData.py` — never hand-roll a new pool/connection config.
+- - **Browser-free scraping**: No Playwright/Chromium. All scrapers are HTTP. Spotify monthly listeners renders via the **scrape.do** API (`SCRAPE_DO_TOKEN`); Instagram uses the `IG_SESSIONID` cookie. AI verification uses **Google Gemini** (`gemini-2.5-flash`, `GOOGLE_AI_API_KEY`).
+- - **Best-Effort Scraping**: Scrapers are isolated and partial-by-design; one platform failing must never block the others. Respect the 24h cache TTL.
+- - **Markdown Persistence**: All state must be tracked in `ai/*.md`.
+-diff --git a/ai/ARCHITECTURE.md b/ai/ARCHITECTURE.md
+-index a4330e3..67e11c2 100644
+---- a/ai/ARCHITECTURE.md
+-+++ b/ai/ARCHITECTURE.md
+-@@ -33,10 +33,11 @@ Incighder aggregates and visualizes artist audience metrics from music and socia
+- - **Role**: Source of truth for all artist metrics and history. Local install via Homebrew `mysql@8.4`; DB `incighder`, user `incighder`.
+- - **Master schema**: `data-api/schema.sql` (MySQL DDL — `JSON` columns, `AUTO_INCREMENT`, `TIMESTAMP DEFAULT CURRENT_TIMESTAMP`, table-level `FOREIGN KEY`s on InnoDB). Tables: `artists`, `albums`, `tracks`, `metric_snapshots`.
+- - **Growth tracking**: `metric_snapshots(artist_id, platform, account_key, value, captured_at)`. `account_key` ties a point to the specific linked profile so account switches start a fresh timeline. Big counts are `BIGINT`.
+--- **Applying schema**: `./.venv/bin/python apply_schema.py` from `data-api/` (drop-and-recreate; `start_dev.sh` runs it on boot). There is no incremental-migration framework yet (see tech-debt backlog).
+-+- **Applying schema**: `./.venv/bin/python apply_schema.py` from `data-api/` — **idempotent** (`CREATE TABLE IF NOT EXISTS`; existing data untouched), so `start_dev.sh` safely runs it on every boot. Destructive rebuild: `apply_schema.py --reset` (interactive confirmation, or `APPLY_SCHEMA_RESET_CONFIRM=yes`). History: the old drop-and-recreate default silently wiped all data on every dev start — that was the recurring "DB lost everything" bug. There is no incremental-migration framework yet (see tech-debt backlog).
+-+- **Connection config (all three runtimes)**: `DATABASE_URL` (`mysql://user:pass@host:port/db?sslmode=require`) wins; `DB_HOST`/`DB_PORT`/`DB_USER`/`DB_PASSWORD`/`DB_NAME`/`DB_SSL` fill gaps; defaults target local MySQL. Implemented once per runtime: `src/lib/db.ts` (`getPool()` — single shared mysql2 pool), `scripts/db-config.mjs`, `_db_config()` in `data-api/scrapeArtistData.py` (PyMySQL, TLS via certifi). Point `DATABASE_URL` at a hosted MySQL (TiDB Serverless/Aiven) and the whole stack follows — see `DEPLOY.md`.
+- 
+- ### 4. Running it (native, no Docker)
+--- **`./start_dev.sh`** (repo root): starts MySQL 8.4, sets up the Python venv + installs deps on first run, applies the schema, launches the data-api (gunicorn :5050, with `OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES` for macOS thread-fork safety), then `npm run dev` (frontend :3000).
+-+- **`./start_dev.sh`** (repo root): starts MySQL 8.4 (skipped when `DATABASE_URL` is set), sets up the Python venv + installs deps on first run, ensures the schema, launches the data-api (gunicorn `:$DATA_API_PORT`, default 5050, with `OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES` for macOS thread-fork safety), then `npm run dev` (frontend `:$WEB_PORT`, default 3000). Ports are env-overridable: `DATA_API_PORT=8080 WEB_PORT=4000 ./start_dev.sh`.
+- - Frontend alone: `npm run dev` at the repo root. Data-api alone: venv gunicorn in `data-api/`.
+- 
+- ### 5. Scheduler (auto-scrape worker — `data-api/scheduler.py`)
+-@@ -50,7 +51,7 @@ Incighder aggregates and visualizes artist audience metrics from music and socia
+- 5. **Display**: Next.js reads MySQL via `mysql2` and renders dashboard, table, detail, sparklines, history.
+- 
+- ## Deployment (Vercel)
+--The frontend is Vercel-ready as a single flat project. To actually deploy: point `DB_*` env at a **hosted MySQL**, and either host the `data-api` somewhere public and set `DATA_API_URL`, or continue porting its endpoints into native TS routes (Spotify search already is). Note scrapers may be IP-blocked from datacenter ranges — see the deep tech-debt item in `PROJECT_STATE.md`.
+-+See **`DEPLOY.md`** (repo root) for the step-by-step. Shape: Vercel hosts the flat Next app with `DATABASE_URL` pointed at a free hosted MySQL (TiDB Serverless/Aiven) — full read/write deployed, with the committed JSON snapshot as read-only fallback when no DB is reachable. The `data-api` stays local (residential IP scrapes more reliably than datacenter ranges) writing to the same hosted DB; a cloudflared tunnel + `DATA_API_URL` in Vercel lets the deployed site trigger live operations. Long-term direction remains porting proxy endpoints into TS routes.
+- 
+- ## AI Workspace Substrate
+- - **State & vision**: `ai/PROJECT_STATE.md` (read first).
+-diff --git a/ai/CONTEXT_BUNDLE.md b/ai/CONTEXT_BUNDLE.md
+-index cdd56c7..c4d4a3c 100644
+---- a/ai/CONTEXT_BUNDLE.md
+-+++ b/ai/CONTEXT_BUNDLE.md
+-@@ -1,5 +1,5 @@
+- # AI Context Bundle
+--Generated: Mon Jun 29 00:55:44 PDT 2026
+-+Generated: Thu Jul 23 13:19:42 PDT 2026
+- 
+- ## ⚠️ Agent Navigation Guide
+- 1. Start with the **Current State** below to understand the focus.
+-@@ -19,7 +19,7 @@ PURPOSE: This is the authoritative rulebook for AI assistants. It defines the 'h
+- ## Architecture Constraints
+- - **Flat app, native run**: The Next.js app lives at the repo root (run `npm` there, not a subdir). Bring up the full stack with **`./start_dev.sh`** (MySQL + venv gunicorn data-api on :5050 + `npm run dev` on :3000). No Docker.
+- - **Two halves, collapsing**: Native TS routes own DB access (`mysql2`) and Spotify search; the rest still proxy to the Python `data-api` via `DATA_API_URL` (`src/lib/data-api.ts`). Direction: keep porting API-call endpoints into TS so the app stays flat/Vercel-deployable. See `ARCHITECTURE.md` for the route map.
+--- **Database**: MySQL 8.4 is the source of truth. `data-api/schema.sql` (MySQL DDL) is the master schema; apply it via `./.venv/bin/python apply_schema.py` from `data-api/` (drop-and-recreate). `mysql2` (Node) / `PyMySQL` (Python); `?` placeholders, no `RETURNING`.
+-+- **Database**: MySQL is the source of truth (local 8.4 or a hosted MySQL via `DATABASE_URL` — see `DEPLOY.md`). `data-api/schema.sql` (MySQL DDL) is the master schema; apply it via `./.venv/bin/python apply_schema.py` from `data-api/` — **idempotent** (`CREATE TABLE IF NOT EXISTS`), safe on every boot. A destructive rebuild requires `--reset` + typed confirmation; NEVER call `--reset` from scripts. `mysql2` (Node) / `PyMySQL` (Python); `?` placeholders, no `RETURNING`. DB config is centralized: `src/lib/db.ts` (`getPool()`), `scripts/db-config.mjs`, and `_db_config()` in `data-api/scrapeArtistData.py` — never hand-roll a new pool/connection config.
+- - **Browser-free scraping**: No Playwright/Chromium. All scrapers are HTTP. Spotify monthly listeners renders via the **scrape.do** API (`SCRAPE_DO_TOKEN`); Instagram uses the `IG_SESSIONID` cookie. AI verification uses **Google Gemini** (`gemini-2.5-flash`, `GOOGLE_AI_API_KEY`).
+- - **Best-Effort Scraping**: Scrapers are isolated and partial-by-design; one platform failing must never block the others. Respect the 24h cache TTL.
+- - **Markdown Persistence**: All state must be tracked in `ai/*.md`.
 ```
