@@ -36,13 +36,13 @@ export function ArtistGrid({ title, group }: { title: string; group?: string }) 
       })
       .then(setArtists)
       .catch((e) => setError(e instanceof Error ? e.message : String(e)));
-    if (!group) {
+    if (!group && admin) {
       fetch("/api/groups")
         .then((r) => (r.ok ? r.json() : []))
         .then(setGroups)
         .catch(() => setGroups([]));
     }
-  }, [group]);
+  }, [group, admin]);
 
   function handleDeleted(id: string) {
     setArtists((prev) => prev?.filter((a) => a.id !== id) ?? prev);
@@ -79,7 +79,7 @@ export function ArtistGrid({ title, group }: { title: string; group?: string }) 
     <div>
       <PageHeader title={title} count={artists?.length} actions={actions} />
 
-      {!group && groups.length > 0 && (
+      {!group && admin && groups.length > 0 && (
         <div className="mb-6 flex flex-wrap items-center gap-2">
           <span className="text-sm text-muted-foreground">Groups:</span>
           {groups.map((g) => (

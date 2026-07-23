@@ -111,7 +111,10 @@ def _download_avatar(url: str):
         throttle(urlparse(url).hostname)
         r = get_session().get(url, timeout=15)
         ctype = r.headers.get("Content-Type", "")
-        if r.status_code != 200 or not ctype.startswith("image/") or len(r.content) > 2_000_000:
+        # Avatars are small (IG hd ~320px, Twitch 300px). Hard cap keeps a data
+        # URI row bounded (~530KB base64 worst case) so images never meaningfully
+        # eat DB space; uploads are client-downscaled to 512px JPEG separately.
+        if r.status_code != 200 or not ctype.startswith("image/") or len(r.content) > 400_000:
             return None
         return f"data:{ctype.split(';')[0]};base64,{base64.b64encode(r.content).decode()}"
     except Exception:
