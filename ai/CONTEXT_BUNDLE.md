@@ -1,5 +1,5 @@
 # AI Context Bundle
-Generated: Thu Jul 23 13:23:21 PDT 2026
+Generated: Thu Jul 23 14:26:04 PDT 2026
 
 ## ⚠️ Agent Navigation Guide
 1. Start with the **Current State** below to understand the focus.
@@ -152,6 +152,8 @@ The long-term aim is a single dashboard that scores artist traction from many si
 ---
 
 ## Recent Changes
+- **Admin gate + visitor curation (2026-07-23)**: passphrase login (`/login`, `ADMIN_PASSWORDS` comma-separated — one each for Carlitos/Adam; HMAC cookie via `AUTH_SECRET`, `src/lib/auth.ts`). All mutating + data-api proxy routes 401 without the cookie; visitors see only `artists.is_public = 1` (list/detail/link-preview all filtered), with an admin Public/Private toggle on the detail page. Admin-only UI: Discover/Manual/Bulk nav, Add-artist, edit/delete/scrape, sources panel. The tunneled data-api now requires `DATA_API_SECRET` (header `X-Data-Api-Secret`, `/health` exempt). NOT a user system by design — swap `passwordOk()` for real auth when Manager mode needs it; the `isAdmin()` guards stay.
+- **Live deploy + self-healing tunnel (2026-07-23)**: site is LIVE at **incighder.vercel.app** (Vercel project recreated, GitHub-connected, `DATABASE_URL` in prod+preview) backed by **TiDB Cloud Serverless** (all data migrated: artists + growth snapshots). New **`./go_live.sh`**: starts data-api + cloudflared quick tunnel and publishes the tunnel URL to `app_config.data_api_url` in the shared DB; `getDataApiUrl()` (`src/lib/data-api.ts`) resolves it there in production (30s cache) so new tunnels need no redeploy. data-api `/health` + `/api/data-api-status` + amber offline banner in `app-shell` when the home server is unreachable (browse/edit still work — only scrape/refresh/discover pause).
 - **Data-wipe bug fixed (2026-07-23)**: the repeated "DB lost everything" incidents were self-inflicted — Docker-era `start_dev.sh` ran `docker-compose down --volumes` (deleted the data volume), and post-migration `apply_schema.py` still dropped all tables on every dev start. `schema.sql` is now `CREATE TABLE IF NOT EXISTS`, `apply_schema.py` is idempotent, and destructive resets require `--reset` + typed confirmation (`APPLY_SCHEMA_RESET_CONFIRM=yes` non-interactively).
 - **Single `DATABASE_URL` for the whole stack (2026-07-23)**: `mysql://user:pass@host:port/db?sslmode=require` understood by Next (`src/lib/db.ts` `getPool()` — one shared mysql2 pool replacing 4 duplicates), the node scripts (`scripts/db-config.mjs`, loads root `.env`), and Python (`_db_config()` in `scrapeArtistData.py`, PyMySQL TLS via certifi). `DB_*` vars still fill gaps; `DB_SSL=true` forces TLS. Enables free hosted MySQL (TiDB Serverless/Aiven) for the Vercel deploy — see `DEPLOY.md` + `.env.example`.
 - **Port-agnostic (2026-07-23)**: `DATA_API_PORT` (default 5050) and `WEB_PORT` (default 3000) drive `start_dev.sh`, `src/lib/data-api.ts`, and app.py's dev server (`PORT` also honored for cloud hosts). `start_dev.sh` skips local MySQL when `DATABASE_URL` is set.
@@ -186,17 +188,18 @@ PURPOSE: Tracks active work and backlog. AI agents should update this after comp
 - (nothing in progress — pick next from Backlog)
 
 ## Backlog
+- [ ] Add a bio section (scraped from spotify or last fm idc) and make it editable for the cases where people have no bio (for non recording artsts like upcoming clients, glogang skaters etc)
+- [ ] Add twitch?
+- [ ] data export (select multiple people, or just one person, or groups)
+- [ ] maybe a /glogang page that tracks skaters and their djs accounts (instead of artists) and that way itll keep their data separate?
 
 ### Manager-platform direction (from the 2026-07 Adam/ChatGPT conversation — "Manager Analytics Platform")
 Strategic frame: two complementary products. **Incighder Discover** = today's app (public data, A&Rs/labels). **Incighder Manager** = artist teams connecting their own accounts (official APIs + manual input — "aggregation without replacement", built *with* platforms not against them). Manager-side first-party data could later enrich Discover. The daily-open question that defines the product: "how are all my artists performing across every platform?" — a story no single platform dashboard can tell.
-- [ ] **Events/campaign tracking**: an `events` table (release, reel, feature, announcement) overlaid on `metric_snapshots` timelines → "this release drove +12% IG followers, +8% Spotify listeners, playlist adds from these 3 playlists". `metric_snapshots` is already the foundation; this is the highest-leverage steal.
+- [ ] **Events/campaign tracking**: an `events` table (release, reel, post, feature, announcement) overlaid on `metric_snapshots` timelines → "this release drove +12% IG followers, +8% Spotify listeners, playlist adds from these 3 playlists". `metric_snapshots` is already the foundation; this is the highest-leverage steal.
 - [ ] **AI weekly digest**: Gemini summary over snapshot deltas ("follower growth slowed 28% this week"; "3 platforms spiked after Friday's release") — pairs with the existing change-alerts backlog item; could be a cross-artist morning digest view.
 - [ ] **Official integrations tier** (Manager mode): connect Spotify for Artists / Meta login / YouTube Studio / TikTok Business per artist for private stats the scrapers can't see; import priority = official API > CSV import > manual entry (manual is fallback only — managers with 10-20 artists won't type numbers).
 - [ ] **Team CRM + notes**: per-artist contacts (playlist curators, journalists, producers, label) and internal team notes.
 - [ ] **Goal tracking / release planning**: targets per metric with progress against the snapshot history.
-- [ ] Add twitch?
-- [ ] login?
-- [ ] data export (select multiple people, or just one person, or groups)
 - [ ] **[DEEP TECH DEBT] Scraping & data-api architecture is fragile post-migration.** The 2026-06-28/29 de-dockerize + MySQL + de-Chromium pass shipped working but accrued real debt that will bite on deployment:
   - **Datacenter-IP blocking**: scrapers now use plain HTTP (no browser). That runs fine from a laptop but Instagram/TikTok/Spotify aggressively block cloud/serverless IPs — these scrapers will largely fail if the data-api ever runs on Vercel/Railway/etc. Needs a deliberate strategy: residential/rotating proxy, official APIs where they exist, and honest graceful degradation + alerting when a source goes dark.
   - **Undocumented internal endpoints**: IG `web_profile_info`, TikTok `__UNIVERSAL_DATA_FOR_REHYDRATION__`, and especially the Spotify pathfinder GraphQL (hardcoded persisted-query `sha256Hash` in `scrapers/spotify.py`, TOTP-gated token mint) break with zero notice when the sites change. No version pinning, no health checks, no fallback.
@@ -215,6 +218,7 @@ Strategic frame: two complementary products. **Incighder Discover** = today's ap
 - [ ] Playlist / chart-placement tracking — competitor table-stakes we lack (see `COMPETITORS.md`)
 
 ## Completed
+- [x] Login/data gate: passphrase admin sessions + `is_public` visitor curation + tunnel shared secret (2026-07-23) — closes "put some functionality behind gates"
 - [x] **Data-wipe fix + hosted-DB/deploy readiness (2026-07-23)**: idempotent `apply_schema.py` (`--reset` gated), `DATABASE_URL`+TLS support across Next/scripts/Python, centralized pool config, env-driven ports, `DEPLOY.md` + `.env.example`
 - [x] **De-dockerize + flatten for Vercel (2026-06-29)**: removed Docker entirely (run natively via `./start_dev.sh`); **Postgres → MySQL 8.4** (`mysql2`/`PyMySQL`, `?` placeholders, `ON DUPLICATE KEY UPDATE`, update-then-SELECT in place of `RETURNING`); **flattened** the Next app from `incighder/incighder/` to the repo root; **dropped Playwright/Chromium** — all scrapers HTTP-only (TikTok rehydration blob, IG `web_profile_info` + `IG_SESSIONID` cookie, Spotify monthly listeners via **scrape.do** render API `SCRAPE_DO_TOKEN`); **Ollama → Gemini** (`gemini-2.5-flash`, `GOOGLE_AI_API_KEY`) in `ai_verify.py`; **Spotify search ported to a native TS route** (no data-api); remaining proxy routes parameterized via `DATA_API_URL`. data-api on :5050 (AirPlay owns 5000), `OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES` for macOS thread-fork safety.
 - [x] Bulk re-scrape + social auto-discovery for tracked artists: `/artists/refresh` + `/api/refresh` → data-api `refresh_artist`; 24h-cache-aware (skips fresh platforms) and surfaces per-platform failure reasons (`artists/refresh/page.tsx`, `scrape_service.py`)
@@ -240,6 +244,7 @@ Strategic frame: two complementary products. **Incighder Discover** = today's ap
 ```text
 .
 ./start_dev.sh
+./go_live.sh
 ./postcss.config.mjs
 ./tsconfig.tsbuildinfo
 ./node_modules
@@ -782,113 +787,113 @@ Strategic frame: two complementary products. **Incighder Discover** = today's ap
 
 ## 5. Recent Git Changes (Summary)
 ```text
+8d5c97e feat: passphrase admin gate, is_public visitor curation, tunnel shared secret
+3e8f2a3 feat: go_live.sh self-healing tunnel + offline banner; live features discover data-api via DB
+94bc68a docs: backlog — manager-platform direction from Adam conversation (events/campaign tracking, AI digest, official integrations, CRM, goals)
 37ecdde fix: stop wiping the DB on every dev start; single DATABASE_URL for hosted MySQL; env-driven ports
 ce05300 feat: refresh artist snapshot on dev start, fail gracefully
-fa8a449 feat: JSON fallback for GET /api/artists/[id]
-8c656f0 feat: JSON fallback for /api/artists + two-way DB sync
-085b49b Fix React Server Components CVE vulnerabilities (#15)
 ```
 
 ## 6. Active Diff
 ```diff
 diff --git a/ai/CONTEXT_BUNDLE.md b/ai/CONTEXT_BUNDLE.md
-index a5c5d29..cc3f0cc 100644
+index 51bda66..8af0afc 100644
 --- a/ai/CONTEXT_BUNDLE.md
 +++ b/ai/CONTEXT_BUNDLE.md
 @@ -1,5 +1,5 @@
  # AI Context Bundle
--Generated: Thu Jul 23 13:19:42 PDT 2026
-+Generated: Thu Jul 23 13:23:21 PDT 2026
+-Generated: Thu Jul 23 13:23:21 PDT 2026
++Generated: Thu Jul 23 14:26:04 PDT 2026
  
  ## ⚠️ Agent Navigation Guide
  1. Start with the **Current State** below to understand the focus.
-@@ -186,6 +186,14 @@ PURPOSE: Tracks active work and backlog. AI agents should update this after comp
+@@ -152,6 +152,8 @@ The long-term aim is a single dashboard that scores artist traction from many si
+ ---
+ 
+ ## Recent Changes
++- **Admin gate + visitor curation (2026-07-23)**: passphrase login (`/login`, `ADMIN_PASSWORDS` comma-separated — one each for Carlitos/Adam; HMAC cookie via `AUTH_SECRET`, `src/lib/auth.ts`). All mutating + data-api proxy routes 401 without the cookie; visitors see only `artists.is_public = 1` (list/detail/link-preview all filtered), with an admin Public/Private toggle on the detail page. Admin-only UI: Discover/Manual/Bulk nav, Add-artist, edit/delete/scrape, sources panel. The tunneled data-api now requires `DATA_API_SECRET` (header `X-Data-Api-Secret`, `/health` exempt). NOT a user system by design — swap `passwordOk()` for real auth when Manager mode needs it; the `isAdmin()` guards stay.
++- **Live deploy + self-healing tunnel (2026-07-23)**: site is LIVE at **incighder.vercel.app** (Vercel project recreated, GitHub-connected, `DATABASE_URL` in prod+preview) backed by **TiDB Cloud Serverless** (all data migrated: artists + growth snapshots). New **`./go_live.sh`**: starts data-api + cloudflared quick tunnel and publishes the tunnel URL to `app_config.data_api_url` in the shared DB; `getDataApiUrl()` (`src/lib/data-api.ts`) resolves it there in production (30s cache) so new tunnels need no redeploy. data-api `/health` + `/api/data-api-status` + amber offline banner in `app-shell` when the home server is unreachable (browse/edit still work — only scrape/refresh/discover pause).
+ - **Data-wipe bug fixed (2026-07-23)**: the repeated "DB lost everything" incidents were self-inflicted — Docker-era `start_dev.sh` ran `docker-compose down --volumes` (deleted the data volume), and post-migration `apply_schema.py` still dropped all tables on every dev start. `schema.sql` is now `CREATE TABLE IF NOT EXISTS`, `apply_schema.py` is idempotent, and destructive resets require `--reset` + typed confirmation (`APPLY_SCHEMA_RESET_CONFIRM=yes` non-interactively).
+ - **Single `DATABASE_URL` for the whole stack (2026-07-23)**: `mysql://user:pass@host:port/db?sslmode=require` understood by Next (`src/lib/db.ts` `getPool()` — one shared mysql2 pool replacing 4 duplicates), the node scripts (`scripts/db-config.mjs`, loads root `.env`), and Python (`_db_config()` in `scrapeArtistData.py`, PyMySQL TLS via certifi). `DB_*` vars still fill gaps; `DB_SSL=true` forces TLS. Enables free hosted MySQL (TiDB Serverless/Aiven) for the Vercel deploy — see `DEPLOY.md` + `.env.example`.
+ - **Port-agnostic (2026-07-23)**: `DATA_API_PORT` (default 5050) and `WEB_PORT` (default 3000) drive `start_dev.sh`, `src/lib/data-api.ts`, and app.py's dev server (`PORT` also honored for cloud hosts). `start_dev.sh` skips local MySQL when `DATABASE_URL` is set.
+@@ -186,17 +188,18 @@ PURPOSE: Tracks active work and backlog. AI agents should update this after comp
  - (nothing in progress — pick next from Backlog)
  
  ## Backlog
-+
-+### Manager-platform direction (from the 2026-07 Adam/ChatGPT conversation — "Manager Analytics Platform")
-+Strategic frame: two complementary products. **Incighder Discover** = today's app (public data, A&Rs/labels). **Incighder Manager** = artist teams connecting their own accounts (official APIs + manual input — "aggregation without replacement", built *with* platforms not against them). Manager-side first-party data could later enrich Discover. The daily-open question that defines the product: "how are all my artists performing across every platform?" — a story no single platform dashboard can tell.
-+- [ ] **Events/campaign tracking**: an `events` table (release, reel, feature, announcement) overlaid on `metric_snapshots` timelines → "this release drove +12% IG followers, +8% Spotify listeners, playlist adds from these 3 playlists". `metric_snapshots` is already the foundation; this is the highest-leverage steal.
-+- [ ] **AI weekly digest**: Gemini summary over snapshot deltas ("follower growth slowed 28% this week"; "3 platforms spiked after Friday's release") — pairs with the existing change-alerts backlog item; could be a cross-artist morning digest view.
-+- [ ] **Official integrations tier** (Manager mode): connect Spotify for Artists / Meta login / YouTube Studio / TikTok Business per artist for private stats the scrapers can't see; import priority = official API > CSV import > manual entry (manual is fallback only — managers with 10-20 artists won't type numbers).
-+- [ ] **Team CRM + notes**: per-artist contacts (playlist curators, journalists, producers, label) and internal team notes.
-+- [ ] **Goal tracking / release planning**: targets per metric with progress against the snapshot history.
- - [ ] Add twitch?
- - [ ] login?
- - [ ] data export (select multiple people, or just one person, or groups)
-@@ -774,113 +782,12 @@ PURPOSE: Tracks active work and backlog. AI agents should update this after comp
++- [ ] Add a bio section (scraped from spotify or last fm idc) and make it editable for the cases where people have no bio (for non recording artsts like upcoming clients, glogang skaters etc)
++- [ ] Add twitch?
++- [ ] data export (select multiple people, or just one person, or groups)
++- [ ] maybe a /glogang page that tracks skaters and their djs accounts (instead of artists) and that way itll keep their data separate?
+ 
+ ### Manager-platform direction (from the 2026-07 Adam/ChatGPT conversation — "Manager Analytics Platform")
+ Strategic frame: two complementary products. **Incighder Discover** = today's app (public data, A&Rs/labels). **Incighder Manager** = artist teams connecting their own accounts (official APIs + manual input — "aggregation without replacement", built *with* platforms not against them). Manager-side first-party data could later enrich Discover. The daily-open question that defines the product: "how are all my artists performing across every platform?" — a story no single platform dashboard can tell.
+-- [ ] **Events/campaign tracking**: an `events` table (release, reel, feature, announcement) overlaid on `metric_snapshots` timelines → "this release drove +12% IG followers, +8% Spotify listeners, playlist adds from these 3 playlists". `metric_snapshots` is already the foundation; this is the highest-leverage steal.
++- [ ] **Events/campaign tracking**: an `events` table (release, reel, post, feature, announcement) overlaid on `metric_snapshots` timelines → "this release drove +12% IG followers, +8% Spotify listeners, playlist adds from these 3 playlists". `metric_snapshots` is already the foundation; this is the highest-leverage steal.
+ - [ ] **AI weekly digest**: Gemini summary over snapshot deltas ("follower growth slowed 28% this week"; "3 platforms spiked after Friday's release") — pairs with the existing change-alerts backlog item; could be a cross-artist morning digest view.
+ - [ ] **Official integrations tier** (Manager mode): connect Spotify for Artists / Meta login / YouTube Studio / TikTok Business per artist for private stats the scrapers can't see; import priority = official API > CSV import > manual entry (manual is fallback only — managers with 10-20 artists won't type numbers).
+ - [ ] **Team CRM + notes**: per-artist contacts (playlist curators, journalists, producers, label) and internal team notes.
+ - [ ] **Goal tracking / release planning**: targets per metric with progress against the snapshot history.
+-- [ ] Add twitch?
+-- [ ] login?
+-- [ ] data export (select multiple people, or just one person, or groups)
+ - [ ] **[DEEP TECH DEBT] Scraping & data-api architecture is fragile post-migration.** The 2026-06-28/29 de-dockerize + MySQL + de-Chromium pass shipped working but accrued real debt that will bite on deployment:
+   - **Datacenter-IP blocking**: scrapers now use plain HTTP (no browser). That runs fine from a laptop but Instagram/TikTok/Spotify aggressively block cloud/serverless IPs — these scrapers will largely fail if the data-api ever runs on Vercel/Railway/etc. Needs a deliberate strategy: residential/rotating proxy, official APIs where they exist, and honest graceful degradation + alerting when a source goes dark.
+   - **Undocumented internal endpoints**: IG `web_profile_info`, TikTok `__UNIVERSAL_DATA_FOR_REHYDRATION__`, and especially the Spotify pathfinder GraphQL (hardcoded persisted-query `sha256Hash` in `scrapers/spotify.py`, TOTP-gated token mint) break with zero notice when the sites change. No version pinning, no health checks, no fallback.
+@@ -215,6 +218,7 @@ Strategic frame: two complementary products. **Incighder Discover** = today's ap
+ - [ ] Playlist / chart-placement tracking — competitor table-stakes we lack (see `COMPETITORS.md`)
+ 
+ ## Completed
++- [x] Login/data gate: passphrase admin sessions + `is_public` visitor curation + tunnel shared secret (2026-07-23) — closes "put some functionality behind gates"
+ - [x] **Data-wipe fix + hosted-DB/deploy readiness (2026-07-23)**: idempotent `apply_schema.py` (`--reset` gated), `DATABASE_URL`+TLS support across Next/scripts/Python, centralized pool config, env-driven ports, `DEPLOY.md` + `.env.example`
+ - [x] **De-dockerize + flatten for Vercel (2026-06-29)**: removed Docker entirely (run natively via `./start_dev.sh`); **Postgres → MySQL 8.4** (`mysql2`/`PyMySQL`, `?` placeholders, `ON DUPLICATE KEY UPDATE`, update-then-SELECT in place of `RETURNING`); **flattened** the Next app from `incighder/incighder/` to the repo root; **dropped Playwright/Chromium** — all scrapers HTTP-only (TikTok rehydration blob, IG `web_profile_info` + `IG_SESSIONID` cookie, Spotify monthly listeners via **scrape.do** render API `SCRAPE_DO_TOKEN`); **Ollama → Gemini** (`gemini-2.5-flash`, `GOOGLE_AI_API_KEY`) in `ai_verify.py`; **Spotify search ported to a native TS route** (no data-api); remaining proxy routes parameterized via `DATA_API_URL`. data-api on :5050 (AirPlay owns 5000), `OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES` for macOS thread-fork safety.
+ - [x] Bulk re-scrape + social auto-discovery for tracked artists: `/artists/refresh` + `/api/refresh` → data-api `refresh_artist`; 24h-cache-aware (skips fresh platforms) and surfaces per-platform failure reasons (`artists/refresh/page.tsx`, `scrape_service.py`)
+@@ -240,6 +244,7 @@ Strategic frame: two complementary products. **Incighder Discover** = today's ap
+ ```text
+ .
+ ./start_dev.sh
++./go_live.sh
+ ./postcss.config.mjs
+ ./tsconfig.tsbuildinfo
+ ./node_modules
+@@ -782,113 +787,12 @@ Strategic frame: two complementary products. **Incighder Discover** = today's ap
  
  ## 5. Recent Git Changes (Summary)
  ```text
-+37ecdde fix: stop wiping the DB on every dev start; single DATABASE_URL for hosted MySQL; env-driven ports
++8d5c97e feat: passphrase admin gate, is_public visitor curation, tunnel shared secret
++3e8f2a3 feat: go_live.sh self-healing tunnel + offline banner; live features discover data-api via DB
++94bc68a docs: backlog — manager-platform direction from Adam conversation (events/campaign tracking, AI digest, official integrations, CRM, goals)
+ 37ecdde fix: stop wiping the DB on every dev start; single DATABASE_URL for hosted MySQL; env-driven ports
  ce05300 feat: refresh artist snapshot on dev start, fail gracefully
- fa8a449 feat: JSON fallback for GET /api/artists/[id]
- 8c656f0 feat: JSON fallback for /api/artists + two-way DB sync
- 085b49b Fix React Server Components CVE vulnerabilities (#15)
--e5696fb flatten for vercel
+-fa8a449 feat: JSON fallback for GET /api/artists/[id]
+-8c656f0 feat: JSON fallback for /api/artists + two-way DB sync
+-085b49b Fix React Server Components CVE vulnerabilities (#15)
  ```
  
  ## 6. Active Diff
  ```diff
--diff --git a/ai/AGENTS.md b/ai/AGENTS.md
--index bb1544b..ef246b3 100644
----- a/ai/AGENTS.md
--+++ b/ai/AGENTS.md
--@@ -9,7 +9,7 @@ PURPOSE: This is the authoritative rulebook for AI assistants. It defines the 'h
-- ## Architecture Constraints
-- - **Flat app, native run**: The Next.js app lives at the repo root (run `npm` there, not a subdir). Bring up the full stack with **`./start_dev.sh`** (MySQL + venv gunicorn data-api on :5050 + `npm run dev` on :3000). No Docker.
-- - **Two halves, collapsing**: Native TS routes own DB access (`mysql2`) and Spotify search; the rest still proxy to the Python `data-api` via `DATA_API_URL` (`src/lib/data-api.ts`). Direction: keep porting API-call endpoints into TS so the app stays flat/Vercel-deployable. See `ARCHITECTURE.md` for the route map.
---- **Database**: MySQL 8.4 is the source of truth. `data-api/schema.sql` (MySQL DDL) is the master schema; apply it via `./.venv/bin/python apply_schema.py` from `data-api/` (drop-and-recreate). `mysql2` (Node) / `PyMySQL` (Python); `?` placeholders, no `RETURNING`.
--+- **Database**: MySQL is the source of truth (local 8.4 or a hosted MySQL via `DATABASE_URL` — see `DEPLOY.md`). `data-api/schema.sql` (MySQL DDL) is the master schema; apply it via `./.venv/bin/python apply_schema.py` from `data-api/` — **idempotent** (`CREATE TABLE IF NOT EXISTS`), safe on every boot. A destructive rebuild requires `--reset` + typed confirmation; NEVER call `--reset` from scripts. `mysql2` (Node) / `PyMySQL` (Python); `?` placeholders, no `RETURNING`. DB config is centralized: `src/lib/db.ts` (`getPool()`), `scripts/db-config.mjs`, and `_db_config()` in `data-api/scrapeArtistData.py` — never hand-roll a new pool/connection config.
-- - **Browser-free scraping**: No Playwright/Chromium. All scrapers are HTTP. Spotify monthly listeners renders via the **scrape.do** API (`SCRAPE_DO_TOKEN`); Instagram uses the `IG_SESSIONID` cookie. AI verification uses **Google Gemini** (`gemini-2.5-flash`, `GOOGLE_AI_API_KEY`).
-- - **Best-Effort Scraping**: Scrapers are isolated and partial-by-design; one platform failing must never block the others. Respect the 24h cache TTL.
-- - **Markdown Persistence**: All state must be tracked in `ai/*.md`.
--diff --git a/ai/ARCHITECTURE.md b/ai/ARCHITECTURE.md
--index a4330e3..67e11c2 100644
----- a/ai/ARCHITECTURE.md
--+++ b/ai/ARCHITECTURE.md
--@@ -33,10 +33,11 @@ Incighder aggregates and visualizes artist audience metrics from music and socia
-- - **Role**: Source of truth for all artist metrics and history. Local install via Homebrew `mysql@8.4`; DB `incighder`, user `incighder`.
-- - **Master schema**: `data-api/schema.sql` (MySQL DDL — `JSON` columns, `AUTO_INCREMENT`, `TIMESTAMP DEFAULT CURRENT_TIMESTAMP`, table-level `FOREIGN KEY`s on InnoDB). Tables: `artists`, `albums`, `tracks`, `metric_snapshots`.
-- - **Growth tracking**: `metric_snapshots(artist_id, platform, account_key, value, captured_at)`. `account_key` ties a point to the specific linked profile so account switches start a fresh timeline. Big counts are `BIGINT`.
---- **Applying schema**: `./.venv/bin/python apply_schema.py` from `data-api/` (drop-and-recreate; `start_dev.sh` runs it on boot). There is no incremental-migration framework yet (see tech-debt backlog).
--+- **Applying schema**: `./.venv/bin/python apply_schema.py` from `data-api/` — **idempotent** (`CREATE TABLE IF NOT EXISTS`; existing data untouched), so `start_dev.sh` safely runs it on every boot. Destructive rebuild: `apply_schema.py --reset` (interactive confirmation, or `APPLY_SCHEMA_RESET_CONFIRM=yes`). History: the old drop-and-recreate default silently wiped all data on every dev start — that was the recurring "DB lost everything" bug. There is no incremental-migration framework yet (see tech-debt backlog).
--+- **Connection config (all three runtimes)**: `DATABASE_URL` (`mysql://user:pass@host:port/db?sslmode=require`) wins; `DB_HOST`/`DB_PORT`/`DB_USER`/`DB_PASSWORD`/`DB_NAME`/`DB_SSL` fill gaps; defaults target local MySQL. Implemented once per runtime: `src/lib/db.ts` (`getPool()` — single shared mysql2 pool), `scripts/db-config.mjs`, `_db_config()` in `data-api/scrapeArtistData.py` (PyMySQL, TLS via certifi). Point `DATABASE_URL` at a hosted MySQL (TiDB Serverless/Aiven) and the whole stack follows — see `DEPLOY.md`.
-- 
-- ### 4. Running it (native, no Docker)
---- **`./start_dev.sh`** (repo root): starts MySQL 8.4, sets up the Python venv + installs deps on first run, applies the schema, launches the data-api (gunicorn :5050, with `OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES` for macOS thread-fork safety), then `npm run dev` (frontend :3000).
--+- **`./start_dev.sh`** (repo root): starts MySQL 8.4 (skipped when `DATABASE_URL` is set), sets up the Python venv + installs deps on first run, ensures the schema, launches the data-api (gunicorn `:$DATA_API_PORT`, default 5050, with `OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES` for macOS thread-fork safety), then `npm run dev` (frontend `:$WEB_PORT`, default 3000). Ports are env-overridable: `DATA_API_PORT=8080 WEB_PORT=4000 ./start_dev.sh`.
-- - Frontend alone: `npm run dev` at the repo root. Data-api alone: venv gunicorn in `data-api/`.
-- 
-- ### 5. Scheduler (auto-scrape worker — `data-api/scheduler.py`)
--@@ -50,7 +51,7 @@ Incighder aggregates and visualizes artist audience metrics from music and socia
-- 5. **Display**: Next.js reads MySQL via `mysql2` and renders dashboard, table, detail, sparklines, history.
-- 
-- ## Deployment (Vercel)
---The frontend is Vercel-ready as a single flat project. To actually deploy: point `DB_*` env at a **hosted MySQL**, and either host the `data-api` somewhere public and set `DATA_API_URL`, or continue porting its endpoints into native TS routes (Spotify search already is). Note scrapers may be IP-blocked from datacenter ranges — see the deep tech-debt item in `PROJECT_STATE.md`.
--+See **`DEPLOY.md`** (repo root) for the step-by-step. Shape: Vercel hosts the flat Next app with `DATABASE_URL` pointed at a free hosted MySQL (TiDB Serverless/Aiven) — full read/write deployed, with the committed JSON snapshot as read-only fallback when no DB is reachable. The `data-api` stays local (residential IP scrapes more reliably than datacenter ranges) writing to the same hosted DB; a cloudflared tunnel + `DATA_API_URL` in Vercel lets the deployed site trigger live operations. Long-term direction remains porting proxy endpoints into TS routes.
-- 
-- ## AI Workspace Substrate
-- - **State & vision**: `ai/PROJECT_STATE.md` (read first).
 -diff --git a/ai/CONTEXT_BUNDLE.md b/ai/CONTEXT_BUNDLE.md
--index cdd56c7..c4d4a3c 100644
+-index a5c5d29..cc3f0cc 100644
 ---- a/ai/CONTEXT_BUNDLE.md
 -+++ b/ai/CONTEXT_BUNDLE.md
 -@@ -1,5 +1,5 @@
 - # AI Context Bundle
---Generated: Mon Jun 29 00:55:44 PDT 2026
--+Generated: Thu Jul 23 13:19:42 PDT 2026
+--Generated: Thu Jul 23 13:19:42 PDT 2026
+-+Generated: Thu Jul 23 13:23:21 PDT 2026
 - 
 - ## ⚠️ Agent Navigation Guide
 - 1. Start with the **Current State** below to understand the focus.
--@@ -19,7 +19,7 @@ PURPOSE: This is the authoritative rulebook for AI assistants. It defines the 'h
-- ## Architecture Constraints
-- - **Flat app, native run**: The Next.js app lives at the repo root (run `npm` there, not a subdir). Bring up the full stack with **`./start_dev.sh`** (MySQL + venv gunicorn data-api on :5050 + `npm run dev` on :3000). No Docker.
-- - **Two halves, collapsing**: Native TS routes own DB access (`mysql2`) and Spotify search; the rest still proxy to the Python `data-api` via `DATA_API_URL` (`src/lib/data-api.ts`). Direction: keep porting API-call endpoints into TS so the app stays flat/Vercel-deployable. See `ARCHITECTURE.md` for the route map.
---- **Database**: MySQL 8.4 is the source of truth. `data-api/schema.sql` (MySQL DDL) is the master schema; apply it via `./.venv/bin/python apply_schema.py` from `data-api/` (drop-and-recreate). `mysql2` (Node) / `PyMySQL` (Python); `?` placeholders, no `RETURNING`.
--+- **Database**: MySQL is the source of truth (local 8.4 or a hosted MySQL via `DATABASE_URL` — see `DEPLOY.md`). `data-api/schema.sql` (MySQL DDL) is the master schema; apply it via `./.venv/bin/python apply_schema.py` from `data-api/` — **idempotent** (`CREATE TABLE IF NOT EXISTS`), safe on every boot. A destructive rebuild requires `--reset` + typed confirmation; NEVER call `--reset` from scripts. `mysql2` (Node) / `PyMySQL` (Python); `?` placeholders, no `RETURNING`. DB config is centralized: `src/lib/db.ts` (`getPool()`), `scripts/db-config.mjs`, and `_db_config()` in `data-api/scrapeArtistData.py` — never hand-roll a new pool/connection config.
-- - **Browser-free scraping**: No Playwright/Chromium. All scrapers are HTTP. Spotify monthly listeners renders via the **scrape.do** API (`SCRAPE_DO_TOKEN`); Instagram uses the `IG_SESSIONID` cookie. AI verification uses **Google Gemini** (`gemini-2.5-flash`, `GOOGLE_AI_API_KEY`).
-- - **Best-Effort Scraping**: Scrapers are isolated and partial-by-design; one platform failing must never block the others. Respect the 24h cache TTL.
-- - **Markdown Persistence**: All state must be tracked in `ai/*.md`.
+-@@ -186,6 +186,14 @@ PURPOSE: Tracks active work and backlog. AI agents should update this after comp
+- - (nothing in progress — pick next from Backlog)
+- 
+- ## Backlog
+-+
+-+### Manager-platform direction (from the 2026-07 Adam/ChatGPT conversation — "Manager Analytics Platform")
+-+Strategic frame: two complementary products. **Incighder Discover** = today's app (public data, A&Rs/labels). **Incighder Manager** = artist teams connecting their own accounts (official APIs + manual input — "aggregation without replacement", built *with* platforms not against them). Manager-side first-party data could later enrich Discover. The daily-open question that defines the product: "how are all my artists performing across every platform?" — a story no single platform dashboard can tell.
+-+- [ ] **Events/campaign tracking**: an `events` table (release, reel, feature, announcement) overlaid on `metric_snapshots` timelines → "this release drove +12% IG followers, +8% Spotify listeners, playlist adds from these 3 playlists". `metric_snapshots` is already the foundation; this is the highest-leverage steal.
+-+- [ ] **AI weekly digest**: Gemini summary over snapshot deltas ("follower growth slowed 28% this week"; "3 platforms spiked after Friday's release") — pairs with the existing change-alerts backlog item; could be a cross-artist morning digest view.
+-+- [ ] **Official integrations tier** (Manager mode): connect Spotify for Artists / Meta login / YouTube Studio / TikTok Business per artist for private stats the scrapers can't see; import priority = official API > CSV import > manual entry (manual is fallback only — managers with 10-20 artists won't type numbers).
+-+- [ ] **Team CRM + notes**: per-artist contacts (playlist curators, journalists, producers, label) and internal team notes.
+-+- [ ] **Goal tracking / release planning**: targets per metric with progress against the snapshot history.
+- - [ ] Add twitch?
+- - [ ] login?
 ```
