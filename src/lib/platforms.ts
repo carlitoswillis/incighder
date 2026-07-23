@@ -127,8 +127,14 @@ export const SCRAPED_PLATFORMS = PLATFORMS.filter((p) => p.scraped);
  * a tile full of dashes just advertises missing data. The SourcesPanel still
  * lists every platform so new links can be added. */
 export function platformHasPresence(artist: Artist, p: PlatformMeta): boolean {
+  // Spotify needs a real identity — manual inserts stamp followers/popularity 0,
+  // so a bare zero must NOT count as presence.
+  if (p.key === "spotify") {
+    return Boolean(
+      artist.spotify_id || artist.external_urls?.spotify || artist.monthly_listeners != null,
+    );
+  }
   if (artist[p.metric.field] != null) return true;
   if (p.linkField && artist.social_links?.[p.linkField]) return true;
-  if (p.key === "spotify" && (artist.spotify_id || artist.followers != null)) return true;
   return false;
 }

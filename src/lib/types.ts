@@ -40,6 +40,8 @@ export interface Artist {
   tiktok_video_count?: number | null;
   twitch_followers?: number | null;
   x_followers?: number | null;
+  /** Median weekly audience growth % across platforms (server-computed). */
+  momentum_wk_pct?: number | null;
   social_links?: { [key: string]: string } | null;
   scrape_meta?: { [key: string]: ScrapeMetaEntry } | null;
 }

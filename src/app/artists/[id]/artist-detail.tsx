@@ -227,11 +227,7 @@ function ArtistDetail() {
   const genres = parseGenres(artist.genres);
   const image = artist.images?.[0]?.url ?? null;
   const spotifyUrl = artist.external_urls?.spotify;
-  const { score, breakdown } = calculateArtistScore({
-    followers: artist.followers ?? 0,
-    popularity: artist.popularity ?? 0,
-    monthly_listeners: artist.monthly_listeners ?? null,
-  });
+  const { score, breakdown } = calculateArtistScore(artist);
 
   return (
     <div className="space-y-6">

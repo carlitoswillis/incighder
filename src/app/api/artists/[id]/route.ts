@@ -3,6 +3,7 @@ import { RowDataPacket, ResultSetHeader } from 'mysql2/promise';
 import fallbackArtists from '@/data/artists-fallback.json';
 import { getPool } from '@/lib/db';
 import { isAdmin } from '@/lib/auth';
+import { attachMomentum } from '@/lib/momentum';
 
 const pool = getPool();
 
@@ -24,7 +25,8 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     if (rows.length === 0 || (!admin && !rows[0].is_public)) {
       return NextResponse.json({ error: 'Artist not found' }, { status: 404 });
     }
-    return NextResponse.json(rows[0]);
+    const [withMomentum] = await attachMomentum(rows as { id: string }[]);
+    return NextResponse.json(withMomentum);
   } catch (error) {
     // No reachable MySQL (e.g. serverless deploy) — fall back to the snapshot.
     console.error('Error fetching artist; serving JSON fallback:', error);

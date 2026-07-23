@@ -103,11 +103,7 @@ export default function GroupReportPage({
           <div className="mt-6 border-t border-border">
             {members.map((a) => {
               const h = histories[a.id] ?? {};
-              const { score } = calculateArtistScore({
-                followers: a.followers ?? 0,
-                popularity: a.popularity ?? 0,
-                monthly_listeners: a.monthly_listeners ?? null,
-              });
+              const { score } = calculateArtistScore(a);
               return (
                 <div
                   key={a.id}

@@ -3,6 +3,7 @@ import { getDataApiUrl, dataApiHeaders } from "@/lib/data-api";
 import { isAdmin } from "@/lib/auth";
 import fallbackArtists from '@/data/artists-fallback.json';
 import { getPool } from '@/lib/db';
+import { attachMomentum } from '@/lib/momentum';
 
 const pool = getPool();
 
@@ -28,7 +29,7 @@ export async function GET(request: Request) {
 
   try {
     const [rows] = await pool.query(sql, values);
-    return NextResponse.json(rows);
+    return NextResponse.json(await attachMomentum(rows as { id: string }[]));
   } catch (error) {
     // No reachable MySQL (e.g. serverless deploy on Vercel) — serve the static
     // snapshot from scripts/export-artists.mjs so the dashboard still loads.

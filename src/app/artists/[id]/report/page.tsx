@@ -56,11 +56,7 @@ export default function ReportPage({
 
   const image = artist.images?.[0]?.url ?? null;
   const genres = (artist.genres ?? "").replace(/[[\]"']/g, "").split(",").map((s) => s.trim()).filter(Boolean);
-  const { score } = calculateArtistScore({
-    followers: artist.followers ?? 0,
-    popularity: artist.popularity ?? 0,
-    monthly_listeners: artist.monthly_listeners ?? null,
-  });
+  const { score } = calculateArtistScore(artist);
   const tracked = PLATFORMS.filter(
     (p) => history[p.key] || (artist[p.metric.field as keyof Artist] ?? null) !== null,
   );
