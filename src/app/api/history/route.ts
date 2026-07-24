@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { RowDataPacket } from "mysql2/promise";
 import { getPool } from "@/lib/db";
+import { linkedPlatforms } from "@/lib/linked";
 
 // Per-platform follower time series for the CURRENTLY-linked account only.
 // Native port of the data-api's metric_history — reads metric_snapshots
@@ -25,6 +26,17 @@ export async function GET(request: Request) {
       [artistId],
     );
 
+    // Snapshots outlive the link they came from — clearing a source removes the
+    // link but keeps its history, so an unlinked platform would otherwise go on
+    // rendering a Growth tile. Only report platforms the artist is still on.
+    const [artistRows] = await pool.query<RowDataPacket[]>(
+      "SELECT social_links, spotify_id FROM artists WHERE id = ?",
+      [artistId],
+    );
+    const linked = artistRows.length
+      ? linkedPlatforms(artistRows[0] as { social_links?: unknown; spotify_id?: unknown })
+      : null;
+
     const byPlatform = new Map<string, { key: string | null; t: string; v: number }[]>();
     for (const r of rows) {
       const list = byPlatform.get(r.platform) ?? [];
@@ -38,6 +50,7 @@ export async function GET(request: Request) {
 
     const out: Record<string, unknown> = {};
     for (const [platform, series] of byPlatform) {
+      if (linked && !linked.has(platform)) continue;
       const currentKey = series[series.length - 1].key; // most recent account wins
       const points: Point[] = series
         .filter((s) => s.key === currentKey)

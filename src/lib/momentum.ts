@@ -1,5 +1,6 @@
 import { RowDataPacket } from "mysql2/promise";
 import { getPool } from "@/lib/db";
+import { linkedPlatforms } from "@/lib/linked";
 
 // Server-side momentum: median weekly audience growth % across each artist's
 // tracked platforms (currently-linked account only), from metric_snapshots.
@@ -27,9 +28,9 @@ function weeklyPct(series: Snap[]): number | null {
   return ((last.v - first.v) / first.v) * 100 / weeks;
 }
 
-export async function attachMomentum<T extends { id: string }>(
-  rows: T[],
-): Promise<(T & { momentum_wk_pct: number | null })[]> {
+export async function attachMomentum<
+  T extends { id: string; social_links?: unknown; spotify_id?: unknown },
+>(rows: T[]): Promise<(T & { momentum_wk_pct: number | null })[]> {
   if (!rows.length) return rows as (T & { momentum_wk_pct: number | null })[];
   const ids = rows.map((r) => r.id);
   const [snaps] = await getPool().query<RowDataPacket[]>(
@@ -56,7 +57,10 @@ export async function attachMomentum<T extends { id: string }>(
     const platforms = byArtist.get(row.id);
     const pcts: number[] = [];
     if (platforms) {
-      for (const series of platforms.values()) {
+      // Snapshots from a since-cleared source must not move momentum.
+      const linked = linkedPlatforms(row);
+      for (const [platform, series] of platforms) {
+        if (!linked.has(platform)) continue;
         const p = weeklyPct(series);
         if (p !== null) pcts.push(p);
       }
