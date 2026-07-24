@@ -123,9 +123,8 @@ export function EventsSection({
         <div>
           <h2 className="text-lg font-semibold tracking-tight">Events</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Releases, videos, announcements — with the audience change observed
-            in the two weeks after each one. Correlation, not proof: read it
-            next to the growth timeline above.
+            Releases, videos, announcements — and how the numbers moved in
+            the two weeks after each one.
           </p>
         </div>
         {admin && (
@@ -252,7 +251,7 @@ export function EventsSection({
                     {e.impact.map((i) => (
                       <span
                         key={i.platform}
-                        title={`${platformLabel(i.platform)}: ${formatCompact(i.before)} → ${formatCompact(i.after)} in the 14 days after${i.window_open ? " (window still open)" : ""} — observed change, not proven cause`}
+                        title={`${platformLabel(i.platform)}: ${formatCompact(i.before)} → ${formatCompact(i.after)} in the 14 days after${i.window_open ? " (window still open)" : ""}`}
                         className={cn(
                           "inline-flex items-center gap-1 rounded-md px-2 py-0.5 font-mono text-xs tabular-nums ring-1 ring-inset",
                           i.change > 0
