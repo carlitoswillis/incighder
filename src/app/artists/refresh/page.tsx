@@ -15,7 +15,11 @@ interface Artist {
   id: string;
   name: string;
   social_links: Record<string, string> | null;
+  group_name: string | null;
 }
+
+/** Group-filter sentinel for "artists on the main list only". */
+const NO_GROUP = " none";
 
 type RowState = "idle" | "running" | "done" | "error";
 
@@ -60,6 +64,9 @@ export default function RefreshPage() {
   const [done, setDone] = useState(0);
   /** Off = scrape existing links only; no web search / LLM verification pass. */
   const [discover, setDiscover] = useState(true);
+  const [groups, setGroups] = useState<string[]>([]);
+  /** "" = every artist, NO_GROUP = main list only, else a group name. */
+  const [groupFilter, setGroupFilter] = useState("");
 
   useEffect(() => {
     fetch("/api/artists?all=1")
@@ -71,9 +78,40 @@ export default function RefreshPage() {
       })
       .catch(() => toast.error("Failed to load artists."))
       .finally(() => setLoading(false));
+
+    fetch("/api/groups")
+      .then((r) => r.json())
+      .then((data: { group_name: string }[]) =>
+        setGroups(data.map((g) => g.group_name)),
+      )
+      .catch(() => {
+        // Non-fatal: without the list the filter just offers all/main list.
+      });
   }, []);
 
-  const allSelected = selected.size === artists.length && artists.length > 0;
+  // Filtering narrows what a run touches, not just what's on screen, so the
+  // selection follows the filter rather than carrying hidden artists along.
+  const visible = artists.filter((a) =>
+    !groupFilter
+      ? true
+      : groupFilter === NO_GROUP
+        ? !a.group_name
+        : a.group_name === groupFilter,
+  );
+
+  function changeGroupFilter(value: string) {
+    setGroupFilter(value);
+    const next = artists.filter((a) =>
+      !value
+        ? true
+        : value === NO_GROUP
+          ? !a.group_name
+          : a.group_name === value,
+    );
+    setSelected(new Set(next.map((a) => a.id)));
+  }
+
+  const allSelected = selected.size === visible.length && visible.length > 0;
 
   function toggle(id: string) {
     setSelected((prev) => {
@@ -85,7 +123,7 @@ export default function RefreshPage() {
   }
 
   function toggleAll() {
-    setSelected(allSelected ? new Set() : new Set(artists.map((a) => a.id)));
+    setSelected(allSelected ? new Set() : new Set(visible.map((a) => a.id)));
   }
 
   function missingCount(a: Artist) {
@@ -94,7 +132,7 @@ export default function RefreshPage() {
   }
 
   async function handleRun() {
-    const targets = artists.filter((a) => selected.has(a.id));
+    const targets = visible.filter((a) => selected.has(a.id));
     if (!targets.length) return;
     setRunning(true);
     setDone(0);
@@ -138,7 +176,7 @@ export default function RefreshPage() {
     toast.success(`Refreshed ${okArtists}/${targets.length} artist${targets.length === 1 ? "" : "s"}.`);
   }
 
-  const total = artists.filter((a) => selected.has(a.id)).length;
+  const total = visible.filter((a) => selected.has(a.id)).length;
 
   return (
     <div>
@@ -166,9 +204,30 @@ export default function RefreshPage() {
               checked={allSelected}
               onChange={toggleAll}
               className="size-4 accent-primary"
-              disabled={running || !artists.length}
+              disabled={running || !visible.length}
             />
-            Select all ({artists.length})
+            Select all ({visible.length})
+          </label>
+          <label className="flex items-center gap-2 text-sm">
+            Group
+            <select
+              value={groupFilter}
+              onChange={(e) => changeGroupFilter(e.target.value)}
+              disabled={running}
+              className="h-9 rounded-md border border-input bg-transparent px-2 text-sm"
+            >
+              <option value="" className="bg-card">
+                All artists ({artists.length})
+              </option>
+              <option value={NO_GROUP} className="bg-card">
+                Main list only
+              </option>
+              {groups.map((g) => (
+                <option key={g} value={g} className="bg-card">
+                  {g}
+                </option>
+              ))}
+            </select>
           </label>
           <label className="flex items-center gap-2 text-sm">
             <input
@@ -200,9 +259,13 @@ export default function RefreshPage() {
 
       {loading ? (
         <p className="text-sm text-muted-foreground">Loading artists…</p>
+      ) : !visible.length ? (
+        <p className="text-sm text-muted-foreground">
+          No artists in this group.
+        </p>
       ) : (
         <div className="space-y-1.5">
-          {artists.map((a) => {
+          {visible.map((a) => {
             const r = results[a.id];
             const missing = missingCount(a);
             return (
@@ -219,6 +282,11 @@ export default function RefreshPage() {
                 />
                 <span className="min-w-0 flex-1 truncate text-sm font-medium">
                   {a.name}
+                  {!groupFilter && a.group_name && (
+                    <span className="ml-2 text-xs font-normal text-muted-foreground">
+                      {a.group_name}
+                    </span>
+                  )}
                 </span>
 
                 {r ? (
