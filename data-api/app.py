@@ -130,7 +130,12 @@ def refresh_artist_route():
     if not artist_id:
         return jsonify({'error': 'artist_id is required'}), 400
     try:
-        return jsonify(refresh_artist(artist_id, force=bool(data.get('force')))), 200
+        return jsonify(refresh_artist(
+            artist_id,
+            force=bool(data.get('force')),
+            # Opt-out: omitted means discover, matching the historical behaviour.
+            discover=data.get('discover', True) is not False,
+        )), 200
     except LookupError:
         return jsonify({'error': 'Artist not found'}), 404
     except Exception as e:

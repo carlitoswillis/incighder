@@ -45,7 +45,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   if (!(await isAdmin())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const artistData = await request.json();
+  const { group_name, ...artistData } = await request.json();
 
   try {
     const response = await fetch(`${await getDataApiUrl()}/insert_artist`, {
@@ -60,6 +60,20 @@ export async function POST(request: Request) {
     }
 
     const data = await response.json();
+
+    // The insert path only knows Spotify's payload, so roster placement is a
+    // follow-up write. The row id is Spotify's id (see insert_artist_data).
+    const group = typeof group_name === 'string' ? group_name.trim().slice(0, 64) : '';
+    if (group && artistData.id) {
+      try {
+        await pool.query('UPDATE artists SET group_name = ? WHERE id = ?', [group, artistData.id]);
+      } catch (error) {
+        // The artist is in — surface the grouping failure without failing the add.
+        console.error('Artist inserted but group assignment failed:', error);
+        return NextResponse.json({ ...data, group_error: true });
+      }
+    }
+
     return NextResponse.json(data);
   } catch (error) {
     console.error('Error inserting artist via scraper service:', error);

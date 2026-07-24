@@ -58,6 +58,8 @@ export default function RefreshPage() {
   const [results, setResults] = useState<Record<string, RowResult>>({});
   const [running, setRunning] = useState(false);
   const [done, setDone] = useState(0);
+  /** Off = scrape existing links only; no web search / LLM verification pass. */
+  const [discover, setDiscover] = useState(true);
 
   useEffect(() => {
     fetch("/api/artists?all=1")
@@ -111,7 +113,7 @@ export default function RefreshPage() {
         const res = await fetch("/api/refresh", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ artist_id: a.id, force: false }),
+          body: JSON.stringify({ artist_id: a.id, force: false, discover }),
         });
         const d: RefreshResponse = await res.json();
         if (!res.ok) throw new Error(d.error || "Refresh failed");
@@ -145,12 +147,19 @@ export default function RefreshPage() {
 
       <div className="mb-4 rounded-xl bg-card p-4 ring-1 ring-foreground/10">
         <p className="text-sm text-muted-foreground">
-          Auto-discovers socials for platforms an artist isn&apos;t linked on yet
-          (confident matches only), then scrapes any linked platform whose cached
-          data is stale (&gt;24h) to capture fresh metrics and growth snapshots.
-          Platforms with fresh cache are skipped.
+          {discover ? (
+            <>
+              Auto-discovers socials for platforms an artist isn&apos;t linked on
+              yet (confident matches only), then scrapes
+            </>
+          ) : (
+            <>Scrapes</>
+          )}{" "}
+          any linked platform whose cached data is stale (&gt;24h) to capture
+          fresh metrics and growth snapshots. Platforms with fresh cache are
+          skipped.
         </p>
-        <div className="mt-3 flex items-center justify-between gap-3">
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
           <label className="flex items-center gap-2 text-sm">
             <input
               type="checkbox"
@@ -161,6 +170,19 @@ export default function RefreshPage() {
             />
             Select all ({artists.length})
           </label>
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={discover}
+              onChange={() => setDiscover((v) => !v)}
+              className="size-4 accent-primary"
+              disabled={running}
+            />
+            Auto-discover missing socials
+            <span className="text-xs text-muted-foreground">
+              (off = re-scrape existing links only, much faster)
+            </span>
+          </label>
           <Button onClick={handleRun} disabled={running || !total}>
             {running ? (
               <>
@@ -168,7 +190,8 @@ export default function RefreshPage() {
               </>
             ) : (
               <>
-                <RefreshCw /> Refresh {total} selected
+                <RefreshCw /> {discover ? "Refresh" : "Re-scrape"} {total}{" "}
+                selected
               </>
             )}
           </Button>
@@ -201,7 +224,9 @@ export default function RefreshPage() {
                 {r ? (
                   <RowSummary r={r} />
                 ) : missing > 0 ? (
-                  <Badge variant="secondary">{missing} to discover</Badge>
+                  <Badge variant="secondary">
+                    {missing} {discover ? "to discover" : "unlinked"}
+                  </Badge>
                 ) : (
                   <span className="text-xs text-muted-foreground">all linked</span>
                 )}

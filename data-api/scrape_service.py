@@ -279,18 +279,20 @@ def _artist_name_and_links(artist_id: str) -> tuple[str, dict]:
         conn.close()
 
 
-def refresh_artist(artist_id: str, force: bool = False) -> dict:
+def refresh_artist(artist_id: str, force: bool = False, discover: bool = True) -> dict:
     """Auto-discover socials for any platform an artist isn't linked on yet
     (accepting only confident matches), then scrape every linked platform.
 
     Discovery is best-effort: if it fails or finds nothing, we still scrape the
     artist's existing links. Returns the scrape result plus the links we added.
+    discover=False skips the search/LLM step entirely — a scrape-only refresh of
+    the links the artist already has.
     """
     name, social_links = _artist_name_and_links(artist_id)
     missing = [p for p in DISCOVERABLE_PLATFORMS if not social_links.get(p)]
 
     discovered: dict = {}
-    if missing and name:
+    if discover and missing and name:
         try:
             from scrapers.discovery import discover_links
             for platform, cand in discover_links(name, missing).items():
