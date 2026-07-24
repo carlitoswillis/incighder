@@ -14,7 +14,7 @@ const pool = getPool();
 const ATTRIBUTION_DAYS = 14;
 const DAY_MS = 24 * 3600 * 1000;
 
-const EVENT_TYPES = ["release", "video", "reel", "show", "announcement", "press", "other"];
+const EVENT_TYPES = ["release", "video", "reel", "post", "show", "announcement", "press", "other"];
 
 interface Impact {
   platform: string;

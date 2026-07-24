@@ -30,7 +30,7 @@ interface EventRow {
   impact: Impact[];
 }
 
-const TYPES = ["release", "video", "reel", "show", "announcement", "press", "other"];
+const TYPES = ["release", "video", "reel", "post", "show", "announcement", "press", "other"];
 
 const platformLabel = (key: string) =>
   PLATFORMS.find((p) => p.key === key)?.label ?? key;
