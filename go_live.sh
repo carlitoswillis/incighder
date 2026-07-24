@@ -53,8 +53,12 @@ else
   cd "$ROOT/data-api"
   export OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES
   export NO_PROXY="*"
+  # --reload matches start_dev.sh: this process serves the deployed site for
+  # hours while code is still being edited, and a worker running yesterday's
+  # code fails silently (new request fields are simply ignored). Reload it, or
+  # `kill -HUP <master pid>` an already-running one.
   ./.venv/bin/gunicorn --workers 1 --threads 8 --worker-class gthread \
-    --timeout 180 --bind "0.0.0.0:$DATA_API_PORT" app:app \
+    --timeout 180 --reload --bind "0.0.0.0:$DATA_API_PORT" app:app \
     > "$LOGDIR/data-api.log" 2>&1 &
   API_PID=$!
   cd "$ROOT"
