@@ -40,6 +40,7 @@ cleanup() {
   publish_url "" || true
   [ -n "$TUNNEL_PID" ] && kill "$TUNNEL_PID" 2>/dev/null
   [ -n "$API_PID" ] && kill "$API_PID" 2>/dev/null
+  [ -n "$SCHED_PID" ] && kill "$SCHED_PID" 2>/dev/null
   echo "    done. (Deployed site will show the offline banner within a minute.)"
 }
 trap cleanup EXIT INT TERM
@@ -61,6 +62,18 @@ else
     curl -s -m 2 "http://127.0.0.1:$DATA_API_PORT/health" >/dev/null 2>&1 && break
     sleep 1
   done
+fi
+
+# 1b. auto-scrape scheduler: daily TTL-respected sweep so growth snapshots
+# (momentum, event impact) accrue without manual refreshes.
+if pgrep -f "python scheduler.py" >/dev/null 2>&1; then
+  echo "==> scheduler already running"
+else
+  echo "==> Starting auto-scrape scheduler (every ${AUTO_SCRAPE_INTERVAL_HOURS:-24}h)..."
+  cd "$ROOT/data-api"
+  ./.venv/bin/python scheduler.py > "$LOGDIR/scheduler.log" 2>&1 &
+  SCHED_PID=$!
+  cd "$ROOT"
 fi
 
 # 2. cloudflared quick tunnel

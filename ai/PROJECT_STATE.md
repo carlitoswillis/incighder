@@ -111,6 +111,8 @@ Strategic frame: two complementary products. **Incighder Discover** = today's ap
 - [ ] Playlist / chart-placement tracking — competitor table-stakes we lack (see `COMPETITORS.md`)
 
 ## Completed
+- [x] Events/campaign tracking (2026-07-23): `events` table + `/api/events` — per-platform impact computed vs `metric_snapshots` (baseline at event date → last reading in a 14-day attribution window); Events card on artist pages with impact chips + admin inline add/delete. Precision grows with snapshot density — the scheduler now runs inside `go_live.sh` (daily TTL-respected sweep) so snapshots accrue whenever the Mac is live.
+- [x] Manual sort order (2026-07-23): `sort_order` column (lower = higher, NULL last) in the edit form; lists order by it. Glo Gang / Glo Gang Skate Team / Maino pinned atop glogang. Also added `@glogang` (291K IG) + `@glogangskateteam` (6.8K IG) as tracked members.
 - [x] Weighted cross-platform traction score (2026-07-23): Reach (≤100, log total audience across all platforms) + Breadth (≤25) + **Momentum** (≤50, median weekly growth % from `metric_snapshots`, server-attached as `momentum_wk_pct` via `src/lib/momentum.ts`) + Spotify popularity (≤25). IG-only members score meaningfully; breakdown tooltip explains every point.
 - [x] Hide unlinked platforms (2026-07-23): `platformHasPresence()` filters cards + metric grid (SourcesPanel still lists all for linking); Spotify presence requires a real identity, not manual-insert zeros.
 - [x] Twitch platform (2026-07-23): `scrapers/twitch.py` via the twitch.tv web GQL Client-ID (no API keys), `twitch_followers` + growth snapshots + UI/CSV. Maino Da Plug tracked (6.9K followers).
