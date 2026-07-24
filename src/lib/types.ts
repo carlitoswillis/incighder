@@ -14,6 +14,8 @@ export interface Artist {
   bio_source?: string | null;
   /** Roster separation — NULL = main list, e.g. 'glogang' → /g/glogang. */
   group_name?: string | null;
+  /** Manual list position (lower = higher); NULL sorts last. */
+  sort_order?: number | null;
   followers: number | null;
   popularity: number | null;
   genres: string | null;

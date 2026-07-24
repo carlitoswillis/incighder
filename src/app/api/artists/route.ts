@@ -25,7 +25,9 @@ export async function GET(request: Request) {
     where.push('group_name IS NULL');
   }
   const sql =
-    'SELECT * FROM artists' + (where.length ? ` WHERE ${where.join(' AND ')}` : '');
+    'SELECT * FROM artists' +
+    (where.length ? ` WHERE ${where.join(' AND ')}` : '') +
+    ' ORDER BY (sort_order IS NULL), sort_order, name';
 
   try {
     const [rows] = await pool.query(sql, values);

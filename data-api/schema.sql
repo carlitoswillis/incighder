@@ -11,6 +11,8 @@ CREATE TABLE IF NOT EXISTS artists (
     -- Optional roster separation (e.g. 'glogang'). NULL = main artist list;
     -- grouped rows appear only on /g/<group_name>.
     group_name VARCHAR(64) NULL,
+    -- Manual list position (lower = higher); NULL sorts after all pinned rows.
+    sort_order INT NULL,
     followers INTEGER NULL,
     popularity INTEGER NULL,
     genres TEXT NULL,
@@ -92,4 +94,20 @@ CREATE TABLE IF NOT EXISTS app_config (
     k VARCHAR(64) PRIMARY KEY,
     v TEXT,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+
+-- Campaign/event tracking: a dated marker (release, video, announcement, ...)
+-- overlaid on metric_snapshots so the app can answer "what did this moment do
+-- to the numbers?". Impact is computed at read time, not stored.
+CREATE TABLE IF NOT EXISTS events (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    artist_id VARCHAR(255) NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    event_type VARCHAR(32) NULL,
+    url VARCHAR(512) NULL,
+    happened_at DATE NOT NULL,
+    notes TEXT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (artist_id) REFERENCES artists(id) ON DELETE CASCADE,
+    INDEX idx_events_artist (artist_id, happened_at)
 ) ENGINE=InnoDB;

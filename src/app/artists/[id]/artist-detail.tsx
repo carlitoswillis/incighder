@@ -19,6 +19,7 @@ import { ScoreBadge } from "@/components/score-badge";
 import { MetricGrid } from "@/components/metric-grid";
 import { SourcesPanel } from "@/components/sources-panel";
 import { useAdmin } from "@/components/admin-context";
+import { EventsSection } from "@/components/events-section";
 import { DeleteArtistDialog } from "@/components/delete-artist-dialog";
 import { GrowthSection } from "@/components/growth-section";
 
@@ -61,6 +62,7 @@ function ArtistDetail() {
     x_followers: "",
     bio: "",
     group_name: "",
+    sort_order: "",
   });
 
   useEffect(() => {
@@ -81,6 +83,7 @@ function ArtistDetail() {
           x_followers: data.x_followers != null ? String(data.x_followers) : "",
           bio: data.bio || "",
           group_name: data.group_name || "",
+          sort_order: data.sort_order != null ? String(data.sort_order) : "",
         });
         setInitialImages(imagesText(data.images));
       } catch (e) {
@@ -201,6 +204,7 @@ function ArtistDetail() {
           external_urls: parsedUrls,
           bio: form.bio,
           group_name: form.group_name.trim() || null,
+          sort_order: form.sort_order.trim() === "" ? null : parseInt(form.sort_order, 10),
           ...(form.bio !== (artist?.bio || "") ? { bio_source: "manual" } : {}),
         }),
       });
@@ -386,13 +390,24 @@ function ArtistDetail() {
               }
             />
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="group">Group (optional — e.g. glogang; moves them off the main list to /g/&lt;group&gt;)</Label>
-            <Input
-              id="group"
-              value={form.group_name}
-              onChange={(e) => setForm({ ...form, group_name: e.target.value })}
-            />
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="group">Group (optional — e.g. glogang; moves them off the main list to /g/&lt;group&gt;)</Label>
+              <Input
+                id="group"
+                value={form.group_name}
+                onChange={(e) => setForm({ ...form, group_name: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="sort">Sort position (lower = higher on the list; blank = default)</Label>
+              <Input
+                id="sort"
+                inputMode="numeric"
+                value={form.sort_order}
+                onChange={(e) => setForm({ ...form, sort_order: e.target.value })}
+              />
+            </div>
           </div>
           <div className="space-y-2">
             <Label htmlFor="bio">Bio</Label>
@@ -464,6 +479,8 @@ function ArtistDetail() {
       />
 
       {/* Sources */}
+      <EventsSection artistId={artistId} />
+
       {admin && <SourcesPanel artist={artist} onScraped={setArtist} />}
 
       <DeleteArtistDialog
