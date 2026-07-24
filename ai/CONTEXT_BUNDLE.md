@@ -1,5 +1,5 @@
 # AI Context Bundle
-Generated: Thu Jul 23 17:44:57 PDT 2026
+Generated: Fri Jul 24 13:20:46 PDT 2026
 
 ## ⚠️ Agent Navigation Guide
 1. Start with the **Current State** below to understand the focus.
@@ -152,6 +152,7 @@ The long-term aim is a single dashboard that scores artist traction from many si
 ---
 
 ## Recent Changes
+- **Rewound reports (2026-07-24)**: the one-sheet report pages (`/artists/[id]/report`, `/g/[group]/report`) now have the rewind scrubber — view/print the report as of any recorded snapshot day, shareable via `?date=YYYY-MM-DD`. Shared helpers in `src/lib/rewind.ts` + `components/rewind-scrubber.tsx`; rewound score recomputed from as-of values (momentum stripped — approximation); footprint hidden when rewound (no history for those fields).
 - **Twitch + photos (2026-07-23)**: Twitch is a first-class tracked platform (web GQL, keyless). Manual adds get profile pictures automatically from their socials on scrape; admins can also upload a photo (data-URI storage, no file infra, ~60-150KB/person — negligible vs TiDB's 5GiB). Group chips on home are now admin-only: grouped members are visible ONLY via their /g/<group> URL.
 - **Data export + one-sheets (2026-07-23)**: admin CSV export; print/PDF-ready per-person and per-group "traction one-sheet" pages (masthead, traction ledger with deltas + sparklines, footprint); `/api/history` now native TS. Glogang roster onboarded: 8 skaters + DJ Maino (IG links, Maino also YT + Twitch in `external_urls`; 7/9 scraped — IG anonymous rate limit blocked daniel/brandon, retry later or set `IG_SESSIONID`).
 - **Artist groups (2026-07-23)**: `group_name` column + `/g/[group]` pages + `/api/groups`; main list = ungrouped only (roster separation à la glogang); shared `ArtistGrid` component behind home and group pages.
@@ -216,6 +217,7 @@ Strategic frame: two complementary products. **Incighder Discover** = today's ap
 - [ ] Playlist / chart-placement tracking — competitor table-stakes we lack (see `COMPETITORS.md`)
 
 ## Completed
+- [x] Rewound reports (2026-07-24): date scrubber + `?date=` param on both one-sheet report pages — replay any snapshot day, print historical reports (`lib/rewind.ts`, `components/rewind-scrubber.tsx`)
 - [x] Rewind scrubber (2026-07-23): time-travel the Growth section — slider ticks are the real snapshot dates (workingmemory's "time travel = pure replay of recorded events" pattern); shows each platform's value on that day + "since then" delta; sparklines truncate. Pure client-side over `/api/history`. Pairs with events for reviewing what stats looked like on a given date.
 - [x] Events/campaign tracking (2026-07-23): `events` + `event_artists` junction (one event spans many people — group-mate chips in the add form, '+N others' badge); `/api/events` computes per-person change vs `metric_snapshots` (baseline at event date → last reading in a 14-day window). Copy deliberately frames it as **observed correlation, not causation**. Event types incl. `post`. Scheduler runs inside `go_live.sh` (daily sweep) so snapshot density — and attribution sharpness — grows on its own.
 - [x] Manual sort order (2026-07-23): `sort_order` column + admin **up/down arrows on cards** (grid persists 1-based order; edit-form Sort field = direct override). Glo Gang / Glo Gang Skate Team / Maino pinned atop glogang. Also added `@glogang` (291K IG) + `@glogangskateteam` (6.8K IG) as tracked members.
@@ -795,113 +797,113 @@ Strategic frame: two complementary products. **Incighder Discover** = today's ap
 
 ## 5. Recent Git Changes (Summary)
 ```text
-6533ac4 feat: rewind scrubber — time-travel the Growth section to any snapshot date
-4c8da31 copy: events section states the 14-day window plainly, no disclaimer
-7091876 docs: multi-person events, reorder arrows, correlation framing
-4b44663 feat: in-UI reordering (admin up/down arrows) + honest event-impact language
-cf43c78 feat: events apply to multiple people
+cf10eca fix: Spotify search falls back to the data-api
+938196f fix: growth + momentum ignore snapshots from cleared sources
+d370fac fix: go_live.sh runs gunicorn with --reload
+8cf7f9e feat: group filter on the bulk Refresh page
+bb30046 feat: bulk import assigns a group; bulk refresh can skip auto-discovery
 ```
 
 ## 6. Active Diff
 ```diff
 diff --git a/ai/CONTEXT_BUNDLE.md b/ai/CONTEXT_BUNDLE.md
-index 3166703..dbcf9fb 100644
+index 8f15972..ec1d1a8 100644
 --- a/ai/CONTEXT_BUNDLE.md
 +++ b/ai/CONTEXT_BUNDLE.md
 @@ -1,5 +1,5 @@
  # AI Context Bundle
--Generated: Thu Jul 23 17:33:06 PDT 2026
-+Generated: Thu Jul 23 17:44:57 PDT 2026
+-Generated: Thu Jul 23 17:44:57 PDT 2026
++Generated: Fri Jul 24 13:20:46 PDT 2026
  
  ## ⚠️ Agent Navigation Guide
  1. Start with the **Current State** below to understand the focus.
-@@ -216,6 +216,7 @@ Strategic frame: two complementary products. **Incighder Discover** = today's ap
+@@ -152,6 +152,7 @@ The long-term aim is a single dashboard that scores artist traction from many si
+ ---
+ 
+ ## Recent Changes
++- **Rewound reports (2026-07-24)**: the one-sheet report pages (`/artists/[id]/report`, `/g/[group]/report`) now have the rewind scrubber — view/print the report as of any recorded snapshot day, shareable via `?date=YYYY-MM-DD`. Shared helpers in `src/lib/rewind.ts` + `components/rewind-scrubber.tsx`; rewound score recomputed from as-of values (momentum stripped — approximation); footprint hidden when rewound (no history for those fields).
+ - **Twitch + photos (2026-07-23)**: Twitch is a first-class tracked platform (web GQL, keyless). Manual adds get profile pictures automatically from their socials on scrape; admins can also upload a photo (data-URI storage, no file infra, ~60-150KB/person — negligible vs TiDB's 5GiB). Group chips on home are now admin-only: grouped members are visible ONLY via their /g/<group> URL.
+ - **Data export + one-sheets (2026-07-23)**: admin CSV export; print/PDF-ready per-person and per-group "traction one-sheet" pages (masthead, traction ledger with deltas + sparklines, footprint); `/api/history` now native TS. Glogang roster onboarded: 8 skaters + DJ Maino (IG links, Maino also YT + Twitch in `external_urls`; 7/9 scraped — IG anonymous rate limit blocked daniel/brandon, retry later or set `IG_SESSIONID`).
+ - **Artist groups (2026-07-23)**: `group_name` column + `/g/[group]` pages + `/api/groups`; main list = ungrouped only (roster separation à la glogang); shared `ArtistGrid` component behind home and group pages.
+@@ -216,6 +217,7 @@ Strategic frame: two complementary products. **Incighder Discover** = today's ap
  - [ ] Playlist / chart-placement tracking — competitor table-stakes we lack (see `COMPETITORS.md`)
  
  ## Completed
-+- [x] Rewind scrubber (2026-07-23): time-travel the Growth section — slider ticks are the real snapshot dates (workingmemory's "time travel = pure replay of recorded events" pattern); shows each platform's value on that day + "since then" delta; sparklines truncate. Pure client-side over `/api/history`. Pairs with events for reviewing what stats looked like on a given date.
++- [x] Rewound reports (2026-07-24): date scrubber + `?date=` param on both one-sheet report pages — replay any snapshot day, print historical reports (`lib/rewind.ts`, `components/rewind-scrubber.tsx`)
+ - [x] Rewind scrubber (2026-07-23): time-travel the Growth section — slider ticks are the real snapshot dates (workingmemory's "time travel = pure replay of recorded events" pattern); shows each platform's value on that day + "since then" delta; sparklines truncate. Pure client-side over `/api/history`. Pairs with events for reviewing what stats looked like on a given date.
  - [x] Events/campaign tracking (2026-07-23): `events` + `event_artists` junction (one event spans many people — group-mate chips in the add form, '+N others' badge); `/api/events` computes per-person change vs `metric_snapshots` (baseline at event date → last reading in a 14-day window). Copy deliberately frames it as **observed correlation, not causation**. Event types incl. `post`. Scheduler runs inside `go_live.sh` (daily sweep) so snapshot density — and attribution sharpness — grows on its own.
  - [x] Manual sort order (2026-07-23): `sort_order` column + admin **up/down arrows on cards** (grid persists 1-based order; edit-form Sort field = direct override). Glo Gang / Glo Gang Skate Team / Maino pinned atop glogang. Also added `@glogang` (291K IG) + `@glogangskateteam` (6.8K IG) as tracked members.
- - [x] Weighted cross-platform traction score (2026-07-23): Reach (≤100, log total audience across all platforms) + Breadth (≤25) + **Momentum** (≤50, median weekly growth % from `metric_snapshots`, server-attached as `momentum_wk_pct` via `src/lib/momentum.ts`) + Spotify popularity (≤25). IG-only members score meaningfully; breakdown tooltip explains every point.
-@@ -794,113 +795,12 @@ Strategic frame: two complementary products. **Incighder Discover** = today's ap
+@@ -795,113 +797,12 @@ Strategic frame: two complementary products. **Incighder Discover** = today's ap
  
  ## 5. Recent Git Changes (Summary)
  ```text
-+6533ac4 feat: rewind scrubber — time-travel the Growth section to any snapshot date
-+4c8da31 copy: events section states the 14-day window plainly, no disclaimer
-+7091876 docs: multi-person events, reorder arrows, correlation framing
- 4b44663 feat: in-UI reordering (admin up/down arrows) + honest event-impact language
- cf43c78 feat: events apply to multiple people
--1bc09c5 feat: 'post' event type
--93e2547 feat: run auto-scrape scheduler from go_live.sh; docs for events + sorting
--dc92d11 feat: events/campaign tracking + manual sort order
+-6533ac4 feat: rewind scrubber — time-travel the Growth section to any snapshot date
+-4c8da31 copy: events section states the 14-day window plainly, no disclaimer
+-7091876 docs: multi-person events, reorder arrows, correlation framing
+-4b44663 feat: in-UI reordering (admin up/down arrows) + honest event-impact language
+-cf43c78 feat: events apply to multiple people
++cf10eca fix: Spotify search falls back to the data-api
++938196f fix: growth + momentum ignore snapshots from cleared sources
++d370fac fix: go_live.sh runs gunicorn with --reload
++8cf7f9e feat: group filter on the bulk Refresh page
++bb30046 feat: bulk import assigns a group; bulk refresh can skip auto-discovery
  ```
  
  ## 6. Active Diff
  ```diff
 -diff --git a/ai/CONTEXT_BUNDLE.md b/ai/CONTEXT_BUNDLE.md
--index c0c3478..05c9d79 100644
+-index 3166703..dbcf9fb 100644
 ---- a/ai/CONTEXT_BUNDLE.md
 -+++ b/ai/CONTEXT_BUNDLE.md
 -@@ -1,5 +1,5 @@
 - # AI Context Bundle
---Generated: Thu Jul 23 17:19:07 PDT 2026
--+Generated: Thu Jul 23 17:33:06 PDT 2026
+--Generated: Thu Jul 23 17:33:06 PDT 2026
+-+Generated: Thu Jul 23 17:44:57 PDT 2026
 - 
 - ## ⚠️ Agent Navigation Guide
 - 1. Start with the **Current State** below to understand the focus.
--@@ -216,8 +216,8 @@ Strategic frame: two complementary products. **Incighder Discover** = today's ap
+-@@ -216,6 +216,7 @@ Strategic frame: two complementary products. **Incighder Discover** = today's ap
 - - [ ] Playlist / chart-placement tracking — competitor table-stakes we lack (see `COMPETITORS.md`)
 - 
 - ## Completed
---- [x] Events/campaign tracking (2026-07-23): `events` table + `/api/events` — per-platform impact computed vs `metric_snapshots` (baseline at event date → last reading in a 14-day attribution window); Events card on artist pages with impact chips + admin inline add/delete. Precision grows with snapshot density — the scheduler now runs inside `go_live.sh` (daily TTL-respected sweep) so snapshots accrue whenever the Mac is live.
---- [x] Manual sort order (2026-07-23): `sort_order` column (lower = higher, NULL last) in the edit form; lists order by it. Glo Gang / Glo Gang Skate Team / Maino pinned atop glogang. Also added `@glogang` (291K IG) + `@glogangskateteam` (6.8K IG) as tracked members.
--+- [x] Events/campaign tracking (2026-07-23): `events` + `event_artists` junction (one event spans many people — group-mate chips in the add form, '+N others' badge); `/api/events` computes per-person change vs `metric_snapshots` (baseline at event date → last reading in a 14-day window). Copy deliberately frames it as **observed correlation, not causation**. Event types incl. `post`. Scheduler runs inside `go_live.sh` (daily sweep) so snapshot density — and attribution sharpness — grows on its own.
--+- [x] Manual sort order (2026-07-23): `sort_order` column + admin **up/down arrows on cards** (grid persists 1-based order; edit-form Sort field = direct override). Glo Gang / Glo Gang Skate Team / Maino pinned atop glogang. Also added `@glogang` (291K IG) + `@glogangskateteam` (6.8K IG) as tracked members.
+-+- [x] Rewind scrubber (2026-07-23): time-travel the Growth section — slider ticks are the real snapshot dates (workingmemory's "time travel = pure replay of recorded events" pattern); shows each platform's value on that day + "since then" delta; sparklines truncate. Pure client-side over `/api/history`. Pairs with events for reviewing what stats looked like on a given date.
+- - [x] Events/campaign tracking (2026-07-23): `events` + `event_artists` junction (one event spans many people — group-mate chips in the add form, '+N others' badge); `/api/events` computes per-person change vs `metric_snapshots` (baseline at event date → last reading in a 14-day window). Copy deliberately frames it as **observed correlation, not causation**. Event types incl. `post`. Scheduler runs inside `go_live.sh` (daily sweep) so snapshot density — and attribution sharpness — grows on its own.
+- - [x] Manual sort order (2026-07-23): `sort_order` column + admin **up/down arrows on cards** (grid persists 1-based order; edit-form Sort field = direct override). Glo Gang / Glo Gang Skate Team / Maino pinned atop glogang. Also added `@glogang` (291K IG) + `@glogangskateteam` (6.8K IG) as tracked members.
 - - [x] Weighted cross-platform traction score (2026-07-23): Reach (≤100, log total audience across all platforms) + Breadth (≤25) + **Momentum** (≤50, median weekly growth % from `metric_snapshots`, server-attached as `momentum_wk_pct` via `src/lib/momentum.ts`) + Spotify popularity (≤25). IG-only members score meaningfully; breakdown tooltip explains every point.
-- - [x] Hide unlinked platforms (2026-07-23): `platformHasPresence()` filters cards + metric grid (SourcesPanel still lists all for linking); Spotify presence requires a real identity, not manual-insert zeros.
-- - [x] Twitch platform (2026-07-23): `scrapers/twitch.py` via the twitch.tv web GQL Client-ID (no API keys), `twitch_followers` + growth snapshots + UI/CSV. Maino Da Plug tracked (6.9K followers).
--@@ -794,113 +794,12 @@ Strategic frame: two complementary products. **Incighder Discover** = today's ap
+-@@ -794,113 +795,12 @@ Strategic frame: two complementary products. **Incighder Discover** = today's ap
 - 
 - ## 5. Recent Git Changes (Summary)
 - ```text
--+4b44663 feat: in-UI reordering (admin up/down arrows) + honest event-impact language
--+cf43c78 feat: events apply to multiple people
--+1bc09c5 feat: 'post' event type
--+93e2547 feat: run auto-scrape scheduler from go_live.sh; docs for events + sorting
-- dc92d11 feat: events/campaign tracking + manual sort order
---36ba3bf fix: wrap artist-page action row on narrow screens (delete button was clipped)
---27be6f0 docs: cross-platform score + platform filtering recorded
---bbf8a3f feat: cross-platform traction score with momentum
---96b0f99 feat: hide unlinked platforms from cards/grids; IG crawler-UA fallback
+-+6533ac4 feat: rewind scrubber — time-travel the Growth section to any snapshot date
+-+4c8da31 copy: events section states the 14-day window plainly, no disclaimer
+-+7091876 docs: multi-person events, reorder arrows, correlation framing
+- 4b44663 feat: in-UI reordering (admin up/down arrows) + honest event-impact language
+- cf43c78 feat: events apply to multiple people
+--1bc09c5 feat: 'post' event type
+--93e2547 feat: run auto-scrape scheduler from go_live.sh; docs for events + sorting
+--dc92d11 feat: events/campaign tracking + manual sort order
 - ```
 - 
 - ## 6. Active Diff
 - ```diff
 --diff --git a/ai/CONTEXT_BUNDLE.md b/ai/CONTEXT_BUNDLE.md
---index 9b2d78e..08ffb0e 100644
+--index c0c3478..05c9d79 100644
 ----- a/ai/CONTEXT_BUNDLE.md
 --+++ b/ai/CONTEXT_BUNDLE.md
 --@@ -1,5 +1,5 @@
 -- # AI Context Bundle
----Generated: Thu Jul 23 15:53:09 PDT 2026
---+Generated: Thu Jul 23 17:19:07 PDT 2026
+---Generated: Thu Jul 23 17:19:07 PDT 2026
+--+Generated: Thu Jul 23 17:33:06 PDT 2026
 -- 
 -- ## ⚠️ Agent Navigation Guide
 -- 1. Start with the **Current State** below to understand the focus.
---@@ -216,6 +216,8 @@ Strategic frame: two complementary products. **Incighder Discover** = today's ap
+--@@ -216,8 +216,8 @@ Strategic frame: two complementary products. **Incighder Discover** = today's ap
 -- - [ ] Playlist / chart-placement tracking — competitor table-stakes we lack (see `COMPETITORS.md`)
 -- 
 -- ## Completed
---+- [x] Events/campaign tracking (2026-07-23): `events` table + `/api/events` — per-platform impact computed vs `metric_snapshots` (baseline at event date → last reading in a 14-day attribution window); Events card on artist pages with impact chips + admin inline add/delete. Precision grows with snapshot density — the scheduler now runs inside `go_live.sh` (daily TTL-respected sweep) so snapshots accrue whenever the Mac is live.
---+- [x] Manual sort order (2026-07-23): `sort_order` column (lower = higher, NULL last) in the edit form; lists order by it. Glo Gang / Glo Gang Skate Team / Maino pinned atop glogang. Also added `@glogang` (291K IG) + `@glogangskateteam` (6.8K IG) as tracked members.
+---- [x] Events/campaign tracking (2026-07-23): `events` table + `/api/events` — per-platform impact computed vs `metric_snapshots` (baseline at event date → last reading in a 14-day attribution window); Events card on artist pages with impact chips + admin inline add/delete. Precision grows with snapshot density — the scheduler now runs inside `go_live.sh` (daily TTL-respected sweep) so snapshots accrue whenever the Mac is live.
+---- [x] Manual sort order (2026-07-23): `sort_order` column (lower = higher, NULL last) in the edit form; lists order by it. Glo Gang / Glo Gang Skate Team / Maino pinned atop glogang. Also added `@glogang` (291K IG) + `@glogangskateteam` (6.8K IG) as tracked members.
+--+- [x] Events/campaign tracking (2026-07-23): `events` + `event_artists` junction (one event spans many people — group-mate chips in the add form, '+N others' badge); `/api/events` computes per-person change vs `metric_snapshots` (baseline at event date → last reading in a 14-day window). Copy deliberately frames it as **observed correlation, not causation**. Event types incl. `post`. Scheduler runs inside `go_live.sh` (daily sweep) so snapshot density — and attribution sharpness — grows on its own.
+--+- [x] Manual sort order (2026-07-23): `sort_order` column + admin **up/down arrows on cards** (grid persists 1-based order; edit-form Sort field = direct override). Glo Gang / Glo Gang Skate Team / Maino pinned atop glogang. Also added `@glogang` (291K IG) + `@glogangskateteam` (6.8K IG) as tracked members.
 -- - [x] Weighted cross-platform traction score (2026-07-23): Reach (≤100, log total audience across all platforms) + Breadth (≤25) + **Momentum** (≤50, median weekly growth % from `metric_snapshots`, server-attached as `momentum_wk_pct` via `src/lib/momentum.ts`) + Spotify popularity (≤25). IG-only members score meaningfully; breakdown tooltip explains every point.
--- - [x] Hide unlinked platforms (2026-07-23): `platformHasPresence()` filters cards + metric grid (SourcesPanel still lists all for linking); Spotify presence requires a real identity, not manual-insert zeros.
--- - [x] Twitch platform (2026-07-23): `scrapers/twitch.py` via the twitch.tv web GQL Client-ID (no API keys), `twitch_followers` + growth snapshots + UI/CSV. Maino Da Plug tracked (6.9K followers).
---@@ -792,113 +794,12 @@ Strategic frame: two complementary products. **Incighder Discover** = today's ap
--- 
--- ## 5. Recent Git Changes (Summary)
--- ```text
---+dc92d11 feat: events/campaign tracking + manual sort order
---+36ba3bf fix: wrap artist-page action row on narrow screens (delete button was clipped)
 ```

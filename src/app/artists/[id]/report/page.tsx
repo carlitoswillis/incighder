@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useEffect, useState } from "react";
+import { use, useEffect, useMemo, useState } from "react";
 import { ArtistImage } from "@/components/artist-image";
 import Link from "next/link";
 import { ArrowLeft, Printer } from "lucide-react";
@@ -9,6 +9,12 @@ import type { Artist } from "@/lib/types";
 import { PLATFORMS } from "@/lib/platforms";
 import { calculateArtistScore } from "@/utils/score";
 import { formatCompact, formatFull } from "@/lib/format";
+import { dayEnd, rewindArtist, snapshotDays, valueAsOf } from "@/lib/rewind";
+import {
+  RewindScrubber,
+  formatDay,
+  useRewindDay,
+} from "@/components/rewind-scrubber";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
@@ -24,6 +30,7 @@ type HistoryEntry = {
 // Print/PDF-ready one-sheet: the whole traction story on a single page.
 // Screen keeps the site's dark identity; @media print flips to the light
 // tokens (globals.css) so it reads like a document, not a screenshot.
+// The rewind scrubber (and ?date=) replays the sheet as of any snapshot day.
 export default function ReportPage({
   params,
 }: {
@@ -45,6 +52,13 @@ export default function ReportPage({
       .catch(() => setHistory({}));
   }, [id]);
 
+  const days = useMemo(
+    () => snapshotDays(Object.values(history).map((e) => e.points ?? [])),
+    [history],
+  );
+  const { ticks, dayIdx, select, asOfDay } = useRewindDay(days);
+  const asOfEnd = asOfDay ? dayEnd(asOfDay) : null;
+
   if (error) return <p className="text-sm text-destructive">Not available.</p>;
   if (!artist)
     return (
@@ -56,7 +70,9 @@ export default function ReportPage({
 
   const image = artist.images?.[0]?.url ?? null;
   const genres = (artist.genres ?? "").replace(/[[\]"']/g, "").split(",").map((s) => s.trim()).filter(Boolean);
-  const { score } = calculateArtistScore(artist);
+  const { score } = calculateArtistScore(
+    asOfEnd ? rewindArtist(artist, history, asOfEnd) : artist,
+  );
   const tracked = PLATFORMS.filter(
     (p) => history[p.key] || (artist[p.metric.field as keyof Artist] ?? null) !== null,
   );
@@ -78,16 +94,19 @@ export default function ReportPage({
   return (
     <div className="mx-auto max-w-3xl">
       {/* Screen-only chrome */}
-      <div className="mb-6 flex items-center justify-between print:hidden">
-        <Link
-          href={`/artists/${id}`}
-          className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
-        >
-          <ArrowLeft className="size-4" /> Back to profile
-        </Link>
-        <Button onClick={() => window.print()} size="sm">
-          <Printer className="size-4" /> Print / save PDF
-        </Button>
+      <div className="mb-6 space-y-3 print:hidden">
+        <div className="flex items-center justify-between">
+          <Link
+            href={`/artists/${id}`}
+            className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <ArrowLeft className="size-4" /> Back to profile
+          </Link>
+          <Button onClick={() => window.print()} size="sm">
+            <Printer className="size-4" /> Print / save PDF
+          </Button>
+        </div>
+        <RewindScrubber ticks={ticks} dayIdx={dayIdx} onSelect={select} />
       </div>
 
       <div className="report-sheet rounded-xl bg-card p-8 ring-1 ring-foreground/10 print:rounded-none print:p-0 print:ring-0">
@@ -102,7 +121,7 @@ export default function ReportPage({
             </span>
           </div>
           <span className="font-mono text-[11px] uppercase tracking-[0.2em] text-muted-foreground">
-            {today}
+            {asOfDay ? formatDay(asOfDay) : today}
           </span>
         </div>
 
@@ -154,10 +173,30 @@ export default function ReportPage({
           <div className="mt-2 border-t border-border">
             {tracked.map((p) => {
               const e = history[p.key];
-              const current =
-                e?.current ?? (artist[p.metric.field as keyof Artist] as number | null);
-              if (current == null) return null;
-              const pct = e && e.first ? (e.change / e.first) * 100 : null;
+              let current: number | null;
+              let change: number | null;
+              let pct: number | null;
+              let since: string | null;
+              let sparkValues: number[];
+              if (asOfEnd) {
+                // Replay: last value recorded by that day, delta vs the
+                // series start up to that day.
+                current = e ? valueAsOf(e.points, asOfEnd) : null;
+                if (current == null) return null;
+                const pts = e.points.filter((pt) => pt.t <= asOfEnd);
+                change = current - pts[0].v;
+                since = pts[0].t;
+                pct = pts[0].v ? (change / pts[0].v) * 100 : null;
+                sparkValues = pts.map((pt) => pt.v);
+              } else {
+                current =
+                  e?.current ?? (artist[p.metric.field as keyof Artist] as number | null);
+                if (current == null) return null;
+                change = e ? e.change : null;
+                since = e ? e.since : null;
+                pct = e && e.first ? (e.change / e.first) * 100 : null;
+                sparkValues = e ? e.points.map((pt) => pt.v) : [];
+              }
               const Icon = p.Icon;
               return (
                 <div
@@ -175,21 +214,21 @@ export default function ReportPage({
                     {formatCompact(current)}
                   </div>
                   <div className="min-w-0 flex-1 text-sm">
-                    {e && e.change !== 0 ? (
+                    {change != null && change !== 0 ? (
                       <span
                         className={cn(
                           "font-mono tabular-nums",
-                          e.change > 0 ? "text-emerald-500" : "text-rose-500",
+                          change > 0 ? "text-emerald-500" : "text-rose-500",
                         )}
                       >
-                        {e.change > 0 ? "+" : ""}
-                        {formatCompact(e.change)}
-                        {pct != null && (
+                        {change > 0 ? "+" : ""}
+                        {formatCompact(change)}
+                        {pct != null && since != null && (
                           <span className="text-muted-foreground">
                             {" "}
                             ({pct > 0 ? "+" : ""}
                             {pct.toFixed(1)}%) since{" "}
-                            {new Date(e.since).toLocaleDateString("en-US", {
+                            {new Date(since).toLocaleDateString("en-US", {
                               month: "short",
                               day: "numeric",
                             })}
@@ -200,17 +239,16 @@ export default function ReportPage({
                       <span className="text-muted-foreground/60">—</span>
                     )}
                   </div>
-                  {e && e.points.length > 1 && (
-                    <ReportSparkline values={e.points.map((pt) => pt.v)} />
-                  )}
+                  {sparkValues.length > 1 && <ReportSparkline values={sparkValues} />}
                 </div>
               );
             })}
           </div>
         </div>
 
-        {/* Footprint */}
-        {footprint.length > 0 && (
+        {/* Footprint — current-only fields with no snapshot history, so it
+            comes off the sheet when the report is rewound. */}
+        {footprint.length > 0 && !asOfDay && (
           <div className="mt-8">
             <h2 className="font-mono text-[11px] uppercase tracking-[0.2em] text-muted-foreground">
               Footprint
@@ -234,7 +272,9 @@ export default function ReportPage({
             incighder.vercel.app/artists/{id}
           </span>
           <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-            Cross-platform traction · live data
+            {asOfDay
+              ? `Cross-platform traction · as of ${formatDay(asOfDay)}`
+              : "Cross-platform traction · live data"}
           </span>
         </div>
       </div>
