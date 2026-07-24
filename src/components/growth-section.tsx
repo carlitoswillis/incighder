@@ -40,7 +40,9 @@ export function GrowthSection({
     for (const e of Object.values(history)) {
       for (const pt of e.points) days.add(pt.t.slice(0, 10));
     }
-    return [...days].sort();
+    // The most recent snapshot day IS "Now" — offering it as a tick would just
+    // show a zero-change view of the same day.
+    return [...days].sort().slice(0, -1);
   }, [history]);
   const [tickIdx, setTickIdx] = useState<number | null>(null); // null = now
 
@@ -69,7 +71,7 @@ export function GrowthSection({
         timeline, so re-linking a different account doesn&apos;t count as growth.
       </p>
 
-      {ticks.length > 1 && (
+      {ticks.length > 0 && (
         <div className="mt-4 flex flex-wrap items-center gap-3 rounded-lg border border-border/60 px-3 py-2">
           <History className="size-4 shrink-0 text-muted-foreground" />
           <input
