@@ -71,8 +71,16 @@ export async function GET(request: Request) {
     }
 
     const [events] = await pool.query<RowDataPacket[]>(
-      "SELECT * FROM events WHERE artist_id = ? ORDER BY happened_at DESC, id DESC",
-      [artistId],
+      `SELECT e.*,
+              (SELECT COUNT(*) - 1 FROM event_artists x WHERE x.event_id = e.id) AS shared_with,
+              (SELECT GROUP_CONCAT(a.name ORDER BY a.name SEPARATOR ', ')
+                 FROM event_artists x JOIN artists a ON a.id = x.artist_id
+                WHERE x.event_id = e.id AND x.artist_id <> ?) AS shared_names
+         FROM events e
+         JOIN event_artists ea ON ea.event_id = e.id
+        WHERE ea.artist_id = ?
+        ORDER BY e.happened_at DESC, e.id DESC`,
+      [artistId, artistId],
     );
     if (!events.length) return NextResponse.json([]);
 
@@ -103,10 +111,15 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   if (!(await isAdmin())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   try {
-    const { artist_id, title, event_type, url, happened_at, notes } = await request.json();
-    if (!artist_id || !title || !happened_at) {
+    const { artist_id, artist_ids, title, event_type, url, happened_at, notes } =
+      await request.json();
+    // One event, any number of people (a group video tags the whole crew).
+    const ids: string[] = [
+      ...new Set([...(Array.isArray(artist_ids) ? artist_ids : []), artist_id].filter(Boolean)),
+    ];
+    if (!ids.length || !title || !happened_at) {
       return NextResponse.json(
-        { error: "artist_id, title and happened_at are required" },
+        { error: "artist_id(s), title and happened_at are required" },
         { status: 400 },
       );
     }
@@ -114,7 +127,13 @@ export async function POST(request: Request) {
     const [res] = await pool.query<ResultSetHeader>(
       `INSERT INTO events (artist_id, title, event_type, url, happened_at, notes)
        VALUES (?, ?, ?, ?, ?, ?)`,
-      [artist_id, title, type, url || null, happened_at, notes || null],
+      [ids[0], title, type, url || null, happened_at, notes || null],
+    );
+    await pool.query(
+      `INSERT IGNORE INTO event_artists (event_id, artist_id) VALUES ${ids
+        .map(() => "(?, ?)")
+        .join(", ")}`,
+      ids.flatMap((a) => [res.insertId, a]),
     );
     const [rows] = await pool.query<RowDataPacket[]>("SELECT * FROM events WHERE id = ?", [
       res.insertId,

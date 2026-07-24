@@ -28,6 +28,8 @@ interface EventRow {
   happened_at: string;
   notes: string | null;
   impact: Impact[];
+  shared_with?: number;
+  shared_names?: string | null;
 }
 
 const TYPES = ["release", "video", "reel", "post", "show", "announcement", "press", "other"];
@@ -38,10 +40,28 @@ const platformLabel = (key: string) =>
 // Timeline of releases/videos/announcements with per-platform impact chips —
 // "since this event: +9.1% Spotify, +25% Instagram" — computed server-side
 // against the growth snapshots.
-export function EventsSection({ artistId }: { artistId: string }) {
+export function EventsSection({
+  artistId,
+  group,
+}: {
+  artistId: string;
+  group?: string | null;
+}) {
   const { admin } = useAdmin();
   const [events, setEvents] = useState<EventRow[] | null>(null);
   const [showForm, setShowForm] = useState(false);
+  const [groupMates, setGroupMates] = useState<{ id: string; name: string }[]>([]);
+  const [alsoApply, setAlsoApply] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (!admin || !group) return;
+    fetch(`/api/artists?group=${encodeURIComponent(group)}`)
+      .then((r) => (r.ok ? r.json() : []))
+      .then((rows: { id: string; name: string }[]) =>
+        setGroupMates(rows.filter((r) => r.id !== artistId)),
+      )
+      .catch(() => setGroupMates([]));
+  }, [admin, group, artistId]);
   const [form, setForm] = useState({
     title: "",
     event_type: "release",
@@ -64,11 +84,17 @@ export function EventsSection({ artistId }: { artistId: string }) {
       const r = await fetch("/api/events", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ artist_id: artistId, ...form, url: form.url || null }),
+        body: JSON.stringify({
+          artist_id: artistId,
+          artist_ids: [artistId, ...alsoApply],
+          ...form,
+          url: form.url || null,
+        }),
       });
       if (!r.ok) throw new Error((await r.json()).error || `HTTP ${r.status}`);
       setShowForm(false);
       setForm((f) => ({ ...f, title: "", url: "" }));
+      setAlsoApply(new Set());
       toast.success("Event added");
       load();
     } catch (err) {
@@ -143,6 +169,38 @@ export function EventsSection({ artistId }: { artistId: string }) {
           <Button type="submit" size="sm">
             Save
           </Button>
+          {groupMates.length > 0 && (
+            <div className="sm:col-span-5">
+              <span className="text-xs text-muted-foreground">Also applies to:</span>
+              <div className="mt-1.5 flex flex-wrap gap-1.5">
+                {groupMates.map((m) => {
+                  const on = alsoApply.has(m.id);
+                  return (
+                    <button
+                      key={m.id}
+                      type="button"
+                      onClick={() =>
+                        setAlsoApply((prev) => {
+                          const next = new Set(prev);
+                          if (next.has(m.id)) next.delete(m.id);
+                          else next.add(m.id);
+                          return next;
+                        })
+                      }
+                      className={cn(
+                        "rounded-md px-2 py-1 text-xs ring-1 ring-inset transition-colors",
+                        on
+                          ? "bg-primary/15 text-primary ring-primary/40"
+                          : "text-muted-foreground ring-border hover:text-foreground",
+                      )}
+                    >
+                      {m.name}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </form>
       )}
 
@@ -167,6 +225,14 @@ export function EventsSection({ artistId }: { artistId: string }) {
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="font-medium">{e.title}</span>
                   {e.event_type && <Badge variant="secondary">{e.event_type}</Badge>}
+                  {(e.shared_with ?? 0) > 0 && (
+                    <Badge
+                      variant="secondary"
+                      title={e.shared_names ? `Also: ${e.shared_names}` : undefined}
+                    >
+                      +{e.shared_with} other{e.shared_with === 1 ? "" : "s"}
+                    </Badge>
+                  )}
                   {e.url && (
                     <a
                       href={e.url}

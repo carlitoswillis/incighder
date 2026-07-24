@@ -479,7 +479,7 @@ function ArtistDetail() {
       />
 
       {/* Sources */}
-      <EventsSection artistId={artistId} />
+      <EventsSection artistId={artistId} group={artist.group_name} />
 
       {admin && <SourcesPanel artist={artist} onScraped={setArtist} />}
 

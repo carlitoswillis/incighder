@@ -99,6 +99,9 @@ CREATE TABLE IF NOT EXISTS app_config (
 -- Campaign/event tracking: a dated marker (release, video, announcement, ...)
 -- overlaid on metric_snapshots so the app can answer "what did this moment do
 -- to the numbers?". Impact is computed at read time, not stored.
+-- event_artists is the source of truth for who an event applies to (an event
+-- can span many people — e.g. a group video); events.artist_id is legacy and
+-- mirrors the first tagged person.
 CREATE TABLE IF NOT EXISTS events (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     artist_id VARCHAR(255) NOT NULL,
@@ -110,4 +113,12 @@ CREATE TABLE IF NOT EXISTS events (
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (artist_id) REFERENCES artists(id) ON DELETE CASCADE,
     INDEX idx_events_artist (artist_id, happened_at)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS event_artists (
+    event_id BIGINT NOT NULL,
+    artist_id VARCHAR(255) NOT NULL,
+    PRIMARY KEY (event_id, artist_id),
+    FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE,
+    FOREIGN KEY (artist_id) REFERENCES artists(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
