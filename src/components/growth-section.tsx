@@ -6,6 +6,7 @@ import { PLATFORMS } from "@/lib/platforms";
 import { formatCompact, formatFull } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { Sparkline } from "@/components/sparkline";
+import { useAdmin } from "@/components/admin-context";
 
 type Entry = {
   account_key: string;
@@ -23,6 +24,7 @@ export function GrowthSection({
   artistId: string;
   refreshSignal?: string;
 }) {
+  const { admin } = useAdmin();
   const [history, setHistory] = useState<Record<string, Entry> | null>(null);
 
   useEffect(() => {
@@ -71,7 +73,7 @@ export function GrowthSection({
         timeline, so re-linking a different account doesn&apos;t count as growth.
       </p>
 
-      {ticks.length > 0 && (
+      {admin && ticks.length > 0 && (
         <div className="mt-4 flex flex-wrap items-center gap-3 rounded-lg border border-border/60 px-3 py-2">
           <History className="size-4 shrink-0 text-muted-foreground" />
           <input
