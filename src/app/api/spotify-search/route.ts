@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { isAdmin } from "@/lib/auth";
+import { getDataApiUrl, dataApiHeaders } from "@/lib/data-api";
 
 // Spotify client-credentials token, cached in-process until shortly before expiry.
 let cachedToken: { value: string; expiresAt: number } | null = null;
@@ -56,7 +57,30 @@ export async function GET(request: Request) {
     const data = await res.json();
     return NextResponse.json(data);
   } catch (error) {
-    console.error("Error searching Spotify:", error);
-    return NextResponse.json({ error: "Failed to search Spotify" }, { status: 500 });
+    // The deploy has no Spotify credentials of its own (they live with the
+    // data-api), so fall back to its /spotify_search — same response shape. Every
+    // caller of this route also needs the data-api to actually add an artist, so
+    // this adds no dependency the flow didn't already have.
+    console.error("Direct Spotify search failed; trying data-api:", error);
+    try {
+      return await searchViaDataApi(query);
+    } catch (fallbackError) {
+      console.error("data-api Spotify search failed:", fallbackError);
+      return NextResponse.json({ error: "Failed to search Spotify" }, { status: 500 });
+    }
   }
+}
+
+async function searchViaDataApi(query: string) {
+  const res = await fetch(
+    `${await getDataApiUrl()}/spotify_search?q=${encodeURIComponent(query)}`,
+    { headers: dataApiHeaders() },
+  );
+  // A stale/missing route serves Flask's HTML 404 page; don't blind-parse it.
+  const text = await res.text();
+  if (!res.headers.get("content-type")?.includes("application/json")) {
+    throw new Error(`data-api returned ${res.status} (non-JSON)`);
+  }
+  if (!res.ok) throw new Error(`data-api returned ${res.status}`);
+  return NextResponse.json(JSON.parse(text));
 }
