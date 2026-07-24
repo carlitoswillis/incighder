@@ -37,9 +37,10 @@ const TYPES = ["release", "video", "reel", "post", "show", "announcement", "pres
 const platformLabel = (key: string) =>
   PLATFORMS.find((p) => p.key === key)?.label ?? key;
 
-// Timeline of releases/videos/announcements with per-platform impact chips —
-// "since this event: +9.1% Spotify, +25% Instagram" — computed server-side
-// against the growth snapshots.
+// Timeline of releases/videos/announcements with per-platform chips showing
+// the change observed in the attribution window AFTER each event. Framed as
+// correlation, deliberately: we can't prove the event caused the movement,
+// only put the two side by side.
 export function EventsSection({
   artistId,
   group,
@@ -122,8 +123,9 @@ export function EventsSection({
         <div>
           <h2 className="text-lg font-semibold tracking-tight">Events</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Releases, videos, announcements — and what each one did to the
-            numbers in the two weeks after.
+            Releases, videos, announcements — with the audience change observed
+            in the two weeks after each one. Correlation, not proof: read it
+            next to the growth timeline above.
           </p>
         </div>
         {admin && (
@@ -206,8 +208,8 @@ export function EventsSection({
 
       {events.length === 0 ? (
         <p className="mt-4 text-sm text-muted-foreground">
-          No events yet — add a release or video drop and Incighder will track
-          what it does to the numbers.
+          No events yet — add a release or video drop and Incighder will show
+          how the numbers moved in the weeks after it.
         </p>
       ) : (
         <div className="mt-4 divide-y divide-border/60">
@@ -250,7 +252,7 @@ export function EventsSection({
                     {e.impact.map((i) => (
                       <span
                         key={i.platform}
-                        title={`${platformLabel(i.platform)}: ${formatCompact(i.before)} → ${formatCompact(i.after)}${i.window_open ? " (window still open)" : ""}`}
+                        title={`${platformLabel(i.platform)}: ${formatCompact(i.before)} → ${formatCompact(i.after)} in the 14 days after${i.window_open ? " (window still open)" : ""} — observed change, not proven cause`}
                         className={cn(
                           "inline-flex items-center gap-1 rounded-md px-2 py-0.5 font-mono text-xs tabular-nums ring-1 ring-inset",
                           i.change > 0

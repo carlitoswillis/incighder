@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { MoreHorizontal, Trash2, SquareArrowOutUpRight, Pencil } from "lucide-react";
+import { ChevronDown, ChevronUp, MoreHorizontal, Trash2, SquareArrowOutUpRight, Pencil } from "lucide-react";
 import { SiSpotify } from "react-icons/si";
 
 import type { Artist } from "@/lib/types";
@@ -33,9 +33,12 @@ function parseGenres(genres: string | null): string[] {
 export function ArtistCard({
   artist,
   onDeleted,
+  onMove,
 }: {
   artist: Artist;
   onDeleted: (id: string) => void;
+  /** Admin reorder — provided by the grid; hidden when absent. */
+  onMove?: (dir: "up" | "down") => void;
 }) {
   const { admin } = useAdmin();
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -96,6 +99,28 @@ export function ArtistCard({
                 )}
               </div>
               <div className="flex shrink-0 items-center gap-2">
+                {admin && onMove && (
+                  <div className="flex flex-col">
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      aria-label="Move up"
+                      className="h-5"
+                      onClick={() => onMove("up")}
+                    >
+                      <ChevronUp className="size-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      aria-label="Move down"
+                      className="h-5"
+                      onClick={() => onMove("down")}
+                    >
+                      <ChevronDown className="size-4" />
+                    </Button>
+                  </div>
+                )}
                 <ScoreBadge score={score} breakdown={breakdown} size="lg" />
                 <DropdownMenu>
                   <DropdownMenuTrigger

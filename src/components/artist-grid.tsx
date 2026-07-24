@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAdmin } from "@/components/admin-context";
+import { toast } from "sonner";
 
 interface GroupRow {
   group_name: string;
@@ -46,6 +47,31 @@ export function ArtistGrid({ title, group }: { title: string; group?: string }) 
 
   function handleDeleted(id: string) {
     setArtists((prev) => prev?.filter((a) => a.id !== id) ?? prev);
+  }
+
+  // Swap with the neighbour, then persist 1-based sort_order for every row
+  // whose position changed. Order is server-truth on next load.
+  function handleMove(id: string, dir: "up" | "down") {
+    setArtists((prev) => {
+      if (!prev) return prev;
+      const i = prev.findIndex((a) => a.id === id);
+      const j = dir === "up" ? i - 1 : i + 1;
+      if (i < 0 || j < 0 || j >= prev.length) return prev;
+      const next = [...prev];
+      [next[i], next[j]] = [next[j], next[i]];
+      next.forEach((a, idx) => {
+        const want = idx + 1;
+        if (a.sort_order !== want) {
+          a.sort_order = want;
+          fetch(`/api/artists/${a.id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ sort_order: want }),
+          }).catch(() => toast.error("Failed to save order"));
+        }
+      });
+      return next;
+    });
   }
 
   const actions = (
@@ -121,7 +147,12 @@ export function ArtistGrid({ title, group }: { title: string; group?: string }) 
       ) : (
         <div className="space-y-6">
           {artists.map((a) => (
-            <ArtistCard key={a.id} artist={a} onDeleted={handleDeleted} />
+            <ArtistCard
+              key={a.id}
+              artist={a}
+              onDeleted={handleDeleted}
+              onMove={admin ? (dir) => handleMove(a.id, dir) : undefined}
+            />
           ))}
         </div>
       )}
