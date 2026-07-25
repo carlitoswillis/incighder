@@ -204,8 +204,11 @@ def scrape_artist(artist_id: str, links: dict | None = None, force: bool = False
                 pic = res.data.get("profile_pic_url")
                 if pic:
                     avatar_urls[platform] = pic
+                # Never write None over an existing metric: a "successful" scrape
+                # with unparseable counts (soft-block) must not erase good data.
+                # Clearing metrics is clear_platform's job, not a scrape's.
                 updates.update({k: v for k, v in res.data.items()
-                                if k in ALLOWED_METRIC_COLUMNS})
+                                if k in ALLOWED_METRIC_COLUMNS and v is not None})
             meta[platform] = {"last_scraped_at": res.scraped_at,
                               "status": "ok" if res.ok else "error",
                               "error": res.error}

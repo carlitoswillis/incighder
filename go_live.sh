@@ -70,7 +70,10 @@ fi
 
 # 1b. auto-scrape scheduler: daily TTL-respected sweep so growth snapshots
 # (momentum, event impact) accrue without manual refreshes.
-if pgrep -f "python scheduler.py" >/dev/null 2>&1; then
+# Match on the script name only: macOS resolves the venv python to ".../MacOS/Python"
+# (capital P), so a "python scheduler.py" pattern silently misses and a duplicate
+# scheduler spawns — two daily sweeps then race-scrape every artist.
+if pgrep -f "scheduler\.py" >/dev/null 2>&1; then
   echo "==> scheduler already running"
 else
   echo "==> Starting auto-scrape scheduler (every ${AUTO_SCRAPE_INTERVAL_HOURS:-24}h)..."

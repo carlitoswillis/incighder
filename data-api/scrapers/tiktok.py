@@ -54,10 +54,16 @@ def fetch_tiktok(handle_or_url: str) -> ScrapeResult:
         stats = info.get("statsV2") or info.get("stats")
         if not stats:
             return ScrapeResult.failure(platform, "stats not in rehydration JSON")
+        followers = _to_int(stats.get("followerCount"))
+        likes = _to_int(stats.get("heartCount") or stats.get("heart"))
+        videos = _to_int(stats.get("videoCount"))
+        if followers is None and likes is None and videos is None:
+            # Blob served but counts missing/unparseable — a soft block, not a profile.
+            return ScrapeResult.failure(platform, "stats present but no parseable counts (soft block)")
         return ScrapeResult.success(platform, {
-            "tiktok_followers": _to_int(stats.get("followerCount")),
-            "tiktok_likes": _to_int(stats.get("heartCount") or stats.get("heart")),
-            "tiktok_video_count": _to_int(stats.get("videoCount")),
+            "tiktok_followers": followers,
+            "tiktok_likes": likes,
+            "tiktok_video_count": videos,
             "profile_pic_url": (info.get("user") or {}).get("avatarLarger")
             or (info.get("user") or {}).get("avatarMedium"),
         })
