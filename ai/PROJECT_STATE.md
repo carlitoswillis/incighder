@@ -2,7 +2,7 @@
 
 PURPOSE: High-level summary of the system's current focus, the product vision, and recent changes — the single place an agent reads first to avoid drift. (Absorbs the former `GOALS.md`.)
 
-## Last Updated: 2026-07-23
+## Last Updated: 2026-07-26
 ## Current Focus: **Deploy-ready with hosted DB.** Killed the recurring data-wipe bug (apply_schema was drop-and-recreate and ran on every dev start — now idempotent, `--reset` gated behind confirmation). Whole stack now takes a single `DATABASE_URL` (mysql://...?sslmode=require, TLS supported) so a free hosted MySQL (TiDB Serverless/Aiven) becomes the wipe-proof source of truth for both local dev and the Vercel deploy; DB config centralized (`src/lib/db.ts`, `scripts/db-config.mjs`, `_db_config()`). Ports env-driven (`DATA_API_PORT`/`WEB_PORT`). See `DEPLOY.md`. Next: create the hosted DB + set Vercel env vars; keep collapsing `data-api` proxy endpoints into TS routes. Backlog: deep scraping/deploy tech debt (below), artist bio, data export, change alerts.
 
 ## Project Goal
@@ -47,6 +47,7 @@ The long-term aim is a single dashboard that scores artist traction from many si
 ---
 
 ## Recent Changes
+- **Partial scrapes retry + honest freshness label (2026-07-26)**: `ScrapeResult.partial` — a scrape that succeeds but misses a metric it owns (Spotify monthly listeners when the scrape.do render fails) gets `scrape_meta.status = "partial"`, which `_is_fresh` treats as stale, so the next refresh/sweep retries it instead of losing a day of snapshots; the render itself now retries 3× (non-200 or count missing from the rendered page). Bulk-refresh UI: "cached" → "N fresh (scraped Xh ago)" with a per-platform tooltip + copy explaining the nightly auto-sweep (the sweep is why manual refreshes usually find everything fresh); partial platforms surface as an amber chip. Note: `scheduler.py` doesn't hot-reload — restart it after editing scrape code.
 - **Rewound reports (2026-07-24)**: the one-sheet report pages (`/artists/[id]/report`, `/g/[group]/report`) now have the rewind scrubber — view/print the report as of any recorded snapshot day, shareable via `?date=YYYY-MM-DD`. Shared helpers in `src/lib/rewind.ts` + `components/rewind-scrubber.tsx`; rewound score recomputed from as-of values (momentum stripped — approximation); footprint hidden when rewound (no history for those fields).
 - **Twitch + photos (2026-07-23)**: Twitch is a first-class tracked platform (web GQL, keyless). Manual adds get profile pictures automatically from their socials on scrape; admins can also upload a photo (data-URI storage, no file infra, ~60-150KB/person — negligible vs TiDB's 5GiB). Group chips on home are now admin-only: grouped members are visible ONLY via their /g/<group> URL.
 - **Data export + one-sheets (2026-07-23)**: admin CSV export; print/PDF-ready per-person and per-group "traction one-sheet" pages (masthead, traction ledger with deltas + sparklines, footprint); `/api/history` now native TS. Glogang roster onboarded: 8 skaters + DJ Maino (IG links, Maino also YT + Twitch in `external_urls`; 7/9 scraped — IG anonymous rate limit blocked daniel/brandon, retry later or set `IG_SESSIONID`).

@@ -18,6 +18,7 @@ import json
 import os
 import re
 import sys
+import time
 from typing import Optional
 from urllib.parse import urlparse
 
@@ -40,34 +41,52 @@ def _artist_id(spotify_id_or_url: str) -> Optional[str]:
     return s  # assume bare id
 
 
-def _monthly_listeners(artist_id: str) -> Optional[int]:
+_RENDER_ATTEMPTS = 3
+
+
+def _monthly_listeners(artist_id: str) -> tuple[Optional[int], Optional[str]]:
     """Render the public artist page via scrape.do and parse monthly listeners.
-    Best-effort: returns None (skipped) if SCRAPE_DO_TOKEN is unset or the render fails."""
+
+    Returns (value, miss_reason). (None, None) means the fetch wasn't attempted
+    (no SCRAPE_DO_TOKEN). A miss_reason string means it was attempted and failed
+    even after retries — the caller marks the scrape partial so the cache retries
+    it on the next refresh instead of waiting out the 24h TTL. Renders are flaky
+    (upstream 502s, JS not finishing before customWait), so retry both a non-200
+    and a rendered page missing the listener count.
+    """
     token = os.getenv("SCRAPE_DO_TOKEN")
     if not token:
-        return None
-    try:
-        throttle("api.scrape.do")
-        resp = get_session().get(
-            "https://api.scrape.do/",
-            params={
-                "token": token,
-                "url": f"https://open.spotify.com/artist/{artist_id}",
-                "render": "true",
-                "customWait": "3500",
-            },
-            timeout=120,
+        return None, None
+    reason = "render failed"
+    for attempt in range(_RENDER_ATTEMPTS):
+        if attempt:
+            time.sleep(5 * attempt)
+        try:
+            throttle("api.scrape.do")
+            resp = get_session().get(
+                "https://api.scrape.do/",
+                params={
+                    "token": token,
+                    "url": f"https://open.spotify.com/artist/{artist_id}",
+                    "render": "true",
+                    "customWait": "3500",
+                },
+                timeout=120,
+            )
+            if resp.status_code != 200:
+                reason = f"render failed: HTTP {resp.status_code}"
+            else:
+                m = _MONTHLY_RE.search(resp.text)
+                if m:
+                    return int(re.sub(r"[.,\s]", "", m.group(1))), None
+                reason = "monthly listeners not in rendered page"
+        except Exception as e:
+            reason = f"render error: {e}"
+        print(
+            f"spotify monthly-listeners attempt {attempt + 1}/{_RENDER_ATTEMPTS}: {reason}",
+            file=sys.stderr,
         )
-        if resp.status_code != 200:
-            print(f"spotify render failed: HTTP {resp.status_code}", file=sys.stderr)
-            return None
-        m = _MONTHLY_RE.search(resp.text)
-        if not m:
-            return None
-        return int(re.sub(r"[.,\s]", "", m.group(1)))
-    except Exception as e:
-        print(f"spotify monthly-listeners error: {e}", file=sys.stderr)
-        return None
+    return None, reason
 
 
 def _web_api_data(artist_id: str) -> dict:
@@ -112,12 +131,16 @@ def fetch_spotify(spotify_id_or_url: str) -> ScrapeResult:
 
     data = _web_api_data(artist_id)
 
-    # Monthly listeners isn't in the Web API; fetch it via the internal web API
-    # (SPOTIFY_SP_DC cookie). Best-effort — skipped if the cookie is unset.
-    ml = _monthly_listeners(artist_id)
+    # Monthly listeners isn't in the Web API; render the page via scrape.do.
+    # Skipped silently when no token; an attempted-but-failed fetch marks the
+    # result partial so the cache retries it next refresh.
+    ml, ml_miss = _monthly_listeners(artist_id)
     if ml is not None:
         data["monthly_listeners"] = ml
 
     if not data:
-        return ScrapeResult.failure(platform, "no data from Web API or internal API")
-    return ScrapeResult.success(platform, data)
+        return ScrapeResult.failure(platform, "no data from Web API or render API")
+    result = ScrapeResult.success(platform, data)
+    if ml_miss:
+        result.partial = f"monthly listeners missing ({ml_miss})"
+    return result

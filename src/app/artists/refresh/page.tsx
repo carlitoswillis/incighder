@@ -29,8 +29,11 @@ interface RowResult {
   discovered: string[];
   /** Platforms scraped successfully this run (excludes cached/skipped). */
   scraped: string[];
-  /** Platforms left untouched because their cached data is still fresh (<24h). */
-  cached: string[];
+  /** Platforms left untouched because they were already scraped <24h ago
+   *  (usually by the nightly auto-sweep), with when that scrape happened. */
+  cached: { platform: string; scrapedAt: string | null }[];
+  /** Platforms that scraped ok but missed a metric (retried next refresh). */
+  partial: { platform: string; note: string }[];
   /** Per-platform failures with the reason the scraper reported. */
   failed: { platform: string; error: string }[];
   error?: string;
@@ -38,21 +41,60 @@ interface RowResult {
 
 interface RefreshResponse {
   discovered?: Record<string, string>;
-  results?: Record<string, { ok?: boolean; skipped?: string; error?: string }>;
+  results?: Record<
+    string,
+    {
+      ok?: boolean;
+      skipped?: string;
+      error?: string;
+      scraped_at?: string;
+      partial?: string | null;
+    }
+  >;
   error?: string;
 }
 
 function summarize(d: RefreshResponse): Omit<RowResult, "state"> {
   const discovered = Object.keys(d.discovered ?? {});
   const scraped: string[] = [];
-  const cached: string[] = [];
+  const cached: RowResult["cached"] = [];
+  const partial: RowResult["partial"] = [];
   const failed: { platform: string; error: string }[] = [];
   for (const [platform, r] of Object.entries(d.results ?? {})) {
-    if (r.skipped) cached.push(platform);
-    else if (r.ok) scraped.push(platform);
-    else failed.push({ platform, error: r.error || "failed" });
+    if (r.skipped) cached.push({ platform, scrapedAt: r.scraped_at ?? null });
+    else if (r.ok) {
+      scraped.push(platform);
+      if (r.partial) partial.push({ platform, note: r.partial });
+    } else failed.push({ platform, error: r.error || "failed" });
   }
-  return { discovered, scraped, cached, failed };
+  return { discovered, scraped, cached, partial, failed };
+}
+
+function ago(t: number): string {
+  const m = Math.max(1, Math.round((Date.now() - t) / 60_000));
+  if (m < 60) return `${m}m ago`;
+  const h = Math.round(m / 60);
+  if (h < 48) return `${h}h ago`;
+  return `${Math.round(h / 24)}d ago`;
+}
+
+/** Age of the OLDEST fresh scrape — "everything was scraped within this". */
+function freshAge(cached: RowResult["cached"]): string | null {
+  const times = cached
+    .map((c) => (c.scrapedAt ? Date.parse(c.scrapedAt) : NaN))
+    .filter((t) => Number.isFinite(t));
+  return times.length ? ago(Math.min(...times)) : null;
+}
+
+function freshTitle(cached: RowResult["cached"]): string {
+  return cached
+    .map(
+      (c) =>
+        `${c.platform}: scraped ${
+          c.scrapedAt ? ago(Date.parse(c.scrapedAt)) : "recently"
+        }`,
+    )
+    .join("\n");
 }
 
 export default function RefreshPage() {
@@ -140,7 +182,14 @@ export default function RefreshPage() {
       Object.fromEntries(
         targets.map((a) => [
           a.id,
-          { state: "running" as RowState, discovered: [], scraped: [], cached: [], failed: [] },
+          {
+            state: "running" as RowState,
+            discovered: [],
+            scraped: [],
+            cached: [],
+            partial: [],
+            failed: [],
+          },
         ]),
       ),
     );
@@ -165,6 +214,7 @@ export default function RefreshPage() {
             discovered: [],
             scraped: [],
             cached: [],
+            partial: [],
             failed: [],
             error: e instanceof Error ? e.message : String(e),
           },
@@ -193,9 +243,10 @@ export default function RefreshPage() {
           ) : (
             <>Scrapes</>
           )}{" "}
-          any linked platform whose cached data is stale (&gt;24h) to capture
-          fresh metrics and growth snapshots. Platforms with fresh cache are
-          skipped.
+          any linked platform whose data is stale (&gt;24h) to capture fresh
+          metrics and growth snapshots. Platforms already scraped in the last
+          24h — usually by the nightly auto-sweep — are reported as fresh and
+          skipped, with when they were scraped.
         </p>
         <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
           <label className="flex items-center gap-2 text-sm">
@@ -322,6 +373,7 @@ function RowSummary({ r }: { r: RowResult }) {
     !r.scraped.length &&
     !r.failed.length &&
     !r.cached.length;
+  const age = freshAge(r.cached);
 
   return (
     <div className="flex flex-col items-end gap-1 text-xs">
@@ -338,10 +390,22 @@ function RowSummary({ r }: { r: RowResult }) {
           </span>
         )}
         {r.cached.length > 0 && (
-          <span className="text-muted-foreground">
-            · {r.cached.length} cached
+          <span
+            className="cursor-help text-muted-foreground"
+            title={freshTitle(r.cached)}
+          >
+            · {r.cached.length} fresh{age ? ` (scraped ${age})` : ""}
           </span>
         )}
+        {r.partial.map((p) => (
+          <span
+            key={`p-${p.platform}`}
+            className="cursor-help text-amber-500"
+            title={p.note}
+          >
+            · {p.platform} partial
+          </span>
+        ))}
         {r.failed.length > 0 && (
           <span className="text-destructive">· {r.failed.length} failed</span>
         )}

@@ -209,9 +209,14 @@ def scrape_artist(artist_id: str, links: dict | None = None, force: bool = False
                 # Clearing metrics is clear_platform's job, not a scrape's.
                 updates.update({k: v for k, v in res.data.items()
                                 if k in ALLOWED_METRIC_COLUMNS and v is not None})
+            # "partial" (ok, but a metric the platform owns went missing — e.g.
+            # the monthly-listeners render 502'd) is deliberately not fresh per
+            # _is_fresh, so the next refresh retries it instead of waiting out
+            # the TTL and losing a day of snapshots.
+            status = "error" if not res.ok else ("partial" if res.partial else "ok")
             meta[platform] = {"last_scraped_at": res.scraped_at,
-                              "status": "ok" if res.ok else "error",
-                              "error": res.error}
+                              "status": status,
+                              "error": res.error or res.partial}
 
         # Avatar fallback: someone with no picture (manual adds — skaters, DJs)
         # inherits their social profile pic. Never overwrites an existing image

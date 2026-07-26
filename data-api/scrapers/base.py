@@ -52,12 +52,19 @@ def _host_key(host: Optional[str]) -> str:
 
 @dataclass
 class ScrapeResult:
-    """Uniform outcome of one platform fetch. ok=False carries an error string."""
+    """Uniform outcome of one platform fetch. ok=False carries an error string.
+
+    partial: set (to a reason string) on an ok result when a metric the platform
+    owns couldn't be fetched this time (e.g. the monthly-listeners render failed
+    while the Web API succeeded). A partial result is not considered fresh by the
+    cache, so the next refresh retries it instead of waiting out the TTL.
+    """
 
     platform: str
     ok: bool
     data: dict = field(default_factory=dict)
     error: Optional[str] = None
+    partial: Optional[str] = None
     scraped_at: str = field(
         default_factory=lambda: datetime.now(timezone.utc).isoformat()
     )
