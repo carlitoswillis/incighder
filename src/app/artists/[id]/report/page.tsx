@@ -17,6 +17,7 @@ import {
 } from "@/components/rewind-scrubber";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ReportPaper } from "@/components/report-paper";
 import { cn } from "@/lib/utils";
 
 type HistoryEntry = {
@@ -28,6 +29,8 @@ type HistoryEntry = {
 };
 
 // Print/PDF-ready one-sheet: the whole traction story on a single page.
+// ReportPaper is a fixed, page-sized box and nothing here is scaled to fit,
+// so the sheet is laid out to stay inside it.
 // Screen keeps the site's dark identity; @media print flips to the light
 // tokens (globals.css) so it reads like a document, not a screenshot.
 // The rewind scrubber (and ?date=) replays the sheet as of any snapshot day.
@@ -62,7 +65,7 @@ export default function ReportPage({
   if (error) return <p className="text-sm text-destructive">Not available.</p>;
   if (!artist)
     return (
-      <div className="mx-auto max-w-3xl space-y-4">
+      <div className="mx-auto w-full max-w-[696px] space-y-4">
         <Skeleton className="h-40 w-full rounded-xl" />
         <Skeleton className="h-64 w-full rounded-xl" />
       </div>
@@ -92,7 +95,7 @@ export default function ReportPage({
   ].filter((f) => f.v != null);
 
   return (
-    <div className="mx-auto max-w-3xl">
+    <div className="mx-auto w-full max-w-[696px]">
       {/* Screen-only chrome */}
       <div className="mb-6 space-y-3 print:hidden">
         <div className="flex items-center justify-between">
@@ -109,7 +112,7 @@ export default function ReportPage({
         <RewindScrubber ticks={ticks} dayIdx={dayIdx} onSelect={select} />
       </div>
 
-      <div className="report-sheet rounded-xl bg-card p-8 ring-1 ring-foreground/10 print:rounded-none print:p-0 print:ring-0">
+      <ReportPaper>
         {/* Masthead */}
         <div className="flex items-baseline justify-between border-b-2 border-primary pb-3">
           <div className="flex items-baseline gap-3">
@@ -126,13 +129,13 @@ export default function ReportPage({
         </div>
 
         {/* Identity */}
-        <div className="mt-8 flex items-start gap-6">
+        <div className="mt-6 flex items-start gap-6">
           {image && (
             <ArtistImage
               src={image}
               alt={artist.name}
-              size={112}
-              className="size-28 shrink-0 rounded-lg object-cover"
+              size={96}
+              className="size-24 shrink-0 rounded-lg object-cover"
             />
           )}
           <div className="min-w-0 flex-1">
@@ -158,15 +161,16 @@ export default function ReportPage({
           </div>
         </div>
 
-        {/* Bio */}
+        {/* Bio — the one free-text field on the sheet, so the one that has to
+            be capped for it to stay on the page. */}
         {artist.bio && (
-          <p className="mt-6 max-w-prose text-sm leading-relaxed text-muted-foreground">
-            {artist.bio.length > 420 ? artist.bio.slice(0, 420).trimEnd() + "…" : artist.bio}
+          <p className="mt-5 max-w-prose text-sm leading-relaxed text-muted-foreground">
+            {artist.bio.length > 240 ? artist.bio.slice(0, 240).trimEnd() + "…" : artist.bio}
           </p>
         )}
 
         {/* Traction ledger */}
-        <div className="mt-8">
+        <div className="mt-6">
           <h2 className="font-mono text-[11px] uppercase tracking-[0.2em] text-muted-foreground">
             Traction
           </h2>
@@ -201,7 +205,7 @@ export default function ReportPage({
               return (
                 <div
                   key={p.key}
-                  className="flex items-center gap-4 border-b border-border py-3"
+                  className="flex items-center gap-4 border-b border-border py-2"
                 >
                   <Icon className="size-4 shrink-0" style={{ color: p.color }} />
                   <div className="w-24 shrink-0 text-sm text-muted-foreground">
@@ -249,13 +253,15 @@ export default function ReportPage({
         {/* Footprint — current-only fields with no snapshot history, so it
             comes off the sheet when the report is rewound. */}
         {footprint.length > 0 && !asOfDay && (
-          <div className="mt-8">
+          <div className="mt-6">
             <h2 className="font-mono text-[11px] uppercase tracking-[0.2em] text-muted-foreground">
               Footprint
             </h2>
-            <div className="mt-2 grid grid-cols-3 gap-px overflow-hidden rounded-lg bg-border sm:grid-cols-6 print:grid-cols-6">
+            {/* The paper is a fixed width, so the sheet never reflows —
+                viewport breakpoints would only lie about it. */}
+            <div className="mt-2 grid grid-cols-6 gap-px overflow-hidden rounded-lg bg-border">
               {footprint.map((f) => (
-                <div key={f.label} className="bg-card p-3 print:bg-transparent">
+                <div key={f.label} className="bg-card p-3">
                   <div className="font-mono text-lg font-semibold tabular-nums">
                     {formatCompact(f.v)}
                   </div>
@@ -267,24 +273,24 @@ export default function ReportPage({
         )}
 
         {/* Footer */}
-        <div className="mt-10 flex items-baseline justify-between border-t border-border pt-3">
-          <span className="font-mono text-[10px] text-muted-foreground">
+        <div className="mt-auto flex items-baseline justify-between gap-4 border-t border-border pt-3">
+          <span className="min-w-0 truncate font-mono text-[10px] text-muted-foreground">
             incighder.vercel.app/artists/{id}
           </span>
-          <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+          <span className="shrink-0 whitespace-nowrap font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
             {asOfDay
               ? `Cross-platform traction · as of ${formatDay(asOfDay)}`
               : "Cross-platform traction · live data"}
           </span>
         </div>
-      </div>
+      </ReportPaper>
     </div>
   );
 }
 
 // Wider sparkline than the card version — the ledger rows give it room.
 function ReportSparkline({ values }: { values: number[] }) {
-  const w = 140;
+  const w = 120;
   const h = 32;
   const pad = 2;
   const min = Math.min(...values);
@@ -299,7 +305,7 @@ function ReportSparkline({ values }: { values: number[] }) {
     .join(" ");
   const up = values[values.length - 1] >= values[0];
   return (
-    <svg width={w} height={h} className="hidden shrink-0 sm:block print:block" aria-hidden>
+    <svg width={w} height={h} className="block shrink-0" aria-hidden>
       <polyline
         points={points}
         fill="none"

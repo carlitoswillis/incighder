@@ -86,6 +86,27 @@
   }
 }
 
+/* One-sheet geometry (see components/report-paper.tsx). The page is a fixed
+   box; `--preview` scales it down on screen when the viewport is narrower than
+   the paper. A transform, so it never affects layout — and it's off for print,
+   where the paper is already page-sized. */
+.report-shell {
+  height: var(--preview-h);
+  overflow: hidden;
+}
+.report-shell + .report-shell {
+  margin-top: 1.5rem;
+}
+.report-page {
+  transform: scale(var(--preview, 1));
+  transform-origin: top left;
+}
+
+/* The margin the paper is sized against — keep in sync with PAGE_W/PAGE_H. */
+@page {
+  margin: 0.5in;
+}
+
 /* Print: the one-sheet becomes a light document — remap the dark tokens to the
    light palette, drop the app chrome, and let the page own the paper. */
 @media print {
@@ -114,7 +135,35 @@
     padding: 0 !important;
     max-width: none !important;
   }
+  /* The paper is sized to the page, so every pixel an ancestor adds around it
+     spills onto a second sheet: min-h-screen pads it out to a viewport's worth
+     of blank paper, and stray margins push the bottom edge over. */
+  html,
+  body,
+  body > * {
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
   body {
     background: #ffffff !important;
+  }
+  /* The paper is already page-sized: undo the on-screen preview scaling and
+     the card styling, and let it sit flush on the sheet. */
+  .report-shell {
+    height: auto !important;
+    overflow: visible !important;
+    break-inside: avoid;
+  }
+  /* Each extra sheet is its own page. */
+  .report-shell + .report-shell {
+    margin-top: 0 !important;
+    break-before: page;
+  }
+  .report-page {
+    transform: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    margin: 0 !important;
   }
 }

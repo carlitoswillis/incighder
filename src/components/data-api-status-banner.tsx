@@ -29,7 +29,7 @@ export function DataApiStatusBanner() {
 
   if (!offline) return null;
   return (
-    <div className="border-b border-amber-500/30 bg-amber-500/10 px-4 py-1.5 text-center text-xs text-amber-400">
+    <div className="border-b border-amber-500/30 bg-amber-500/10 px-4 py-1.5 text-center text-xs text-amber-400 print:hidden">
       Live scraping is offline — the home data server is unreachable. Browsing
       and editing artists still works; scrape, refresh and discover are paused.
     </div>

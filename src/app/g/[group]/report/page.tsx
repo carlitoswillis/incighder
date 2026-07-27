@@ -17,6 +17,7 @@ import {
 } from "@/components/rewind-scrubber";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ReportPaper, ROSTER_PAGE_SIZE, chunk } from "@/components/report-paper";
 import { cn } from "@/lib/utils";
 
 type HistoryEntry = {
@@ -27,9 +28,10 @@ type HistoryEntry = {
 };
 type HistoryMap = Record<string, HistoryEntry>;
 
-// Roster one-sheet: every member of a group on one printable page — a ledger
-// row per person, per-platform numbers with growth deltas. The rewind
-// scrubber (and ?date=) replays the report as of any recorded snapshot day.
+// Roster one-sheet: the group on a printable page — a ledger row per person,
+// per-platform numbers with growth deltas. A roster too long for one sheet
+// continues onto further sheets, ROSTER_PAGE_SIZE members at a time. The
+// rewind scrubber (and ?date=) replays the report as of any snapshot day.
 export default function GroupReportPage({
   params,
 }: {
@@ -75,17 +77,21 @@ export default function GroupReportPage({
     month: "short",
     day: "numeric",
   });
+  // A roster longer than one sheet runs onto more sheets rather than being
+  // squeezed onto one — each sheet prints as its own page.
+  const sheets =
+    members && members.length > 0 ? chunk(members, ROSTER_PAGE_SIZE) : [[]];
 
   if (members === null)
     return (
-      <div className="mx-auto max-w-4xl space-y-4">
+      <div className="mx-auto w-full max-w-[696px] space-y-4">
         <Skeleton className="h-32 w-full rounded-xl" />
         <Skeleton className="h-64 w-full rounded-xl" />
       </div>
     );
 
   return (
-    <div className="mx-auto max-w-4xl">
+    <div className="mx-auto w-full max-w-[696px]">
       <div className="mb-6 space-y-3 print:hidden">
         <div className="flex items-center justify-between">
           <Link
@@ -101,129 +107,155 @@ export default function GroupReportPage({
         <RewindScrubber ticks={ticks} dayIdx={dayIdx} onSelect={select} />
       </div>
 
-      <div className="rounded-xl bg-card p-8 ring-1 ring-foreground/10 print:rounded-none print:p-0 print:ring-0">
-        {/* Masthead */}
-        <div className="flex items-baseline justify-between border-b-2 border-primary pb-3">
-          <div className="flex items-baseline gap-3">
-            <span className="text-lg font-semibold tracking-tight">
-              <span className="text-primary">◐</span> Incighder
-            </span>
+      {sheets.map((sheet, i) => (
+        <ReportPaper key={i}>
+          {/* Masthead */}
+          <div className="flex items-baseline justify-between border-b-2 border-primary pb-3">
+            <div className="flex items-baseline gap-3">
+              <span className="text-lg font-semibold tracking-tight">
+                <span className="text-primary">◐</span> Incighder
+              </span>
+              <span className="font-mono text-[11px] uppercase tracking-[0.2em] text-muted-foreground">
+                Roster one-sheet
+              </span>
+            </div>
             <span className="font-mono text-[11px] uppercase tracking-[0.2em] text-muted-foreground">
-              Roster one-sheet
+              {asOfDay ? formatDay(asOfDay) : today}
             </span>
           </div>
-          <span className="font-mono text-[11px] uppercase tracking-[0.2em] text-muted-foreground">
-            {asOfDay ? formatDay(asOfDay) : today}
-          </span>
-        </div>
 
-        <div className="mt-6 flex items-baseline justify-between">
-          <h1 className="text-3xl font-semibold tracking-tight">{name}</h1>
-          <span className="font-mono text-xs text-muted-foreground">
-            {members.length} {members.length === 1 ? "member" : "members"}
-          </span>
-        </div>
-
-        {members.length === 0 ? (
-          <p className="mt-6 text-sm text-muted-foreground">Nothing here yet.</p>
-        ) : (
-          <div className="mt-6 border-t border-border">
-            {members.map((a) => {
-              const h = histories[a.id] ?? {};
-              // A rewound row only shows what was recorded by that day; the
-              // score is recomputed from those as-of values (— if the person
-              // wasn't tracked yet).
-              const hasAsOf =
-                !asOfEnd ||
-                PLATFORMS.some(
-                  (p) => h[p.key] && valueAsOf(h[p.key].points, asOfEnd) != null,
-                );
-              const { score } = calculateArtistScore(
-                asOfEnd ? rewindArtist(a, h, asOfEnd) : a,
-              );
-              return (
-                <div
-                  key={a.id}
-                  className="flex flex-col gap-3 border-b border-border py-4 sm:flex-row sm:items-center"
-                >
-                  <div className="flex w-56 shrink-0 items-center gap-3">
-                    {a.images?.[0]?.url && (
-                      <ArtistImage
-                        src={a.images[0].url}
-                        alt={a.name}
-                        size={40}
-                        className="size-10 rounded-md object-cover"
-                      />
-                    )}
-                    <div className="min-w-0">
-                      <div className="truncate font-medium">{a.name}</div>
-                      <div className="font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
-                        score {hasAsOf ? score : "—"}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="grid flex-1 grid-cols-3 gap-x-4 gap-y-2 sm:grid-cols-5">
-                    {PLATFORMS.map((p) => {
-                      const e = h[p.key];
-                      let current: number | null;
-                      let pct: number | null;
-                      if (asOfEnd) {
-                        current = e ? valueAsOf(e.points, asOfEnd) : null;
-                        const first =
-                          e && e.points[0] && e.points[0].t <= asOfEnd
-                            ? e.points[0].v
-                            : null;
-                        pct =
-                          current != null && first
-                            ? ((current - first) / first) * 100
-                            : null;
-                      } else {
-                        current =
-                          e?.current ??
-                          (a[p.metric.field as keyof Artist] as number | null);
-                        pct = e && e.first ? (e.change / e.first) * 100 : null;
-                      }
-                      if (current == null) return <div key={p.key} />;
-                      const Icon = p.Icon;
-                      return (
-                        <div key={p.key} className="min-w-0">
-                          <div className="flex items-center gap-1.5">
-                            <Icon className="size-3 shrink-0" style={{ color: p.color }} />
-                            <span className="font-mono text-sm font-semibold tabular-nums">
-                              {formatCompact(current)}
-                            </span>
-                          </div>
-                          {pct != null && pct !== 0 && (
-                            <div
-                              className={cn(
-                                "font-mono text-[10px] tabular-nums",
-                                pct > 0 ? "text-emerald-500" : "text-rose-500",
-                              )}
-                            >
-                              {pct > 0 ? "+" : ""}
-                              {pct.toFixed(1)}%
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              );
-            })}
+          <div className="mt-6 flex items-baseline justify-between">
+            <h1 className="text-3xl font-semibold tracking-tight">{name}</h1>
+            <span className="font-mono text-xs text-muted-foreground">
+              {members.length} {members.length === 1 ? "member" : "members"}
+            </span>
           </div>
-        )}
 
-        <div className="mt-10 flex items-baseline justify-between border-t border-border pt-3">
-          <span className="font-mono text-[10px] text-muted-foreground">
-            incighder.vercel.app/g/{encodeURIComponent(name)}
-          </span>
-          <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-            {asOfDay
-              ? `Cross-platform traction · as of ${formatDay(asOfDay)}`
-              : "Cross-platform traction · live data"}
-          </span>
+          {sheet.length === 0 ? (
+            <p className="mt-6 text-sm text-muted-foreground">Nothing here yet.</p>
+          ) : (
+            <div className="mt-6">
+              {/* Platform icons ride in a header row rather than in every cell —
+                  one column per platform keeps a member to a single row, and the
+                  columns are too narrow to carry an icon each. */}
+              <div className="flex items-end gap-3 border-b border-border pb-1.5">
+                <div className="w-44 shrink-0" />
+                <div className="grid min-w-0 flex-1 grid-cols-7 gap-x-1">
+                  {PLATFORMS.map((p) => (
+                    <p.Icon
+                      key={p.key}
+                      className="size-3.5"
+                      style={{ color: p.color }}
+                      title={p.label}
+                    />
+                  ))}
+                </div>
+              </div>
+              {sheet.map((a) => (
+                <MemberRow
+                  key={a.id}
+                  artist={a}
+                  history={histories[a.id] ?? {}}
+                  asOfEnd={asOfEnd}
+                />
+              ))}
+            </div>
+          )}
+
+          <div className="mt-auto flex items-baseline justify-between gap-4 border-t border-border pt-3">
+            <span className="min-w-0 truncate font-mono text-[10px] text-muted-foreground">
+              incighder.vercel.app/g/{encodeURIComponent(name)}
+            </span>
+            {sheets.length > 1 && (
+              <span className="shrink-0 whitespace-nowrap font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+                Page {i + 1} of {sheets.length}
+              </span>
+            )}
+            <span className="shrink-0 whitespace-nowrap font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+              {asOfDay
+                ? `Cross-platform traction · as of ${formatDay(asOfDay)}`
+                : "Cross-platform traction · live data"}
+            </span>
+          </div>
+        </ReportPaper>
+      ))}
+    </div>
+  );
+}
+
+function MemberRow({
+  artist,
+  history,
+  asOfEnd,
+}: {
+  artist: Artist;
+  history: HistoryMap;
+  asOfEnd: string | null;
+}) {
+  // A rewound row only shows what was recorded by that day; the score is
+  // recomputed from those as-of values (— if the person wasn't tracked yet).
+  const hasAsOf =
+    !asOfEnd ||
+    PLATFORMS.some(
+      (p) => history[p.key] && valueAsOf(history[p.key].points, asOfEnd) != null,
+    );
+  const { score } = calculateArtistScore(
+    asOfEnd ? rewindArtist(artist, history, asOfEnd) : artist,
+  );
+
+  return (
+    <div className="flex items-center gap-3 border-b border-border py-2">
+      <div className="flex w-44 shrink-0 items-center gap-3">
+        {artist.images?.[0]?.url && (
+          <ArtistImage
+            src={artist.images[0].url}
+            alt={artist.name}
+            size={32}
+            className="size-8 rounded-md object-cover"
+          />
+        )}
+        <div className="min-w-0">
+          <div className="truncate font-medium">{artist.name}</div>
+          <div className="font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
+            score {hasAsOf ? score : "—"}
+          </div>
         </div>
+      </div>
+      <div className="grid min-w-0 flex-1 grid-cols-7 gap-x-1">
+        {PLATFORMS.map((p) => {
+          const e = history[p.key];
+          let current: number | null;
+          let pct: number | null;
+          if (asOfEnd) {
+            current = e ? valueAsOf(e.points, asOfEnd) : null;
+            const first =
+              e && e.points[0] && e.points[0].t <= asOfEnd ? e.points[0].v : null;
+            pct = current != null && first ? ((current - first) / first) * 100 : null;
+          } else {
+            current =
+              e?.current ?? (artist[p.metric.field as keyof Artist] as number | null);
+            pct = e && e.first ? (e.change / e.first) * 100 : null;
+          }
+          if (current == null) return <div key={p.key} />;
+          return (
+            <div key={p.key} className="min-w-0">
+              <div className="font-mono text-sm font-semibold tabular-nums">
+                {formatCompact(current)}
+              </div>
+              {pct != null && pct !== 0 && (
+                <div
+                  className={cn(
+                    "font-mono text-[10px] tabular-nums",
+                    pct > 0 ? "text-emerald-500" : "text-rose-500",
+                  )}
+                >
+                  {pct > 0 ? "+" : ""}
+                  {pct.toFixed(1)}%
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
