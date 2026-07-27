@@ -11,10 +11,18 @@ import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 
 // the paper, so it stays a readable whole page on a phone. That's a transform,
 // which never touches layout size, and it's dropped for print.
 
-// 96 CSS px per inch. Sized to fit inside the printable area of BOTH US Letter
+// 96 CSS px per inch. Width fits inside the printable area of BOTH US Letter
 // (7.5 x 10in) and A4 (7.27 x 10.69in) at the 0.5in @page margin in globals.css.
+//
+// Height is set by the sheet's ASPECT RATIO, not by that printable height:
+// Safari (iOS especially) prints by scaling the layout to fit the paper WIDTH,
+// so a sheet narrower than the printable area is scaled *up* and takes its
+// height with it. At 7.25in wide on Letter that is a ~3.4% enlargement, and a
+// sheet any taller than 7.25 / (7.5/10) = 9.67in comes out over 10in — which
+// pushes the footer onto a second, near-empty page. 9.25in leaves room for
+// that, and for narrower default margins than ours (down to 0.25in).
 const PAGE_W = 696; // 7.25in
-const PAGE_H = 936; // 9.75in
+const PAGE_H = 888; // 9.25in
 
 export function ReportPaper({ children }: { children: ReactNode }) {
   const shell = useRef<HTMLDivElement>(null);

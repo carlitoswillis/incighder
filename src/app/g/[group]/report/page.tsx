@@ -204,7 +204,7 @@ function MemberRow({
   );
 
   return (
-    <div className="flex items-center gap-3 border-b border-border py-2">
+    <div className="flex items-center gap-3 border-b border-border py-1.5">
       <div className="flex w-44 shrink-0 items-center gap-3">
         {artist.images?.[0]?.url && (
           <ArtistImage
@@ -215,7 +215,7 @@ function MemberRow({
           />
         )}
         <div className="min-w-0">
-          <div className="truncate font-medium">{artist.name}</div>
+          <div className="truncate font-medium leading-tight">{artist.name}</div>
           <div className="font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
             score {hasAsOf ? score : "—"}
           </div>
