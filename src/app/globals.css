@@ -142,6 +142,7 @@
   body,
   body > * {
     min-height: 0 !important;
+    height: auto !important;
     margin: 0 !important;
     padding: 0 !important;
   }
@@ -165,5 +166,13 @@
     border-radius: 0 !important;
     box-shadow: none !important;
     margin: 0 !important;
+    /* Print the sheet at its content height, not the full page height. The
+       fixed box is a screen affordance — it makes the preview page-shaped and
+       pins the footer to the bottom — but on paper it pads the sheet out to
+       nearly a full page, and Safari's scale-to-fit-width enlargement then
+       tips that empty tail onto a blank second page. Sized to its content
+       there is inches of room to absorb the enlargement. */
+    height: auto !important;
+    overflow: visible !important;
   }
 }
