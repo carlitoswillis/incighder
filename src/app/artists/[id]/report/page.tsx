@@ -139,14 +139,16 @@ export default function ReportPage({
             />
           )}
           <div className="min-w-0 flex-1">
-            <h1 className="text-4xl font-semibold tracking-tight">{artist.name}</h1>
+            <h1 className="line-clamp-2 text-4xl font-semibold tracking-tight">
+              {artist.name}
+            </h1>
             {genres.length > 0 && (
-              <p className="mt-1.5 font-mono text-[11px] uppercase tracking-[0.15em] text-muted-foreground">
+              <p className="mt-1.5 truncate font-mono text-[11px] uppercase tracking-[0.15em] text-muted-foreground">
                 {genres.join(" · ")}
               </p>
             )}
             {artist.external_urls?.spotify && (
-              <p className="mt-2 break-all font-mono text-xs text-muted-foreground">
+              <p className="mt-2 truncate font-mono text-xs text-muted-foreground">
                 {artist.external_urls.spotify.replace("https://", "")}
               </p>
             )}
@@ -161,11 +163,12 @@ export default function ReportPage({
           </div>
         </div>
 
-        {/* Bio — the one free-text field on the sheet, so the one that has to
-            be capped for it to stay on the page. */}
+        {/* The name, the genre list and the bio are the only parts of this
+            sheet whose height depends on the data, so each gets a hard line
+            budget — that is what keeps the sheet inside its page. */}
         {artist.bio && (
-          <p className="mt-5 max-w-prose text-sm leading-relaxed text-muted-foreground">
-            {artist.bio.length > 240 ? artist.bio.slice(0, 240).trimEnd() + "…" : artist.bio}
+          <p className="mt-5 line-clamp-2 max-w-prose text-sm leading-relaxed text-muted-foreground">
+            {artist.bio}
           </p>
         )}
 
@@ -205,7 +208,7 @@ export default function ReportPage({
               return (
                 <div
                   key={p.key}
-                  className="flex items-center gap-4 border-b border-border py-2"
+                  className="flex items-center gap-4 border-b border-border py-1.5"
                 >
                   <Icon className="size-4 shrink-0" style={{ color: p.color }} />
                   <div className="w-24 shrink-0 text-sm text-muted-foreground">
@@ -217,7 +220,7 @@ export default function ReportPage({
                   >
                     {formatCompact(current)}
                   </div>
-                  <div className="min-w-0 flex-1 text-sm">
+                  <div className="min-w-0 flex-1 truncate text-sm">
                     {change != null && change !== 0 ? (
                       <span
                         className={cn(
