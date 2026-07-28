@@ -155,7 +155,9 @@ export default function ReportPage({
           )}
           <div className="min-w-0 flex-1">
             <h1 className="line-clamp-2 text-4xl font-semibold tracking-tight">
-              {artist.name}
+              <Link href={`/artists/${id}`} className="transition-colors hover:text-primary">
+                {artist.name}
+              </Link>
             </h1>
             {genres.length > 0 && (
               <p className="mt-1.5 truncate font-mono text-[11px] uppercase tracking-[0.15em] text-muted-foreground">

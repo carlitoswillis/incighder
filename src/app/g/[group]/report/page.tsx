@@ -365,8 +365,13 @@ function MemberRow({
           />
         )}
         <div className="min-w-0">
-          <div className="truncate font-medium leading-tight">{artist.name}</div>
-          <div className="font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
+          <Link
+            href={`/artists/${artist.id}`}
+            className="block truncate font-medium leading-tight transition-colors hover:text-primary"
+          >
+            {artist.name}
+          </Link>
+          <div className="whitespace-nowrap font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
             score {score ?? "—"}
             {trajectoryLabel && (
               <span
@@ -379,7 +384,7 @@ function MemberRow({
                       : "text-muted-foreground",
                 )}
               >
-                · {trajectoryLabel}
+                · {trajectoryLabel.replace("/wk", "")}
               </span>
             )}
           </div>
@@ -452,7 +457,11 @@ function MemberBreakdown({
           />
         )}
         <div className="min-w-0 flex-1">
-          <h2 className="truncate text-lg font-semibold tracking-tight">{artist.name}</h2>
+          <h2 className="truncate text-lg font-semibold tracking-tight">
+            <Link href={`/artists/${artist.id}`} className="transition-colors hover:text-primary">
+              {artist.name}
+            </Link>
+          </h2>
           {artist.external_urls?.spotify && (
             <p className="truncate font-mono text-[10px] text-muted-foreground">
               {artist.external_urls.spotify.replace("https://", "")}
