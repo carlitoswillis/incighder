@@ -70,7 +70,7 @@ export function ScoreBadge({
           {Math.round(score)}
         </span>
         {size === "lg" && (
-          <span className="text-[9px] uppercase tracking-wider text-muted-foreground">
+          <span className="text-[8px] uppercase tracking-tight text-muted-foreground">
             traction
           </span>
         )}
