@@ -1,11 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Minus, Table2, TrendingDown, TrendingUp } from "lucide-react";
+import { ChevronDown, Minus, Table2, TrendingDown, TrendingUp } from "lucide-react";
 import { PLATFORMS } from "@/lib/platforms";
 import { formatCompact, formatFull } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { GrowthChart } from "@/components/growth-chart";
+import { Sparkline } from "@/components/sparkline";
+import { platformInk } from "@/lib/platforms";
 import { DateRangePicker, useDateRange } from "@/components/date-range";
 import { useAdmin } from "@/components/admin-context";
 import {
@@ -58,6 +60,9 @@ export function GrowthSection({
   );
   const range = useDateRange(days);
   const [table, setTable] = useState(false);
+  // Seven full-height charts is a lot of page to scroll past. Each row carries
+  // its trend as a sparkline and opens the readable chart on demand.
+  const [open, setOpen] = useState<string | null>(null);
 
   if (!history) return null;
   const platforms = PLATFORMS.filter((p) => series[p.key]?.length);
@@ -68,9 +73,10 @@ export function GrowthSection({
         <div>
           <h2 className="text-lg font-semibold tracking-tight">Growth</h2>
           <p className="mt-1 max-w-prose text-sm text-muted-foreground">
-            Follower change over the window below — every scrape day is a point on
-            the line. Each linked account is tracked on its own timeline, so
-            re-linking a different account doesn&apos;t count as growth.
+            Follower change over the window below — every scrape day is a point.
+            Open a platform for the full chart. Each linked account is tracked on
+            its own timeline, so re-linking a different account doesn&apos;t count
+            as growth.
           </p>
         </div>
         {platforms.length > 0 && (
@@ -107,7 +113,7 @@ export function GrowthSection({
           }))}
         />
       ) : (
-        <div className="mt-4 divide-y divide-border/60">
+        <div className="mt-3 divide-y divide-border/60">
           {platforms.map((p) => {
             const windowed = sliceDays(series[p.key], range.fromDay, range.toDay);
             const d = deltaOver(series[p.key], range.fromDay, range.toDay);
@@ -115,11 +121,16 @@ export function GrowthSection({
             const TrendIcon =
               dir === "up" ? TrendingUp : dir === "down" ? TrendingDown : Minus;
             const Icon = p.Icon;
+            const isOpen = open === p.key;
             return (
-              <div key={p.key} className="py-4">
-                <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+              <div key={p.key} className="py-2">
+                <button
+                  onClick={() => setOpen(isOpen ? null : p.key)}
+                  aria-expanded={isOpen}
+                  className="flex w-full flex-wrap items-center gap-x-4 gap-y-1 rounded-md px-1 py-1.5 text-left transition-colors hover:bg-secondary/50"
+                >
                   <Icon
-                    className="size-4 shrink-0 self-center"
+                    className="size-4 shrink-0"
                     style={{ color: p.color }}
                     aria-hidden
                   />
@@ -148,23 +159,42 @@ export function GrowthSection({
                       {windowed.length < 2 ? "one scrape in this window" : "no change"}
                     </span>
                   )}
-                  <span className="ml-auto font-mono text-[11px] text-muted-foreground">
-                    {windowed.length} {windowed.length === 1 ? "scrape day" : "scrape days"}
+                  <span className="ml-auto flex items-center gap-3">
+                    {!isOpen && (
+                      <Sparkline
+                        series={windowed}
+                        color={p.color}
+                        printColor={platformInk(p, true)}
+                        width={110}
+                        height={26}
+                      />
+                    )}
+                    <span className="font-mono text-[11px] text-muted-foreground">
+                      {windowed.length}d
+                    </span>
+                    <ChevronDown
+                      className={cn(
+                        "size-4 text-muted-foreground transition-transform",
+                        isOpen && "rotate-180",
+                      )}
+                      aria-hidden
+                    />
                   </span>
-                </div>
-                {windowed.length === 0 ? (
-                  <p className="mt-2 text-xs text-muted-foreground">
-                    Not tracked in this window — first recorded{" "}
-                    {formatDay(series[p.key][0].day)}.
-                  </p>
-                ) : (
-                  <GrowthChart
-                    series={windowed}
-                    color={p.color}
-                    label={`${p.label} ${p.metric.label.toLowerCase()}`}
-                    className="mt-2"
-                  />
-                )}
+                </button>
+                {isOpen &&
+                  (windowed.length === 0 ? (
+                    <p className="mt-2 px-1 text-xs text-muted-foreground">
+                      Not tracked in this window — first recorded{" "}
+                      {formatDay(series[p.key][0].day)}.
+                    </p>
+                  ) : (
+                    <GrowthChart
+                      series={windowed}
+                      color={p.color}
+                      label={`${p.label} ${p.metric.label.toLowerCase()}`}
+                      className="mt-1"
+                    />
+                  ))}
               </div>
             );
           })}
