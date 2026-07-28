@@ -1,19 +1,34 @@
 "use client";
 
+import { TrendingDown, TrendingUp } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
-/** Visualizes the 0–200 artist score (utils/score.ts) as a cyan progress ring. */
+/**
+ * Traction dial (0–max, default 100) with an optional Trajectory chip beneath it.
+ * Pass `trajectoryLabel` (even as null) to opt into the two-signal display: the
+ * chip shows growth direction; a null label reads as "—" (no history yet).
+ */
 export function ScoreBadge({
   score,
   breakdown,
+  max = 100,
+  trajectory,
+  trajectoryLabel,
+  trajectoryTitle,
   size = "default",
 }: {
   score: number;
   breakdown?: string;
+  max?: number;
+  /** Signed weekly %; sets the chip color. */
+  trajectory?: number | null;
+  /** Chip text; pass (incl. null) to render the chip at all. */
+  trajectoryLabel?: string | null;
+  trajectoryTitle?: string;
   size?: "default" | "lg";
 }) {
-  const pct = Math.max(0, Math.min(1, score / 200));
+  const pct = Math.max(0, Math.min(1, max > 0 ? score / max : 0));
   const dim = size === "lg" ? 64 : 48;
   const stroke = size === "lg" ? 6 : 5;
   const r = (dim - stroke) / 2;
@@ -56,16 +71,16 @@ export function ScoreBadge({
         </span>
         {size === "lg" && (
           <span className="text-[9px] uppercase tracking-wider text-muted-foreground">
-            score
+            traction
           </span>
         )}
       </div>
     </div>
   );
 
-  if (!breakdown) return ring;
-
-  return (
+  const dial = !breakdown ? (
+    ring
+  ) : (
     <Tooltip>
       <TooltipTrigger render={<span className="cursor-help" />}>
         {ring}
@@ -74,5 +89,33 @@ export function ScoreBadge({
         {breakdown}
       </TooltipContent>
     </Tooltip>
+  );
+
+  // trajectoryLabel === undefined → caller opted out; render the dial alone
+  // exactly as before (keeps every existing single-score call unchanged).
+  if (trajectoryLabel === undefined) return dial;
+
+  const up = trajectory != null && trajectory > 0.05;
+  const down = trajectory != null && trajectory < -0.05;
+
+  return (
+    <div className="flex flex-col items-center gap-1">
+      {dial}
+      <span
+        title={trajectoryTitle}
+        className={cn(
+          "inline-flex items-center gap-0.5 whitespace-nowrap rounded-full px-1.5 py-0.5 text-[10px] font-medium tabular-nums leading-none",
+          up
+            ? "bg-emerald-500/10 text-emerald-400"
+            : down
+              ? "bg-rose-500/10 text-rose-400"
+              : "text-muted-foreground",
+        )}
+      >
+        {up && <TrendingUp className="size-3" aria-hidden />}
+        {down && <TrendingDown className="size-3" aria-hidden />}
+        {trajectoryLabel ?? "—"}
+      </span>
+    </div>
   );
 }

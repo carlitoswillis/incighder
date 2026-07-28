@@ -28,6 +28,13 @@ from scrapers.youtube import fetch_youtube
 
 CACHE_TTL = timedelta(hours=24)
 
+# How many artists the scheduled sweep works on at once. Safe to raise because
+# throttle() locks per HOST, not per artist (see base.py): concurrent artists
+# hitting the same site still serialize on that host's lock, so we never burst
+# it — we only stop leaving hosts idle between artists. Each scrape_artist owns
+# its own DB connection, so nothing is shared across sweep threads.
+SWEEP_WORKERS = int(os.getenv("SCRAPE_SWEEP_WORKERS", "4"))
+
 # Scraped platforms (X is manual-entry only, handled in the UI / edit form).
 PLATFORMS = ("spotify", "youtube", "soundcloud", "instagram", "tiktok", "twitch")
 
@@ -333,21 +340,38 @@ def all_artist_ids() -> list:
         conn.close()
 
 
+def _sweep_one(aid: str, force: bool) -> tuple[str, dict]:
+    try:
+        results = scrape_artist(aid, force=force).get("results", {})
+        return aid, {
+            "ok": True,
+            "scraped": [p for p, r in results.items()
+                        if r.get("ok") and not r.get("skipped")],
+            "skipped": [p for p, r in results.items() if r.get("skipped")],
+        }
+    except Exception as e:  # never let one artist abort the whole sweep
+        return aid, {"ok": False, "error": str(e)}
+
+
 def scrape_all(force: bool = False) -> dict:
     """Sweep every tracked artist (TTL-respected unless force). Returns a per-artist
-    summary; one artist failing never aborts the sweep. Used by the scheduler."""
+    summary; one artist failing never aborts the sweep. Used by the scheduler.
+
+    Artists are swept SWEEP_WORKERS at a time. The per-host throttle (not per-artist)
+    is what keeps this polite: two artists hitting the same site still queue on that
+    host's lock, so raising concurrency fills idle host time without ever bursting a
+    single site. A larger roster gets a near-linear wall-clock win up to the point
+    where every distinct host is kept busy."""
+    ids = all_artist_ids()
+    if not ids:
+        return {}
+    workers = max(1, min(SWEEP_WORKERS, len(ids)))
     summary: dict = {}
-    for aid in all_artist_ids():
-        try:
-            results = scrape_artist(aid, force=force).get("results", {})
-            summary[aid] = {
-                "ok": True,
-                "scraped": [p for p, r in results.items()
-                            if r.get("ok") and not r.get("skipped")],
-                "skipped": [p for p, r in results.items() if r.get("skipped")],
-            }
-        except Exception as e:  # never let one artist abort the whole sweep
-            summary[aid] = {"ok": False, "error": str(e)}
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        futures = [pool.submit(_sweep_one, aid, force) for aid in ids]
+        for fut in as_completed(futures):
+            aid, s = fut.result()
+            summary[aid] = s
     return summary
 
 

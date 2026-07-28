@@ -46,7 +46,8 @@ export function ArtistCard({
   const genres = parseGenres(artist.genres);
   const image = artist.images?.[0]?.url ?? null;
   const spotifyUrl = artist.external_urls?.spotify;
-  const { score, breakdown } = calculateArtistScore(artist);
+  const { score, breakdown, trajectory, trajectoryLabel, trajectoryBreakdown } =
+    calculateArtistScore(artist);
 
   return (
     <>
@@ -121,7 +122,14 @@ export function ArtistCard({
                     </Button>
                   </div>
                 )}
-                <ScoreBadge score={score} breakdown={breakdown} size="lg" />
+                <ScoreBadge
+                  score={score}
+                  breakdown={breakdown}
+                  trajectory={trajectory}
+                  trajectoryLabel={trajectoryLabel}
+                  trajectoryTitle={trajectoryBreakdown}
+                  size="lg"
+                />
                 <DropdownMenu>
                   <DropdownMenuTrigger
                     render={

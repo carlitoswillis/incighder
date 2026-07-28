@@ -1,9 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { CalendarRange } from "lucide-react";
+import { CalendarRange, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { daysBetween, formatDay } from "@/lib/series";
+import { daysBetween, formatDay, formatDayShort } from "@/lib/series";
 
 // Growth is read over a window, so both ends are pickable: a start date to
 // measure FROM and an end date to measure TO. Ticks are the real snapshot days,
@@ -94,20 +94,31 @@ export function DateRangePicker({
   className?: string;
 }) {
   const { days, fromIdx, toIdx, fromDay, toDay, isFull, setRange } = range;
+  const [custom, setCustom] = useState(false);
   if (days.length < 2) return null;
   const last = days.length - 1;
 
-  // A preset is the last N days of recorded history — it moves the start and
-  // pins the end to the newest snapshot.
-  const applyPreset = (n: number) => {
-    const cutoff = days[last];
+  // The start index a "last N days" preset resolves to (end pinned to newest).
+  const presetFrom = (n: number) => {
     let from = 0;
     days.forEach((d, i) => {
-      if (daysBetween(d, cutoff) >= n) from = i;
+      if (daysBetween(d, days[last]) >= n) from = i;
     });
-    setRange(from, last);
+    return from;
   };
+  // Which chip is lit: a preset only when the end is pinned to "now" and the
+  // start matches; otherwise All, otherwise the window is Custom.
+  const activePreset =
+    toIdx === last ? PRESETS.find((n) => presetFrom(n) === fromIdx) : undefined;
   const spanDays = fromDay && toDay ? daysBetween(fromDay, toDay) : 0;
+
+  const chip = (active: boolean) =>
+    cn(
+      "rounded-md px-2 py-1 text-xs transition-colors",
+      active
+        ? "bg-primary/15 text-primary"
+        : "text-muted-foreground hover:bg-secondary hover:text-foreground",
+    );
 
   return (
     <div
@@ -116,77 +127,105 @@ export function DateRangePicker({
         className,
       )}
     >
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-        <CalendarRange className="size-4 shrink-0 text-muted-foreground" />
-        <span className="font-mono text-xs tabular-nums">
-          {fromDay ? formatDay(fromDay) : "—"}
-          <span className="px-1.5 text-muted-foreground">→</span>
-          {toDay ? formatDay(toDay) : "—"}
-        </span>
-        <span className="text-xs text-muted-foreground">
-          {spanDays > 0 ? `${spanDays} days` : "same day"}
-        </span>
-        <div className="ml-auto flex items-center gap-1">
-          {PRESETS.map((n) => (
-            <button
-              key={n}
-              onClick={() => applyPreset(n)}
-              className="rounded-md px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-            >
-              {n}d
-            </button>
-          ))}
+      <div className="flex flex-wrap items-center gap-x-1.5 gap-y-2">
+        <CalendarRange className="mr-0.5 size-4 shrink-0 text-muted-foreground" />
+        {PRESETS.map((n) => (
           <button
-            onClick={range.reset}
-            disabled={isFull}
-            className={cn(
-              "rounded-md px-2 py-1 text-xs transition-colors",
-              isFull
-                ? "text-muted-foreground/40"
-                : "text-primary hover:bg-secondary",
-            )}
+            key={n}
+            onClick={() => {
+              setRange(presetFrom(n), last);
+              setCustom(false);
+            }}
+            className={chip(activePreset === n)}
+            aria-pressed={activePreset === n}
           >
-            All
+            {n}d
           </button>
-        </div>
+        ))}
+        <button
+          onClick={() => {
+            range.reset();
+            setCustom(false);
+          }}
+          className={chip(isFull)}
+          aria-pressed={isFull}
+        >
+          All
+        </button>
+        <button
+          onClick={() => setCustom((c) => !c)}
+          className={cn(
+            chip(!activePreset && !isFull),
+            "inline-flex items-center gap-1",
+          )}
+          aria-expanded={custom}
+        >
+          Custom
+          <ChevronDown
+            className={cn("size-3.5 transition-transform", custom && "rotate-180")}
+            aria-hidden
+          />
+        </button>
+        <span className="ml-auto font-mono text-xs tabular-nums text-muted-foreground">
+          {fromDay ? formatDayShort(fromDay) : "—"}
+          <span className="px-1">→</span>
+          {toDay ? formatDayShort(toDay) : "—"}
+          <span className="ml-1.5 text-muted-foreground/70">
+            {spanDays > 0 ? `${spanDays}d` : "same day"}
+          </span>
+        </span>
       </div>
 
-      {/* Two handles over the same track: start on top, end below, each snapping
-          to a recorded day. Native inputs so keyboard and screen readers work. */}
-      <div className="mt-2 space-y-1">
-        <label className="flex items-center gap-2">
-          <span className="w-8 shrink-0 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-            From
-          </span>
-          <input
-            type="range"
-            min={0}
-            max={last}
-            step={1}
+      {/* Custom window: two day pickers. Native selects so keyboard and touch
+          both work, and the list only holds days that were actually recorded. */}
+      {custom && (
+        <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-border/60 pt-2.5">
+          <DaySelect
+            label="From"
+            days={days}
             value={fromIdx}
-            onChange={(e) => setRange(Number(e.target.value), toIdx)}
-            className="w-full accent-primary"
-            aria-label="Start of the comparison window"
-            aria-valuetext={fromDay ? formatDay(fromDay) : undefined}
+            onChange={(i) => setRange(i, toIdx)}
           />
-        </label>
-        <label className="flex items-center gap-2">
-          <span className="w-8 shrink-0 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-            To
-          </span>
-          <input
-            type="range"
-            min={0}
-            max={last}
-            step={1}
+          <DaySelect
+            label="To"
+            days={days}
             value={toIdx}
-            onChange={(e) => setRange(fromIdx, Number(e.target.value))}
-            className="w-full accent-primary"
-            aria-label="End of the comparison window"
-            aria-valuetext={toDay ? formatDay(toDay) : undefined}
+            onChange={(i) => setRange(fromIdx, i)}
           />
-        </label>
-      </div>
+        </div>
+      )}
     </div>
+  );
+}
+
+function DaySelect({
+  label,
+  days,
+  value,
+  onChange,
+}: {
+  label: string;
+  days: string[];
+  value: number;
+  onChange: (i: number) => void;
+}) {
+  return (
+    <label className="flex items-center gap-1.5">
+      <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+        {label}
+      </span>
+      <select
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+        className="rounded-md border border-border/60 bg-transparent px-1.5 py-1 text-xs tabular-nums focus:outline-none focus:ring-1 focus:ring-primary"
+        aria-label={`${label} day`}
+      >
+        {days.map((d, i) => (
+          <option key={d} value={i}>
+            {formatDay(d)}
+          </option>
+        ))}
+      </select>
+    </label>
   );
 }

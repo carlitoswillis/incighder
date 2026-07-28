@@ -318,7 +318,9 @@ function Footer({
   );
 }
 
-/** Score as of the window's end, or "—" when nothing was tracked by then. */
+/** Traction as of the window's end (null when nothing was tracked by then), plus
+ *  trajectory. Trajectory is only meaningful live — rewindArtist strips momentum —
+ *  so it comes back null on a rewound/windowed sheet. */
 function windowScore(artist: Artist, history: HistoryMap, asOfDay: string | null) {
   const end = asOfDay ? dayEnd(asOfDay) : null;
   const tracked =
@@ -327,8 +329,12 @@ function windowScore(artist: Artist, history: HistoryMap, asOfDay: string | null
       const pts = history[p.key]?.points ?? [];
       return pts.some((pt) => pt.t <= end);
     });
-  const { score } = calculateArtistScore(end ? rewindArtist(artist, history, end) : artist);
-  return tracked ? score : null;
+  const s = calculateArtistScore(end ? rewindArtist(artist, history, end) : artist);
+  return {
+    score: tracked ? s.score : null,
+    trajectory: s.trajectory,
+    trajectoryLabel: s.trajectoryLabel,
+  };
 }
 
 function MemberRow({
@@ -342,7 +348,11 @@ function MemberRow({
   history: HistoryMap;
   range: DateRange;
 }) {
-  const score = windowScore(artist, history, range.isLive ? null : range.toDay);
+  const { score, trajectory, trajectoryLabel } = windowScore(
+    artist,
+    history,
+    range.isLive ? null : range.toDay,
+  );
   return (
     <div className="flex items-center gap-3 border-b border-border py-1.5">
       <div className="flex w-44 shrink-0 items-center gap-3">
@@ -358,6 +368,20 @@ function MemberRow({
           <div className="truncate font-medium leading-tight">{artist.name}</div>
           <div className="font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
             score {score ?? "—"}
+            {trajectoryLabel && (
+              <span
+                className={cn(
+                  "ml-1 normal-case",
+                  trajectory != null && trajectory > 0.05
+                    ? "text-emerald-500"
+                    : trajectory != null && trajectory < -0.05
+                      ? "text-rose-500"
+                      : "text-muted-foreground",
+                )}
+              >
+                · {trajectoryLabel}
+              </span>
+            )}
           </div>
         </div>
       </div>
@@ -404,7 +428,11 @@ function MemberBreakdown({
   history: HistoryMap;
   range: DateRange;
 }) {
-  const score = windowScore(artist, history, range.isLive ? null : range.toDay);
+  const { score, trajectory, trajectoryLabel } = windowScore(
+    artist,
+    history,
+    range.isLive ? null : range.toDay,
+  );
   const rows = PLATFORMS.map((p) => {
     const full = series[p.key] ?? [];
     const d = deltaOver(full, range.fromDay, range.toDay);
@@ -438,6 +466,20 @@ function MemberBreakdown({
           <div className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground">
             Traction score
           </div>
+          {trajectoryLabel && (
+            <div
+              className={cn(
+                "mt-0.5 font-mono text-[10px] tabular-nums",
+                trajectory != null && trajectory > 0.05
+                  ? "text-emerald-500"
+                  : trajectory != null && trajectory < -0.05
+                    ? "text-rose-500"
+                    : "text-muted-foreground",
+              )}
+            >
+              {trajectoryLabel}
+            </div>
+          )}
         </div>
       </div>
 

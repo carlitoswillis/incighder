@@ -88,7 +88,7 @@ export default function ReportPage({
 
   const image = artist.images?.[0]?.url ?? null;
   const genres = (artist.genres ?? "").replace(/[[\]"']/g, "").split(",").map((s) => s.trim()).filter(Boolean);
-  const { score } = calculateArtistScore(
+  const { score, trajectory, trajectoryLabel } = calculateArtistScore(
     asOfEnd ? rewindArtist(artist, history, asOfEnd) : artist,
   );
   const tracked = PLATFORMS.filter(
@@ -175,6 +175,20 @@ export default function ReportPage({
             <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
               Traction score
             </div>
+            {trajectoryLabel && (
+              <div
+                className={cn(
+                  "mt-1 font-mono text-[11px] tabular-nums",
+                  trajectory != null && trajectory > 0.05
+                    ? "text-emerald-500"
+                    : trajectory != null && trajectory < -0.05
+                      ? "text-rose-500"
+                      : "text-muted-foreground",
+                )}
+              >
+                {trajectoryLabel}
+              </div>
+            )}
           </div>
         </div>
 

@@ -76,7 +76,11 @@ fi
 if pgrep -f "scheduler\.py" >/dev/null 2>&1; then
   echo "==> scheduler already running"
 else
-  echo "==> Starting auto-scrape scheduler (every ${AUTO_SCRAPE_INTERVAL_HOURS:-24}h)..."
+  # SCRAPE_SWEEP_WORKERS (default 4) sweeps that many artists in parallel; safe
+  # because throttle() rate-limits per host, not per artist (see scrape_service).
+  # Set it in .env or the shell to tune. NOTE: the scheduler does NOT hot-reload —
+  # kill the running one before re-running this to pick up new scrape code.
+  echo "==> Starting auto-scrape scheduler (every ${AUTO_SCRAPE_INTERVAL_HOURS:-24}h, ${SCRAPE_SWEEP_WORKERS:-4} artists in parallel)..."
   cd "$ROOT/data-api"
   ./.venv/bin/python scheduler.py > "$LOGDIR/scheduler.log" 2>&1 &
   SCHED_PID=$!

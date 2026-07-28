@@ -21,10 +21,11 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-type Row = { a: Artist; score: number };
+type Row = { a: Artist; score: number; traj: number | null; trajLabel: string | null };
 type SortKey =
   | "name"
   | "score"
+  | "trajectory"
   | "followers"
   | "monthly_listeners"
   | "youtube_subscribers"
@@ -33,6 +34,7 @@ type SortKey =
 
 const NUMERIC: Record<Exclude<SortKey, "name">, (r: Row) => number> = {
   score: (r) => r.score,
+  trajectory: (r) => r.traj ?? -Infinity,
   followers: (r) => r.a.followers ?? -1,
   monthly_listeners: (r) => r.a.monthly_listeners ?? -1,
   youtube_subscribers: (r) => r.a.youtube_subscribers ?? -1,
@@ -54,14 +56,10 @@ export default function TablePage() {
 
   const rows = useMemo<Row[]>(() => {
     if (!artists) return [];
-    const out = artists.map((a) => ({
-      a,
-      score: calculateArtistScore({
-        followers: a.followers ?? 0,
-        popularity: a.popularity ?? 0,
-        monthly_listeners: a.monthly_listeners ?? null,
-      }).score,
-    }));
+    const out = artists.map((a) => {
+      const s = calculateArtistScore(a);
+      return { a, score: s.score, traj: s.trajectory, trajLabel: s.trajectoryLabel };
+    });
     out.sort((x, y) => {
       const cmp =
         sortKey === "name"
@@ -148,7 +146,10 @@ export default function TablePage() {
               <TableRow>
                 <SortHead k="name">Artist</SortHead>
                 <SortHead k="score" className="[&>button]:justify-end text-right">
-                  Score
+                  Traction
+                </SortHead>
+                <SortHead k="trajectory" className="[&>button]:justify-end text-right">
+                  Trajectory
                 </SortHead>
                 <SortHead
                   k="followers"
@@ -163,7 +164,7 @@ export default function TablePage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {rows.map(({ a, score }) => (
+              {rows.map(({ a, score, traj, trajLabel }) => (
                 <TableRow key={a.id}>
                   <TableCell>
                     <Link
@@ -175,6 +176,19 @@ export default function TablePage() {
                   </TableCell>
                   <TableCell className="text-right font-medium tabular-nums">
                     {Math.round(score)}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    <span
+                      className={cn(
+                        traj != null && traj > 0.05
+                          ? "text-emerald-500"
+                          : traj != null && traj < -0.05
+                            ? "text-rose-500"
+                            : "text-muted-foreground",
+                      )}
+                    >
+                      {trajLabel ?? "—"}
+                    </span>
                   </TableCell>
                   <TableCell className="text-right tabular-nums">
                     {formatCompact(a.followers)}

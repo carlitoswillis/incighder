@@ -231,7 +231,8 @@ function ArtistDetail() {
   const genres = parseGenres(artist.genres);
   const image = artist.images?.[0]?.url ?? null;
   const spotifyUrl = artist.external_urls?.spotify;
-  const { score, breakdown } = calculateArtistScore(artist);
+  const { score, breakdown, trajectory, trajectoryLabel, trajectoryBreakdown } =
+    calculateArtistScore(artist);
 
   return (
     <div className="space-y-6">
@@ -281,7 +282,14 @@ function ArtistDetail() {
           )}
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          <ScoreBadge score={score} breakdown={breakdown} size="lg" />
+          <ScoreBadge
+            score={score}
+            breakdown={breakdown}
+            trajectory={trajectory}
+            trajectoryLabel={trajectoryLabel}
+            trajectoryTitle={trajectoryBreakdown}
+            size="lg"
+          />
           <Button
             variant="outline"
             render={<Link href={`/artists/${artistId}/report`} />}
