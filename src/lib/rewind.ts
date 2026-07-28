@@ -2,19 +2,10 @@ import type { Artist } from "@/lib/types";
 import { PLATFORMS } from "@/lib/platforms";
 
 // Time-travel helpers for the report pages: a rewound report is a pure replay
-// of recorded metric_snapshots points (same pattern as the Growth scrubber).
+// of recorded metric_snapshots points. Day-granularity series and window maths
+// live in lib/series.ts; this is the artist-level replay on top of them.
 
 export type HistoryPoint = { t: string; v: number };
-
-// Every day (YYYY-MM-DD, oldest→newest) that has at least one snapshot across
-// the given series. The newest day is the "today" view; days before it are
-// valid rewind targets.
-export function snapshotDays(pointLists: HistoryPoint[][]): string[] {
-  const days = new Set<string>();
-  for (const points of pointLists)
-    for (const pt of points) days.add(pt.t.slice(0, 10));
-  return [...days].sort();
-}
 
 export const dayEnd = (day: string) => `${day}T23:59:59Z`;
 

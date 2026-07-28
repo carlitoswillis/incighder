@@ -23,6 +23,13 @@ export interface PlatformMeta {
   key: PlatformKey;
   label: string;
   color: string; // brand hex (icon tint)
+  /**
+   * Mark colour for LIGHT surfaces — the printed one-sheets. Two brand hues are
+   * too pale on white to carry a line or a dot (X at 1.2:1, Spotify at 2.6:1),
+   * so they get a darker step of the same hue. Omitted where the brand colour
+   * already clears 3:1 on white.
+   */
+  inkColor?: string;
   Icon: IconType;
   scraped: boolean; // x is manual-only
   linkField?: PlatformKey; // key in artist.social_links (scraped platforms)
@@ -40,6 +47,7 @@ export const PLATFORMS: PlatformMeta[] = [
     key: "spotify",
     label: "Spotify",
     color: "#1DB954",
+    inkColor: "#15803D",
     Icon: SiSpotify,
     scraped: true,
     linkField: "spotify",
@@ -113,6 +121,7 @@ export const PLATFORMS: PlatformMeta[] = [
     key: "x",
     label: "X",
     color: "#E7E9EA",
+    inkColor: "#0F1419",
     Icon: SiX,
     scraped: false,
     metric: { field: "x_followers", label: "Followers (manual)" },
@@ -137,4 +146,9 @@ export function platformHasPresence(artist: Artist, p: PlatformMeta): boolean {
   if (artist[p.metric.field] != null) return true;
   if (p.linkField && artist.social_links?.[p.linkField]) return true;
   return false;
+}
+
+/** Mark colour for a platform on the given surface (print sheets are light). */
+export function platformInk(p: PlatformMeta, light = false): string {
+  return light ? (p.inkColor ?? p.color) : p.color;
 }

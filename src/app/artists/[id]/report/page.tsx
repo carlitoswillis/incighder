@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useEffect, useMemo, useState } from "react";
+import { use, useEffect, useMemo, useState, type CSSProperties } from "react";
 import { ArtistImage } from "@/components/artist-image";
 import Link from "next/link";
 import { ArrowLeft, Printer } from "lucide-react";
@@ -9,12 +9,19 @@ import type { Artist } from "@/lib/types";
 import { PLATFORMS } from "@/lib/platforms";
 import { calculateArtistScore } from "@/utils/score";
 import { formatCompact, formatFull } from "@/lib/format";
-import { dayEnd, rewindArtist, snapshotDays, valueAsOf } from "@/lib/rewind";
+import { dayEnd, rewindArtist } from "@/lib/rewind";
+import { DateRangePicker, useDateRange } from "@/components/date-range";
+import { Sparkline } from "@/components/sparkline";
 import {
-  RewindScrubber,
+  allDays,
+  dailySeries,
+  deltaOver,
   formatDay,
-  useRewindDay,
-} from "@/components/rewind-scrubber";
+  formatDayShort,
+  sliceDays,
+  type DayPoint,
+} from "@/lib/series";
+import { platformInk } from "@/lib/platforms";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ReportPaper } from "@/components/report-paper";
@@ -33,7 +40,8 @@ type HistoryEntry = {
 // so the sheet is laid out to stay inside it.
 // Screen keeps the site's dark identity; @media print flips to the light
 // tokens (globals.css) so it reads like a document, not a screenshot.
-// The rewind scrubber (and ?date=) replays the sheet as of any snapshot day.
+// The date range (?from=&to=) sets what the sheet reads as of, and what its
+// growth is measured from.
 export default function ReportPage({
   params,
 }: {
@@ -55,11 +63,18 @@ export default function ReportPage({
       .catch(() => setHistory({}));
   }, [id]);
 
+  const series = useMemo(() => {
+    const out: Record<string, DayPoint[]> = {};
+    for (const [key, e] of Object.entries(history)) out[key] = dailySeries(e.points ?? []);
+    return out;
+  }, [history]);
   const days = useMemo(
-    () => snapshotDays(Object.values(history).map((e) => e.points ?? [])),
+    () => allDays(Object.values(history).map((e) => e.points ?? [])),
     [history],
   );
-  const { ticks, dayIdx, select, asOfDay } = useRewindDay(days);
+  const range = useDateRange(days);
+  // The sheet reads AS OF the window's end; deltas are measured from its start.
+  const asOfDay = range.isLive ? null : range.toDay;
   const asOfEnd = asOfDay ? dayEnd(asOfDay) : null;
 
   if (error) return <p className="text-sm text-destructive">Not available.</p>;
@@ -109,7 +124,7 @@ export default function ReportPage({
             <Printer className="size-4" /> Print / save PDF
           </Button>
         </div>
-        <RewindScrubber ticks={ticks} dayIdx={dayIdx} onSelect={select} />
+        <DateRangePicker range={range} />
       </div>
 
       <ReportPaper>
@@ -179,38 +194,28 @@ export default function ReportPage({
           </h2>
           <div className="mt-2 border-t border-border">
             {tracked.map((p) => {
-              const e = history[p.key];
-              let current: number | null;
-              let change: number | null;
-              let pct: number | null;
-              let since: string | null;
-              let sparkValues: number[];
-              if (asOfEnd) {
-                // Replay: last value recorded by that day, delta vs the
-                // series start up to that day.
-                current = e ? valueAsOf(e.points, asOfEnd) : null;
-                if (current == null) return null;
-                const pts = e.points.filter((pt) => pt.t <= asOfEnd);
-                change = current - pts[0].v;
-                since = pts[0].t;
-                pct = pts[0].v ? (change / pts[0].v) * 100 : null;
-                sparkValues = pts.map((pt) => pt.v);
-              } else {
-                current =
-                  e?.current ?? (artist[p.metric.field as keyof Artist] as number | null);
-                if (current == null) return null;
-                change = e ? e.change : null;
-                since = e ? e.since : null;
-                pct = e && e.first ? (e.change / e.first) * 100 : null;
-                sparkValues = e ? e.points.map((pt) => pt.v) : [];
-              }
+              const full = series[p.key] ?? [];
+              const windowed = sliceDays(full, range.fromDay, range.toDay);
+              const d = deltaOver(full, range.fromDay, range.toDay);
+              // Platforms with no snapshots still show their stored count.
+              const current =
+                d.to ?? (artist[p.metric.field as keyof Artist] as number | null);
+              if (current == null) return null;
               const Icon = p.Icon;
               return (
                 <div
                   key={p.key}
                   className="flex items-center gap-4 border-b border-border py-1.5"
                 >
-                  <Icon className="size-4 shrink-0" style={{ color: p.color }} />
+                  <Icon
+                    className="mark size-4 shrink-0"
+                    style={
+                      {
+                        "--mark": p.color,
+                        "--mark-print": platformInk(p, true),
+                      } as CSSProperties
+                    }
+                  />
                   <div className="w-24 shrink-0 text-sm text-muted-foreground">
                     {p.label}
                   </div>
@@ -221,24 +226,20 @@ export default function ReportPage({
                     {formatCompact(current)}
                   </div>
                   <div className="min-w-0 flex-1 truncate text-sm">
-                    {change != null && change !== 0 ? (
+                    {d.change != null && d.change !== 0 ? (
                       <span
                         className={cn(
                           "font-mono tabular-nums",
-                          change > 0 ? "text-emerald-500" : "text-rose-500",
+                          d.change > 0 ? "text-emerald-500" : "text-rose-500",
                         )}
                       >
-                        {change > 0 ? "+" : ""}
-                        {formatCompact(change)}
-                        {pct != null && since != null && (
+                        {d.change > 0 ? "+" : ""}
+                        {formatCompact(d.change)}
+                        {d.pct != null && range.fromDay && (
                           <span className="text-muted-foreground">
                             {" "}
-                            ({pct > 0 ? "+" : ""}
-                            {pct.toFixed(1)}%) since{" "}
-                            {new Date(since).toLocaleDateString("en-US", {
-                              month: "short",
-                              day: "numeric",
-                            })}
+                            ({d.pct > 0 ? "+" : ""}
+                            {d.pct.toFixed(1)}%) since {formatDayShort(range.fromDay)}
                           </span>
                         )}
                       </span>
@@ -246,7 +247,14 @@ export default function ReportPage({
                       <span className="text-muted-foreground/60">—</span>
                     )}
                   </div>
-                  {sparkValues.length > 1 && <ReportSparkline values={sparkValues} />}
+                  <Sparkline
+                    series={windowed}
+                    color={p.color}
+                    printColor={platformInk(p, true)}
+                    width={120}
+                    height={32}
+                    className="shrink-0"
+                  />
                 </div>
               );
             })}
@@ -291,32 +299,3 @@ export default function ReportPage({
   );
 }
 
-// Wider sparkline than the card version — the ledger rows give it room.
-function ReportSparkline({ values }: { values: number[] }) {
-  const w = 120;
-  const h = 32;
-  const pad = 2;
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  const range = max - min || 1;
-  const points = values
-    .map((v, i) => {
-      const x = pad + (i / (values.length - 1)) * (w - 2 * pad);
-      const y = h - pad - ((v - min) / range) * (h - 2 * pad);
-      return `${x.toFixed(1)},${y.toFixed(1)}`;
-    })
-    .join(" ");
-  const up = values[values.length - 1] >= values[0];
-  return (
-    <svg width={w} height={h} className="block shrink-0" aria-hidden>
-      <polyline
-        points={points}
-        fill="none"
-        strokeWidth={1.5}
-        strokeLinejoin="round"
-        strokeLinecap="round"
-        className={up ? "stroke-emerald-500" : "stroke-rose-500"}
-      />
-    </svg>
-  );
-}
