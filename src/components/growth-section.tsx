@@ -152,12 +152,19 @@ export function GrowthSection({
                     {windowed.length} {windowed.length === 1 ? "scrape day" : "scrape days"}
                   </span>
                 </div>
-                <GrowthChart
-                  series={windowed}
-                  color={p.color}
-                  label={`${p.label} ${p.metric.label.toLowerCase()}`}
-                  className="mt-2"
-                />
+                {windowed.length === 0 ? (
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Not tracked in this window — first recorded{" "}
+                    {formatDay(series[p.key][0].day)}.
+                  </p>
+                ) : (
+                  <GrowthChart
+                    series={windowed}
+                    color={p.color}
+                    label={`${p.label} ${p.metric.label.toLowerCase()}`}
+                    className="mt-2"
+                  />
+                )}
               </div>
             );
           })}

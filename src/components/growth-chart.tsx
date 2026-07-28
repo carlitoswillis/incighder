@@ -99,6 +99,11 @@ export function GrowthChart({
     setCursor(best);
   };
 
+  // A window can exclude a platform's whole tracked period (it started late, or
+  // stopped) — there is then nothing to plot, and the axis labels below have no
+  // day to name. The caller says so in words instead.
+  if (series.length === 0) return null;
+
   const first = series[0];
   const lastPt = series[series.length - 1];
 
