@@ -98,26 +98,34 @@ export function DateRangePicker({
   if (days.length < 2) return null;
   const last = days.length - 1;
 
-  // The start index a "last N days" preset resolves to (end pinned to newest).
+  // "Last N days" is the window covering the N days up to the newest snapshot,
+  // starting at the first day recorded INSIDE it. Snapping to the newest day
+  // outside it instead stretched a "7d" chip across the whole history whenever
+  // scraping was sparse — four scrapes over a month made every preset mean All.
   const presetFrom = (n: number) => {
-    let from = 0;
-    days.forEach((d, i) => {
-      if (daysBetween(d, days[last]) >= n) from = i;
-    });
-    return from;
+    const i = days.findIndex((d) => daysBetween(d, days[last]) <= n);
+    return i < 0 ? last : i;
   };
-  // Which chip is lit: a preset only when the end is pinned to "now" and the
-  // start matches; otherwise All, otherwise the window is Custom.
+  // A preset the recorded history cannot reach back to would just be All, so
+  // offer it as unavailable rather than as a button that appears to do nothing.
+  const recorded = daysBetween(days[0], days[last]);
+  const presetUsable = (n: number) => recorded > n;
+  // Exactly one chip is lit: All when the window is the whole history,
+  // otherwise the preset that matches it, otherwise it is Custom.
   const activePreset =
-    toIdx === last ? PRESETS.find((n) => presetFrom(n) === fromIdx) : undefined;
+    !isFull && toIdx === last
+      ? PRESETS.find((n) => presetUsable(n) && presetFrom(n) === fromIdx)
+      : undefined;
   const spanDays = fromDay && toDay ? daysBetween(fromDay, toDay) : 0;
 
-  const chip = (active: boolean) =>
+  const chip = (active: boolean, disabled = false) =>
     cn(
       "rounded-md px-2 py-1 text-xs transition-colors",
-      active
-        ? "bg-primary/15 text-primary"
-        : "text-muted-foreground hover:bg-secondary hover:text-foreground",
+      disabled
+        ? "cursor-not-allowed text-muted-foreground/35"
+        : active
+          ? "bg-primary/15 text-primary"
+          : "text-muted-foreground hover:bg-secondary hover:text-foreground",
     );
 
   return (
@@ -132,12 +140,18 @@ export function DateRangePicker({
         {PRESETS.map((n) => (
           <button
             key={n}
+            disabled={!presetUsable(n)}
             onClick={() => {
               setRange(presetFrom(n), last);
               setCustom(false);
             }}
-            className={chip(activePreset === n)}
+            className={chip(activePreset === n, !presetUsable(n))}
             aria-pressed={activePreset === n}
+            title={
+              presetUsable(n)
+                ? undefined
+                : `Only ${recorded} days recorded — same as All`
+            }
           >
             {n}d
           </button>
