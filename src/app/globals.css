@@ -86,6 +86,13 @@
   }
 }
 
+/* Series marks carry the brand hue on screen and a darker step on paper: two
+   brand hues (X, Spotify) are too pale on white to see. Set --mark and
+   --mark-print on the element; the mark itself paints with currentColor. */
+.mark {
+  color: var(--mark);
+}
+
 /* One-sheet geometry (see components/report-paper.tsx). The page is a fixed
    box; `--preview` scales it down on screen when the viewport is narrower than
    the paper. A transform, so it never affects layout — and it's off for print,
@@ -160,6 +167,20 @@
   .report-shell + .report-shell {
     margin-top: 0 !important;
     break-before: page;
+  }
+  /* The detailed roster is a flowing document rather than a fixed sheet — it
+     runs to as many pages as the roster needs, but never splits a person
+     across two of them. */
+  .report-doc {
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+  }
+  .report-block {
+    break-inside: avoid;
+  }
+  .mark {
+    color: var(--mark-print, var(--mark));
   }
   .report-page {
     transform: none !important;
