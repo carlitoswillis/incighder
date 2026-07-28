@@ -166,7 +166,7 @@ export default function GroupReportPage({
   );
 
   const masthead = (
-    <div className="flex items-baseline justify-between border-b-2 border-primary pb-3">
+    <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 border-b-2 border-primary pb-3">
       <div className="flex items-baseline gap-3">
         <span className="text-lg font-semibold tracking-tight">
           <span className="text-primary">◐</span> Incighder
@@ -204,7 +204,7 @@ export default function GroupReportPage({
     return (
       <div className="mx-auto w-full max-w-[860px]">
         {chrome}
-        <div className="report-doc rounded-xl bg-card p-8 ring-1 ring-foreground/10">
+        <div className="report-doc rounded-xl bg-card p-4 ring-1 ring-foreground/10 sm:p-8">
           {masthead}
           {heading}
           {windowNote}
@@ -444,7 +444,7 @@ function MemberBreakdown({
       {rows.length === 0 ? (
         <p className="mt-2 text-sm text-muted-foreground">No tracked platforms.</p>
       ) : (
-        <div className="mt-3 grid grid-cols-2 gap-x-6">
+        <div className="mt-3 grid grid-cols-1 gap-x-6 sm:grid-cols-2">
           {rows.map(({ p, d, current, windowed }) => {
             const Icon = p.Icon;
             return (
