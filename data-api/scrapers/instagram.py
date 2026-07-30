@@ -32,6 +32,7 @@ _META_RE = re.compile(
     r'content="([\d.,KMkm]+)\s+Followers?,\s+[\d.,KMkm]+\s+Following,\s+([\d.,KMkm]+)\s+Posts',
 )
 _OG_IMAGE_RE = re.compile(r'property="og:image"\s+content="([^"]+)"')
+_PROFILE_ID_RE = re.compile(r'"profile_id":"(\d+)"')
 
 
 def _approx_count(text: str) -> Optional[int]:
@@ -49,10 +50,14 @@ def _approx_count(text: str) -> Optional[int]:
 
 
 def _fetch_via_html(handle: str, headers: dict) -> Optional[dict]:
-    """Fallback for accounts the JSON API refuses (HTTP 400 despite auth).
-    Instagram serves crawler user-agents a static page whose og: meta tags
-    carry the counts — exact for small accounts, abbreviated (25.5K) for big
-    ones. No cookies: the crawler treatment is for anonymous requests."""
+    """Fallback for accounts the JSON API refuses (HTTP 400 despite auth —
+    some business/creator profiles trip a server-side schema error there:
+    "Asset asset://laser.provider/ig_business_category_subvertical has been
+    deleted"). Instagram serves crawler user-agents a static page whose og:
+    meta tags carry the counts — exact for small accounts, abbreviated (25.5K)
+    for big ones. The page also embeds the numeric profile_id, which unlocks
+    the exact-count mobile endpoint (see _fetch_via_user_id). No cookies: the
+    crawler treatment is for anonymous requests."""
     page_headers = {
         "User-Agent": "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)",
     }
@@ -72,7 +77,33 @@ def _fetch_via_html(handle: str, headers: dict) -> Optional[dict]:
     img = _OG_IMAGE_RE.search(resp.text)
     if img:
         data["profile_pic_url"] = img.group(1).replace("&amp;", "&")
+    pid = _PROFILE_ID_RE.search(resp.text)
+    if pid:
+        data["_profile_id"] = pid.group(1)
     return data
+
+
+def _fetch_via_user_id(user_id: str, headers: dict) -> Optional[dict]:
+    """Exact counts for profiles whose web_profile_info schema is broken:
+    the mobile users/{id}/info endpoint serializes a different schema, so it
+    still returns exact follower/media counts where the web one 400s."""
+    throttle("i.instagram.com")
+    resp = get_session().get(
+        f"https://i.instagram.com/api/v1/users/{user_id}/info/",
+        headers=headers, timeout=20,
+    )
+    if resp.status_code != 200:
+        return None
+    user = resp.json().get("user") or {}
+    if user.get("follower_count") is None:
+        return None
+    return {
+        "instagram_followers": user.get("follower_count"),
+        "instagram_posts": user.get("media_count"),
+        "instagram_verified": user.get("is_verified"),
+        "profile_pic_url": (user.get("hd_profile_pic_url_info") or {}).get("url")
+                           or user.get("profile_pic_url"),
+    }
 
 
 def fetch_instagram(handle_or_url: str) -> ScrapeResult:
@@ -105,13 +136,27 @@ def fetch_instagram(handle_or_url: str) -> ScrapeResult:
                     "profile_pic_url": user.get("profile_pic_url_hd") or user.get("profile_pic_url"),
                 })
         # Some accounts 400 on the JSON API even when authenticated; the
-        # profile page's meta tags still expose (possibly rounded) counts.
+        # profile page's meta tags still expose (possibly rounded) counts —
+        # and the numeric profile_id, which the mobile info endpoint accepts
+        # for exact counts. Prefer exact; og tags are the last resort.
         try:
             html_data = _fetch_via_html(handle, headers)
         except Exception:
             html_data = None
-        if html_data and html_data.get("instagram_followers") is not None:
-            return ScrapeResult.success(platform, html_data)
+        if html_data:
+            user_id = html_data.pop("_profile_id", None)
+            if user_id:
+                try:
+                    exact = _fetch_via_user_id(user_id, headers)
+                except Exception:
+                    exact = None
+                if exact:
+                    # keep the og profile pic if the mobile payload lacks one
+                    if not exact.get("profile_pic_url") and html_data.get("profile_pic_url"):
+                        exact["profile_pic_url"] = html_data["profile_pic_url"]
+                    return ScrapeResult.success(platform, exact)
+            if html_data.get("instagram_followers") is not None:
+                return ScrapeResult.success(platform, html_data)
         return ScrapeResult.failure(
             platform,
             f"profile lookup failed (HTTP {resp.status_code}; "
