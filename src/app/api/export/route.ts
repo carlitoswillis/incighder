@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { RowDataPacket } from "mysql2/promise";
 import { getPool } from "@/lib/db";
 import { isAdmin } from "@/lib/auth";
+import { attachmentHeader, csvFilename, exportScope } from "@/lib/export-filename";
 
 // CSV export of artist metrics. Admin-only workflow tool.
 //   /api/export              -> main (ungrouped) roster
@@ -57,20 +58,16 @@ export async function GET(request: Request) {
 
   const where: string[] = [];
   const values: unknown[] = [];
-  let scope = "artists";
   if (ids.length) {
     where.push(`id IN (${ids.map(() => "?").join(",")})`);
     values.push(...ids);
-    scope = "selection";
   } else if (group) {
     where.push("group_name = ?");
     values.push(group);
-    scope = group;
   } else if (!all) {
     where.push("group_name IS NULL");
-  } else {
-    scope = "all";
   }
+  const scope = exportScope({ ids, group, all });
 
   try {
     const [rows] = await pool.query<RowDataPacket[]>(
@@ -81,11 +78,10 @@ export async function GET(request: Request) {
       COLUMNS.map((c) => c.header).join(","),
       ...rows.map((a) => COLUMNS.map((c) => cell(c.pick(a))).join(",")),
     ];
-    const stamp = new Date().toISOString().slice(0, 10);
     return new NextResponse(lines.join("\n") + "\n", {
       headers: {
         "Content-Type": "text/csv; charset=utf-8",
-        "Content-Disposition": `attachment; filename="incighder-${scope}-${stamp}.csv"`,
+        "Content-Disposition": attachmentHeader(csvFilename(scope)),
       },
     });
   } catch (e) {
