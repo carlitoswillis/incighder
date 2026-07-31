@@ -25,6 +25,7 @@ import { platformInk } from "@/lib/platforms";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ReportPaper } from "@/components/report-paper";
+import { exportStamp, reportTitle, useDocumentTitle } from "@/lib/export-name";
 import { cn } from "@/lib/utils";
 
 type HistoryEntry = {
@@ -76,6 +77,11 @@ export default function ReportPage({
   // The sheet reads AS OF the window's end; deltas are measured from its start.
   const asOfDay = range.isLive ? null : range.toDay;
   const asOfEnd = asOfDay ? dayEnd(asOfDay) : null;
+
+  // Names the tab, and so names the PDF this page prints to.
+  useDocumentTitle(
+    artist ? reportTitle(artist.name, "one-sheet", exportStamp(range)) : null,
+  );
 
   if (error) return <p className="text-sm text-destructive">Not available.</p>;
   if (!artist)

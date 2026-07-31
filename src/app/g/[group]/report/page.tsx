@@ -24,6 +24,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ReportPaper, ROSTER_PAGE_SIZE, chunk } from "@/components/report-paper";
+import { exportStamp, reportTitle, useDocumentTitle } from "@/lib/export-name";
 import { cn } from "@/lib/utils";
 
 type HistoryEntry = {
@@ -104,6 +105,13 @@ export default function GroupReportPage({
   );
   const range = useDateRange(days);
   const asOfDay = range.isLive ? null : range.toDay;
+
+  // Names the tab, and so names the PDF this page prints to — including which
+  // view it is, so a compact and a detailed export of the same roster are
+  // distinguishable in a downloads folder.
+  useDocumentTitle(
+    reportTitle(name, detailed ? "roster detailed" : "roster compact", exportStamp(range)),
+  );
 
   const today = new Date().toLocaleDateString("en-US", {
     year: "numeric",
