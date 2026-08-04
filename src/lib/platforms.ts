@@ -24,7 +24,7 @@ export interface PlatformMeta {
   label: string;
   color: string; // brand hex (icon tint)
   /**
-   * Mark colour for LIGHT surfaces — the printed one-sheets. Two brand hues are
+   * Mark colour for LIGHT surfaces — the printed reports. Two brand hues are
    * too pale on white to carry a line or a dot (X at 1.2:1, Spotify at 2.6:1),
    * so they get a darker step of the same hue. Omitted where the brand colour
    * already clears 3:1 on white.

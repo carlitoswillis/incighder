@@ -37,7 +37,7 @@ type HistoryMap = Record<string, HistoryEntry>;
 type SeriesMap = Record<string, DayPoint[]>;
 
 // Roster report in two shapes:
-//   compact  — the printable one-sheet, a ledger row per person, paginated at
+//   compact  — the printable report, a ledger row per person, paginated at
 //              ROSTER_PAGE_SIZE members per page.
 //   detailed — a flowing document with a per-platform breakdown and a trend
 //              line per person; runs to as many pages as the roster needs.
@@ -180,7 +180,7 @@ export default function GroupReportPage({
           <span className="text-primary">◐</span> Incighder
         </span>
         <span className="font-mono text-[11px] uppercase tracking-[0.2em] text-muted-foreground">
-          {detailed ? "Roster breakdown" : "Roster one-sheet"}
+          {detailed ? "Roster breakdown" : "Roster report"}
         </span>
       </div>
       <span className="font-mono text-[11px] uppercase tracking-[0.2em] text-muted-foreground">

@@ -93,7 +93,7 @@
   color: var(--mark);
 }
 
-/* One-sheet geometry (see components/report-paper.tsx). The page is a fixed
+/* Report geometry (see components/report-paper.tsx). The page is a fixed
    box; `--preview` scales it down on screen when the viewport is narrower than
    the paper. A transform, so it never affects layout — and it's off for print,
    where the paper is already page-sized. */
@@ -114,7 +114,7 @@
   margin: 0.5in;
 }
 
-/* Print: the one-sheet becomes a light document — remap the dark tokens to the
+/* Print: the report becomes a light document — remap the dark tokens to the
    light palette, drop the app chrome, and let the page own the paper. */
 @media print {
   .dark {

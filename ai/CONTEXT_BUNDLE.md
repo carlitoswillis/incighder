@@ -1,5 +1,5 @@
 # AI Context Bundle
-Generated: Mon Aug  3 22:06:03 PDT 2026
+Generated: Mon Aug  3 22:15:24 PDT 2026
 
 ## ⚠️ Agent Navigation Guide
 1. Start with the **Current State** below to understand the focus.
@@ -108,7 +108,7 @@ See **`DEPLOY.md`** (repo root) for the step-by-step. Shape: Vercel hosts the fl
 PURPOSE: High-level summary of the system's current focus, the product vision, and recent changes — the single place an agent reads first to avoid drift. (Absorbs the former `GOALS.md`.)
 
 ## Last Updated: 2026-07-28
-## Current Focus: **Live, iterating on the analytics/reporting surface.** Site is live at incighder.vercel.app on TiDB Serverless (the data-wipe bug and the single-`DATABASE_URL` migration are done; DB config centralized in `src/lib/db.ts` / `scripts/db-config.mjs` / `_db_config()`). Most recent work is the growth/reporting surface: **windowed growth** (a From/To date range replacing the single-date rewind scrubber), **chart accessibility** (role/aria/keyboard + a Table view), **print-fidelity one-sheets**, and a **concurrent scheduled sweep** (see Recent Changes). Backlog below: change/threshold alerts, playlist/chart tracking, discovery seeded from a tracked artist, robust history charts.
+## Current Focus: **Live, iterating on the analytics/reporting surface.** Site is live at incighder.vercel.app on TiDB Serverless (the data-wipe bug and the single-`DATABASE_URL` migration are done; DB config centralized in `src/lib/db.ts` / `scripts/db-config.mjs` / `_db_config()`). Most recent work is the growth/reporting surface: **windowed growth** (a From/To date range replacing the single-date rewind scrubber), **chart accessibility** (role/aria/keyboard + a Table view), **print-fidelity reports** (formerly "one-sheets" — renamed 2026-08-03), and a **concurrent scheduled sweep** (see Recent Changes). Backlog below: change/threshold alerts, playlist/chart tracking, discovery seeded from a tracked artist, robust history charts.
 
 ## Project Goal
 Build a data application that gives A&Rs, labels, and artists a **holistic view of an artist's online traction and growth potential** by aggregating public metrics across music and social platforms — Spotify, YouTube, SoundCloud, Instagram, TikTok, and X — and tracking how they move over time.
@@ -802,11 +802,11 @@ Strategic frame: two complementary products. **Incighder Discover** = today's ap
 
 ## 5. Recent Git Changes (Summary)
 ```text
+20fb476 Self-healing go_live: survive laptop sleep killing the cloudflared tunnel
+0090f51 Name exports after what they are (#22)
 061f120 IG scraper: exact-count fallback for schema-broken business profiles
 a7860c6 Fix the date-range presets: dead buttons and two chips lit at once (#21)
 1b06ea6 Report pages: clickable artist links + fix compact roster row wrap/cutoff
-9b5da70 Fit the TRACTION ring label (8px, tighter tracking) so it doesn't clip
-b4a8bb3 Traction/Trajectory split, windowed date picker, concurrent sweep, doc fixes
 ```
 
 ## 6. Active Diff
@@ -823,92 +823,92 @@ index cf41a40..7687f3d 100644
 +# local-only run notes
 +RUNNING.local.md
 diff --git a/ai/CONTEXT_BUNDLE.md b/ai/CONTEXT_BUNDLE.md
-index ba9d83c..b476748 100644
+index 23299b0..a605bcc 100644
 --- a/ai/CONTEXT_BUNDLE.md
 +++ b/ai/CONTEXT_BUNDLE.md
 @@ -1,5 +1,5 @@
  # AI Context Bundle
--Generated: Fri Jul 24 13:20:46 PDT 2026
-+Generated: Mon Aug  3 22:06:03 PDT 2026
+-Generated: Mon Aug  3 22:06:03 PDT 2026
++Generated: Mon Aug  3 22:15:24 PDT 2026
  
  ## ⚠️ Agent Navigation Guide
  1. Start with the **Current State** below to understand the focus.
-@@ -107,8 +107,8 @@ See **`DEPLOY.md`** (repo root) for the step-by-step. Shape: Vercel hosts the fl
- 
+@@ -108,7 +108,7 @@ See **`DEPLOY.md`** (repo root) for the step-by-step. Shape: Vercel hosts the fl
  PURPOSE: High-level summary of the system's current focus, the product vision, and recent changes — the single place an agent reads first to avoid drift. (Absorbs the former `GOALS.md`.)
  
--## Last Updated: 2026-07-23
--## Current Focus: **Deploy-ready with hosted DB.** Killed the recurring data-wipe bug (apply_schema was drop-and-recreate and ran on every dev start — now idempotent, `--reset` gated behind confirmation). Whole stack now takes a single `DATABASE_URL` (mysql://...?sslmode=require, TLS supported) so a free hosted MySQL (TiDB Serverless/Aiven) becomes the wipe-proof source of truth for both local dev and the Vercel deploy; DB config centralized (`src/lib/db.ts`, `scripts/db-config.mjs`, `_db_config()`). Ports env-driven (`DATA_API_PORT`/`WEB_PORT`). See `DEPLOY.md`. Next: create the hosted DB + set Vercel env vars; keep collapsing `data-api` proxy endpoints into TS routes. Backlog: deep scraping/deploy tech debt (below), artist bio, data export, change alerts.
-+## Last Updated: 2026-07-28
-+## Current Focus: **Live, iterating on the analytics/reporting surface.** Site is live at incighder.vercel.app on TiDB Serverless (the data-wipe bug and the single-`DATABASE_URL` migration are done; DB config centralized in `src/lib/db.ts` / `scripts/db-config.mjs` / `_db_config()`). Most recent work is the growth/reporting surface: **windowed growth** (a From/To date range replacing the single-date rewind scrubber), **chart accessibility** (role/aria/keyboard + a Table view), **print-fidelity one-sheets**, and a **concurrent scheduled sweep** (see Recent Changes). Backlog below: change/threshold alerts, playlist/chart tracking, discovery seeded from a tracked artist, robust history charts.
+ ## Last Updated: 2026-07-28
+-## Current Focus: **Live, iterating on the analytics/reporting surface.** Site is live at incighder.vercel.app on TiDB Serverless (the data-wipe bug and the single-`DATABASE_URL` migration are done; DB config centralized in `src/lib/db.ts` / `scripts/db-config.mjs` / `_db_config()`). Most recent work is the growth/reporting surface: **windowed growth** (a From/To date range replacing the single-date rewind scrubber), **chart accessibility** (role/aria/keyboard + a Table view), **print-fidelity one-sheets**, and a **concurrent scheduled sweep** (see Recent Changes). Backlog below: change/threshold alerts, playlist/chart tracking, discovery seeded from a tracked artist, robust history charts.
++## Current Focus: **Live, iterating on the analytics/reporting surface.** Site is live at incighder.vercel.app on TiDB Serverless (the data-wipe bug and the single-`DATABASE_URL` migration are done; DB config centralized in `src/lib/db.ts` / `scripts/db-config.mjs` / `_db_config()`). Most recent work is the growth/reporting surface: **windowed growth** (a From/To date range replacing the single-date rewind scrubber), **chart accessibility** (role/aria/keyboard + a Table view), **print-fidelity reports** (formerly "one-sheets" — renamed 2026-08-03), and a **concurrent scheduled sweep** (see Recent Changes). Backlog below: change/threshold alerts, playlist/chart tracking, discovery seeded from a tracked artist, robust history charts.
  
  ## Project Goal
  Build a data application that gives A&Rs, labels, and artists a **holistic view of an artist's online traction and growth potential** by aggregating public metrics across music and social platforms — Spotify, YouTube, SoundCloud, Instagram, TikTok, and X — and tracking how they move over time.
-@@ -152,7 +152,11 @@ The long-term aim is a single dashboard that scores artist traction from many si
- ---
- 
- ## Recent Changes
--- **Rewound reports (2026-07-24)**: the one-sheet report pages (`/artists/[id]/report`, `/g/[group]/report`) now have the rewind scrubber — view/print the report as of any recorded snapshot day, shareable via `?date=YYYY-MM-DD`. Shared helpers in `src/lib/rewind.ts` + `components/rewind-scrubber.tsx`; rewound score recomputed from as-of values (momentum stripped — approximation); footprint hidden when rewound (no history for those fields).
-+- **Self-healing go_live watchdog — sleep/wake tunnel recovery (2026-08-03)**: laptop sleep kills a cloudflared quick tunnel PERMANENTLY — after wake, cloudflared retries its dead edge registration forever without exiting ("control stream encountered a failure while serving" loop), so the old `wait`-based go_live.sh never noticed and the stale URL stayed in `app_config.data_api_url` (live site stuck on the offline banner until a manual restart). `go_live.sh` now ends in a supervision loop (every `GO_LIVE_CHECK_INTERVAL`s, default 20): probes the tunnel END-TO-END through the Cloudflare edge (`$TUNNEL_URL/health`), detects wake via wall-clock jump (fast-path restart, no 3-strike wait), restarts cloudflared + republishes on failure. Also from an ultracode adversarial review (8 confirmed findings): top-level `cd $ROOT` (publish_url was cwd-sensitive), initial publish is non-fatal (watchdog retries), `start_api` reports failure instead of silently "going LIVE" with a dead API, tunnel probes are gated on local-origin health (a dead gunicorn no longer churns healthy tunnels), startup reap-waits leftover cloudflareds before truncating tunnel.log (a half-dead one punches NUL holes → BSD grep sees "binary", never extracts the URL), pidfile single-instance guard, periodic DB read-back heals external overwrites of the published row, and the watchdog restarts a dead scheduler. `scheduler.py`: the 24h `time.sleep` didn't advance during macOS system sleep (a "daily" sweep drifted to ~34h wall-clock on a nightly-sleeping laptop) — now a wall-clock-anchored 60s-tick deadline loop. Runs under pm2 as `incighder-data-api` (kill_timeout 15s); traps are pm2-aware: interruptible sleep (`sleep & wait`), INT/TERM handler exits (no watchdog-resurrects-the-tunnel-after-cleanup), cleanup kills children before the slow DB clear. Verified live: kill -9 on cloudflared → new tunnel up + republished + deployed site back online, hands-off.
-+- **IG exact-count fallback for schema-broken profiles (2026-07-29)**: some business/creator profiles (brandon, daniel of glogang) permanently 400 on `web_profile_info` with an Instagram server-side schema error ("Asset asset://laser.provider/ig_business_category_subvertical has been deleted") — this was misdiagnosed at onboarding as an anonymous rate limit. The og-tag HTML fallback rounds counts for larger accounts ("26K"), and since `_maybe_snapshot` dedupes unchanged values, brandon sat at one growth point for a week. Fix in `scrapers/instagram.py`: the crawler-served profile HTML also embeds the numeric `profile_id`; the fallback now feeds it to the mobile `users/{id}/info/` endpoint (different schema, doesn't trip the bug) for exact follower/media counts + verified + HD avatar, with og tags demoted to last resort. Verified: brandon 26000 (rounded) → 25557 (exact). the Growth section's single-date rewind scrubber is replaced by a **date-range window** (`components/date-range.tsx` + `src/lib/series.ts`) — pick a From/To over real snapshot days and every chart, delta, and sparkline below scopes to it. Growth anchors on the value carried INTO the window (`deltaOver`), so a window that opens between scrapes still measures from where the count actually was. `?date=` still resolves (as the window's end); `?from=&to=` round-trips a shared/printed window. Charts gained accessibility (`role="img"`, `aria-label`, keyboard cursor, `aria-live`, a Table view so no value is hover-gated; two low-contrast platform inks — X, Spotify — darkened to clear 3:1). Print one-sheets are sized by aspect ratio at content height to stop a near-empty second page under Safari's scale-to-fit-width (verified 1.00–1.20 on Letter + A4). `components/rewind-scrubber.tsx` removed; `src/lib/rewind.ts` helpers stay.
-+- **Concurrent scheduled sweep (2026-07-28)**: `scrape_all` sweeps artists `SCRAPE_SWEEP_WORKERS` at a time (default 4) instead of one-at-a-time. Safe because `throttle()` locks per HOST, not per artist — concurrent artists hitting the same site still serialize on that host's lock, so we never burst a site; we only stop leaving hosts idle between artists. Each `scrape_artist` owns its own DB connection, so nothing is shared across sweep threads. Near-linear wall-clock win as the roster grows.
-+- **Partial scrapes retry + honest freshness label (2026-07-26)**: `ScrapeResult.partial` — a scrape that succeeds but misses a metric it owns (Spotify monthly listeners when the scrape.do render fails) gets `scrape_meta.status = "partial"`, which `_is_fresh` treats as stale, so the next refresh/sweep retries it instead of losing a day of snapshots; the render itself now retries 3× (non-200 or count missing from the rendered page). Bulk-refresh UI: "cached" → "N fresh (scraped Xh ago)" with a per-platform tooltip + copy explaining the nightly auto-sweep (the sweep is why manual refreshes usually find everything fresh); partial platforms surface as an amber chip. Note: `scheduler.py` doesn't hot-reload — restart it after editing scrape code.
-+- **Rewound reports (2026-07-24)**: the one-sheet report pages (`/artists/[id]/report`, `/g/[group]/report`) now have the rewind scrubber — view/print the report as of any recorded snapshot day, shareable via `?date=YYYY-MM-DD`. Shared helpers in `src/lib/rewind.ts` + `components/rewind-scrubber.tsx`; rewound score recomputed from as-of values (momentum stripped — approximation); footprint hidden when rewound (no history for those fields). _(2026-07-28: `rewind-scrubber.tsx` removed; the windowed date-range supersedes it and `?date=` still resolves as the window end.)_
- - **Twitch + photos (2026-07-23)**: Twitch is a first-class tracked platform (web GQL, keyless). Manual adds get profile pictures automatically from their socials on scrape; admins can also upload a photo (data-URI storage, no file infra, ~60-150KB/person — negligible vs TiDB's 5GiB). Group chips on home are now admin-only: grouped members are visible ONLY via their /g/<group> URL.
- - **Data export + one-sheets (2026-07-23)**: admin CSV export; print/PDF-ready per-person and per-group "traction one-sheet" pages (masthead, traction ledger with deltas + sparklines, footprint); `/api/history` now native TS. Glogang roster onboarded: 8 skaters + DJ Maino (IG links, Maino also YT + Twitch in `external_urls`; 7/9 scraped — IG anonymous rate limit blocked daniel/brandon, retry later or set `IG_SESSIONID`).
- - **Artist groups (2026-07-23)**: `group_name` column + `/g/[group]` pages + `/api/groups`; main list = ungrouped only (roster separation à la glogang); shared `ArtistGrid` component behind home and group pages.
-@@ -218,7 +222,7 @@ Strategic frame: two complementary products. **Incighder Discover** = today's ap
- 
- ## Completed
- - [x] Rewound reports (2026-07-24): date scrubber + `?date=` param on both one-sheet report pages — replay any snapshot day, print historical reports (`lib/rewind.ts`, `components/rewind-scrubber.tsx`)
--- [x] Rewind scrubber (2026-07-23): time-travel the Growth section — slider ticks are the real snapshot dates (workingmemory's "time travel = pure replay of recorded events" pattern); shows each platform's value on that day + "since then" delta; sparklines truncate. Pure client-side over `/api/history`. Pairs with events for reviewing what stats looked like on a given date.
-+- [x] Rewind scrubber (2026-07-23): time-travel the Growth section — slider ticks are the real snapshot dates (workingmemory's "time travel = pure replay of recorded events" pattern); shows each platform's value on that day + "since then" delta; sparklines truncate. Pure client-side over `/api/history`. Pairs with events for reviewing what stats looked like on a given date. _(Superseded 2026-07-28 by the windowed date-range — `components/date-range.tsx` + `src/lib/series.ts`; `rewind-scrubber.tsx` removed.)_
- - [x] Events/campaign tracking (2026-07-23): `events` + `event_artists` junction (one event spans many people — group-mate chips in the add form, '+N others' badge); `/api/events` computes per-person change vs `metric_snapshots` (baseline at event date → last reading in a 14-day window). Copy deliberately frames it as **observed correlation, not causation**. Event types incl. `post`. Scheduler runs inside `go_live.sh` (daily sweep) so snapshot density — and attribution sharpness — grows on its own.
- - [x] Manual sort order (2026-07-23): `sort_order` column + admin **up/down arrows on cards** (grid persists 1-based order; edit-form Sort field = direct override). Glo Gang / Glo Gang Skate Team / Maino pinned atop glogang. Also added `@glogang` (291K IG) + `@glogangskateteam` (6.8K IG) as tracked members.
- - [x] Weighted cross-platform traction score (2026-07-23): Reach (≤100, log total audience across all platforms) + Breadth (≤25) + **Momentum** (≤50, median weekly growth % from `metric_snapshots`, server-attached as `momentum_wk_pct` via `src/lib/momentum.ts`) + Spotify popularity (≤25). IG-only members score meaningfully; breakdown tooltip explains every point.
-@@ -785,6 +789,7 @@ Strategic frame: two complementary products. **Incighder Discover** = today's ap
- ./scripts/import-artists.mjs
- ./components.json
- ./tsconfig.json
-+./RUNNING.local.md
- ./eslint.config.mjs
- ./next.config.ts
- ./src
-@@ -797,113 +802,12 @@ Strategic frame: two complementary products. **Incighder Discover** = today's ap
+@@ -802,113 +802,12 @@ Strategic frame: two complementary products. **Incighder Discover** = today's ap
  
  ## 5. Recent Git Changes (Summary)
  ```text
--cf10eca fix: Spotify search falls back to the data-api
--938196f fix: growth + momentum ignore snapshots from cleared sources
--d370fac fix: go_live.sh runs gunicorn with --reload
--8cf7f9e feat: group filter on the bulk Refresh page
--bb30046 feat: bulk import assigns a group; bulk refresh can skip auto-discovery
-+061f120 IG scraper: exact-count fallback for schema-broken business profiles
-+a7860c6 Fix the date-range presets: dead buttons and two chips lit at once (#21)
-+1b06ea6 Report pages: clickable artist links + fix compact roster row wrap/cutoff
-+9b5da70 Fit the TRACTION ring label (8px, tighter tracking) so it doesn't clip
-+b4a8bb3 Traction/Trajectory split, windowed date picker, concurrent sweep, doc fixes
++20fb476 Self-healing go_live: survive laptop sleep killing the cloudflared tunnel
++0090f51 Name exports after what they are (#22)
+ 061f120 IG scraper: exact-count fallback for schema-broken business profiles
+ a7860c6 Fix the date-range presets: dead buttons and two chips lit at once (#21)
+ 1b06ea6 Report pages: clickable artist links + fix compact roster row wrap/cutoff
+-9b5da70 Fit the TRACTION ring label (8px, tighter tracking) so it doesn't clip
+-b4a8bb3 Traction/Trajectory split, windowed date picker, concurrent sweep, doc fixes
  ```
  
  ## 6. Active Diff
  ```diff
+-diff --git a/.gitignore b/.gitignore
+-index cf41a40..7687f3d 100644
+---- a/.gitignore
+-+++ b/.gitignore
+-@@ -147,3 +147,6 @@ __pycache__/
+- .aider*
+- .vercel
+- .env*
+-+
+-+# local-only run notes
+-+RUNNING.local.md
 -diff --git a/ai/CONTEXT_BUNDLE.md b/ai/CONTEXT_BUNDLE.md
--index 8f15972..ec1d1a8 100644
+-index ba9d83c..b476748 100644
 ---- a/ai/CONTEXT_BUNDLE.md
 -+++ b/ai/CONTEXT_BUNDLE.md
 -@@ -1,5 +1,5 @@
 - # AI Context Bundle
---Generated: Thu Jul 23 17:44:57 PDT 2026
--+Generated: Fri Jul 24 13:20:46 PDT 2026
+--Generated: Fri Jul 24 13:20:46 PDT 2026
+-+Generated: Mon Aug  3 22:06:03 PDT 2026
 - 
 - ## ⚠️ Agent Navigation Guide
 - 1. Start with the **Current State** below to understand the focus.
--@@ -152,6 +152,7 @@ The long-term aim is a single dashboard that scores artist traction from many si
+-@@ -107,8 +107,8 @@ See **`DEPLOY.md`** (repo root) for the step-by-step. Shape: Vercel hosts the fl
+- 
+- PURPOSE: High-level summary of the system's current focus, the product vision, and recent changes — the single place an agent reads first to avoid drift. (Absorbs the former `GOALS.md`.)
+- 
+--## Last Updated: 2026-07-23
+--## Current Focus: **Deploy-ready with hosted DB.** Killed the recurring data-wipe bug (apply_schema was drop-and-recreate and ran on every dev start — now idempotent, `--reset` gated behind confirmation). Whole stack now takes a single `DATABASE_URL` (mysql://...?sslmode=require, TLS supported) so a free hosted MySQL (TiDB Serverless/Aiven) becomes the wipe-proof source of truth for both local dev and the Vercel deploy; DB config centralized (`src/lib/db.ts`, `scripts/db-config.mjs`, `_db_config()`). Ports env-driven (`DATA_API_PORT`/`WEB_PORT`). See `DEPLOY.md`. Next: create the hosted DB + set Vercel env vars; keep collapsing `data-api` proxy endpoints into TS routes. Backlog: deep scraping/deploy tech debt (below), artist bio, data export, change alerts.
+-+## Last Updated: 2026-07-28
+-+## Current Focus: **Live, iterating on the analytics/reporting surface.** Site is live at incighder.vercel.app on TiDB Serverless (the data-wipe bug and the single-`DATABASE_URL` migration are done; DB config centralized in `src/lib/db.ts` / `scripts/db-config.mjs` / `_db_config()`). Most recent work is the growth/reporting surface: **windowed growth** (a From/To date range replacing the single-date rewind scrubber), **chart accessibility** (role/aria/keyboard + a Table view), **print-fidelity one-sheets**, and a **concurrent scheduled sweep** (see Recent Changes). Backlog below: change/threshold alerts, playlist/chart tracking, discovery seeded from a tracked artist, robust history charts.
+- 
+- ## Project Goal
+- Build a data application that gives A&Rs, labels, and artists a **holistic view of an artist's online traction and growth potential** by aggregating public metrics across music and social platforms — Spotify, YouTube, SoundCloud, Instagram, TikTok, and X — and tracking how they move over time.
+-@@ -152,7 +152,11 @@ The long-term aim is a single dashboard that scores artist traction from many si
 - ---
 - 
 - ## Recent Changes
--+- **Rewound reports (2026-07-24)**: the one-sheet report pages (`/artists/[id]/report`, `/g/[group]/report`) now have the rewind scrubber — view/print the report as of any recorded snapshot day, shareable via `?date=YYYY-MM-DD`. Shared helpers in `src/lib/rewind.ts` + `components/rewind-scrubber.tsx`; rewound score recomputed from as-of values (momentum stripped — approximation); footprint hidden when rewound (no history for those fields).
+--- **Rewound reports (2026-07-24)**: the one-sheet report pages (`/artists/[id]/report`, `/g/[group]/report`) now have the rewind scrubber — view/print the report as of any recorded snapshot day, shareable via `?date=YYYY-MM-DD`. Shared helpers in `src/lib/rewind.ts` + `components/rewind-scrubber.tsx`; rewound score recomputed from as-of values (momentum stripped — approximation); footprint hidden when rewound (no history for those fields).
+-+- **Self-healing go_live watchdog — sleep/wake tunnel recovery (2026-08-03)**: laptop sleep kills a cloudflared quick tunnel PERMANENTLY — after wake, cloudflared retries its dead edge registration forever without exiting ("control stream encountered a failure while serving" loop), so the old `wait`-based go_live.sh never noticed and the stale URL stayed in `app_config.data_api_url` (live site stuck on the offline banner until a manual restart). `go_live.sh` now ends in a supervision loop (every `GO_LIVE_CHECK_INTERVAL`s, default 20): probes the tunnel END-TO-END through the Cloudflare edge (`$TUNNEL_URL/health`), detects wake via wall-clock jump (fast-path restart, no 3-strike wait), restarts cloudflared + republishes on failure. Also from an ultracode adversarial review (8 confirmed findings): top-level `cd $ROOT` (publish_url was cwd-sensitive), initial publish is non-fatal (watchdog retries), `start_api` reports failure instead of silently "going LIVE" with a dead API, tunnel probes are gated on local-origin health (a dead gunicorn no longer churns healthy tunnels), startup reap-waits leftover cloudflareds before truncating tunnel.log (a half-dead one punches NUL holes → BSD grep sees "binary", never extracts the URL), pidfile single-instance guard, periodic DB read-back heals external overwrites of the published row, and the watchdog restarts a dead scheduler. `scheduler.py`: the 24h `time.sleep` didn't advance during macOS system sleep (a "daily" sweep drifted to ~34h wall-clock on a nightly-sleeping laptop) — now a wall-clock-anchored 60s-tick deadline loop. Runs under pm2 as `incighder-data-api` (kill_timeout 15s); traps are pm2-aware: interruptible sleep (`sleep & wait`), INT/TERM handler exits (no watchdog-resurrects-the-tunnel-after-cleanup), cleanup kills children before the slow DB clear. Verified live: kill -9 on cloudflared → new tunnel up + republished + deployed site back online, hands-off.
+-+- **IG exact-count fallback for schema-broken profiles (2026-07-29)**: some business/creator profiles (brandon, daniel of glogang) permanently 400 on `web_profile_info` with an Instagram server-side schema error ("Asset asset://laser.provider/ig_business_category_subvertical has been deleted") — this was misdiagnosed at onboarding as an anonymous rate limit. The og-tag HTML fallback rounds counts for larger accounts ("26K"), and since `_maybe_snapshot` dedupes unchanged values, brandon sat at one growth point for a week. Fix in `scrapers/instagram.py`: the crawler-served profile HTML also embeds the numeric `profile_id`; the fallback now feeds it to the mobile `users/{id}/info/` endpoint (different schema, doesn't trip the bug) for exact follower/media counts + verified + HD avatar, with og tags demoted to last resort. Verified: brandon 26000 (rounded) → 25557 (exact). the Growth section's single-date rewind scrubber is replaced by a **date-range window** (`components/date-range.tsx` + `src/lib/series.ts`) — pick a From/To over real snapshot days and every chart, delta, and sparkline below scopes to it. Growth anchors on the value carried INTO the window (`deltaOver`), so a window that opens between scrapes still measures from where the count actually was. `?date=` still resolves (as the window's end); `?from=&to=` round-trips a shared/printed window. Charts gained accessibility (`role="img"`, `aria-label`, keyboard cursor, `aria-live`, a Table view so no value is hover-gated; two low-contrast platform inks — X, Spotify — darkened to clear 3:1). Print one-sheets are sized by aspect ratio at content height to stop a near-empty second page under Safari's scale-to-fit-width (verified 1.00–1.20 on Letter + A4). `components/rewind-scrubber.tsx` removed; `src/lib/rewind.ts` helpers stay.
+-+- **Concurrent scheduled sweep (2026-07-28)**: `scrape_all` sweeps artists `SCRAPE_SWEEP_WORKERS` at a time (default 4) instead of one-at-a-time. Safe because `throttle()` locks per HOST, not per artist — concurrent artists hitting the same site still serialize on that host's lock, so we never burst a site; we only stop leaving hosts idle between artists. Each `scrape_artist` owns its own DB connection, so nothing is shared across sweep threads. Near-linear wall-clock win as the roster grows.
+-+- **Partial scrapes retry + honest freshness label (2026-07-26)**: `ScrapeResult.partial` — a scrape that succeeds but misses a metric it owns (Spotify monthly listeners when the scrape.do render fails) gets `scrape_meta.status = "partial"`, which `_is_fresh` treats as stale, so the next refresh/sweep retries it instead of losing a day of snapshots; the render itself now retries 3× (non-200 or count missing from the rendered page). Bulk-refresh UI: "cached" → "N fresh (scraped Xh ago)" with a per-platform tooltip + copy explaining the nightly auto-sweep (the sweep is why manual refreshes usually find everything fresh); partial platforms surface as an amber chip. Note: `scheduler.py` doesn't hot-reload — restart it after editing scrape code.
+-+- **Rewound reports (2026-07-24)**: the one-sheet report pages (`/artists/[id]/report`, `/g/[group]/report`) now have the rewind scrubber — view/print the report as of any recorded snapshot day, shareable via `?date=YYYY-MM-DD`. Shared helpers in `src/lib/rewind.ts` + `components/rewind-scrubber.tsx`; rewound score recomputed from as-of values (momentum stripped — approximation); footprint hidden when rewound (no history for those fields). _(2026-07-28: `rewind-scrubber.tsx` removed; the windowed date-range supersedes it and `?date=` still resolves as the window end.)_
 - - **Twitch + photos (2026-07-23)**: Twitch is a first-class tracked platform (web GQL, keyless). Manual adds get profile pictures automatically from their socials on scrape; admins can also upload a photo (data-URI storage, no file infra, ~60-150KB/person — negligible vs TiDB's 5GiB). Group chips on home are now admin-only: grouped members are visible ONLY via their /g/<group> URL.
 - - **Data export + one-sheets (2026-07-23)**: admin CSV export; print/PDF-ready per-person and per-group "traction one-sheet" pages (masthead, traction ledger with deltas + sparklines, footprint); `/api/history` now native TS. Glogang roster onboarded: 8 skaters + DJ Maino (IG links, Maino also YT + Twitch in `external_urls`; 7/9 scraped — IG anonymous rate limit blocked daniel/brandon, retry later or set `IG_SESSIONID`).
 - - **Artist groups (2026-07-23)**: `group_name` column + `/g/[group]` pages + `/api/groups`; main list = ungrouped only (roster separation à la glogang); shared `ArtistGrid` component behind home and group pages.
+-@@ -218,7 +222,7 @@ Strategic frame: two complementary products. **Incighder Discover** = today's ap
+- 
+- ## Completed
+- - [x] Rewound reports (2026-07-24): date scrubber + `?date=` param on both one-sheet report pages — replay any snapshot day, print historical reports (`lib/rewind.ts`, `components/rewind-scrubber.tsx`)
+--- [x] Rewind scrubber (2026-07-23): time-travel the Growth section — slider ticks are the real snapshot dates (workingmemory's "time travel = pure replay of recorded events" pattern); shows each platform's value on that day + "since then" delta; sparklines truncate. Pure client-side over `/api/history`. Pairs with events for reviewing what stats looked like on a given date.
+-+- [x] Rewind scrubber (2026-07-23): time-travel the Growth section — slider ticks are the real snapshot dates (workingmemory's "time travel = pure replay of recorded events" pattern); shows each platform's value on that day + "since then" delta; sparklines truncate. Pure client-side over `/api/history`. Pairs with events for reviewing what stats looked like on a given date. _(Superseded 2026-07-28 by the windowed date-range — `components/date-range.tsx` + `src/lib/series.ts`; `rewind-scrubber.tsx` removed.)_
+- - [x] Events/campaign tracking (2026-07-23): `events` + `event_artists` junction (one event spans many people — group-mate chips in the add form, '+N others' badge); `/api/events` computes per-person change vs `metric_snapshots` (baseline at event date → last reading in a 14-day window). Copy deliberately frames it as **observed correlation, not causation**. Event types incl. `post`. Scheduler runs inside `go_live.sh` (daily sweep) so snapshot density — and attribution sharpness — grows on its own.
+- - [x] Manual sort order (2026-07-23): `sort_order` column + admin **up/down arrows on cards** (grid persists 1-based order; edit-form Sort field = direct override). Glo Gang / Glo Gang Skate Team / Maino pinned atop glogang. Also added `@glogang` (291K IG) + `@glogangskateteam` (6.8K IG) as tracked members.
 ```

@@ -1,7 +1,7 @@
 import type { HistoryPoint } from "@/lib/rewind";
 
 // Day-granularity series and window maths, shared by the growth charts, the
-// one-sheets and the range picker.
+// reports and the range picker.
 //
 // Snapshots are per-scrape, and a scrape can run several times a day. Growth is
 // read per DAY, so a day is one data point carrying that day's last recorded

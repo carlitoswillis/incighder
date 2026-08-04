@@ -82,7 +82,7 @@ export function ArtistGrid({ title, group }: { title: string; group?: string }) 
           size="sm"
           render={<Link href={`/g/${encodeURIComponent(group)}/report`} />}
         >
-          <FileText className="size-4" /> One-sheet
+          <FileText className="size-4" /> Report
         </Button>
       )}
       {admin && (

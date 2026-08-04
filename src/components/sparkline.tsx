@@ -1,7 +1,7 @@
 import type { DayPoint } from "@/lib/series";
 import type { CSSProperties } from "react";
 
-// Compact trend mark for rows and the printed one-sheets. Same reading as the
+// Compact trend mark for rows and the printed reports. Same reading as the
 // full GrowthChart — real time on the x axis, a dot per scrape day — at a size
 // that fits a table row. Static: the row's numbers carry the values, and in
 // print there is nothing to hover.

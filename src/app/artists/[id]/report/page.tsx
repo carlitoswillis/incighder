@@ -36,7 +36,7 @@ type HistoryEntry = {
   since: string;
 };
 
-// Print/PDF-ready one-sheet: the whole traction story on a single page.
+// Print/PDF-ready report: the whole traction story on a single page.
 // ReportPaper is a fixed, page-sized box and nothing here is scaled to fit,
 // so the sheet is laid out to stay inside it.
 // Screen keeps the site's dark identity; @media print flips to the light
@@ -80,7 +80,7 @@ export default function ReportPage({
 
   // Names the tab, and so names the PDF this page prints to.
   useDocumentTitle(
-    artist ? reportTitle(artist.name, "one-sheet", exportStamp(range)) : null,
+    artist ? reportTitle(artist.name, "report", exportStamp(range)) : null,
   );
 
   if (error) return <p className="text-sm text-destructive">Not available.</p>;
@@ -141,7 +141,7 @@ export default function ReportPage({
               <span className="text-primary">◐</span> Incighder
             </span>
             <span className="font-mono text-[11px] uppercase tracking-[0.2em] text-muted-foreground">
-              Traction one-sheet
+              Traction report
             </span>
           </div>
           <span className="font-mono text-[11px] uppercase tracking-[0.2em] text-muted-foreground">

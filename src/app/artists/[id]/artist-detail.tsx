@@ -294,7 +294,7 @@ function ArtistDetail() {
             variant="outline"
             render={<Link href={`/artists/${artistId}/report`} />}
           >
-            One-sheet
+            Report
           </Button>
           {admin && (
             <>
