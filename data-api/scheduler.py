@@ -43,7 +43,14 @@ def main() -> None:
             run_once()
         except Exception as e:  # keep the loop alive across transient failures
             _log(f"sweep error: {e}")
-        time.sleep(INTERVAL_HOURS * 3600)
+        # Short sleeps re-anchored to the wall clock, not one long sleep: on
+        # macOS the monotonic clock time.sleep() counts against pauses during
+        # system sleep, so a single 24h sleep on a laptop that sleeps nightly
+        # measures awake-time only and the "daily" sweep drifts hours later
+        # every cycle (~34h wall-clock per interval).
+        next_run = time.time() + INTERVAL_HOURS * 3600
+        while (remaining := next_run - time.time()) > 0:
+            time.sleep(min(60.0, remaining))
 
 
 if __name__ == "__main__":
