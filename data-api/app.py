@@ -122,6 +122,58 @@ def transcribe():
         return jsonify({'error': 'transcription failed'}), 502
 
 
+@app.route('/speak', methods=['POST'])
+def speak():
+    """Text-to-speech bridge for GLO's spoken replies: Gemini TTS in a natural
+    British delivery, using this machine's key when the Vercel runtime has
+    none. Body {text}; reply audio/wav (Gemini returns raw 16-bit mono PCM,
+    wrapped in a WAV header here)."""
+    import ai_verify
+    import re as _re
+    import struct as _struct
+    import base64 as _base64
+    from flask import Response as _Response
+    if not ai_verify.GEMINI_API_KEY:
+        return jsonify({'error': 'no Gemini key configured on the data-api host'}), 501
+    body = request.get_json(silent=True) or {}
+    text = str(body.get('text') or '').strip()[:2000]
+    if not text:
+        return jsonify({'error': 'text required'}), 400
+    model = os.getenv('GLO_TTS_MODEL', 'gemini-2.5-flash-preview-tts')
+    voice = os.getenv('GLO_TTS_VOICE', 'Despina')
+    style = os.getenv('GLO_TTS_STYLE',
+                      'Read this aloud as a poised British woman with a natural, warm '
+                      'English accent — conversational and unhurried, like a sharp '
+                      'manager briefing a friend')
+    payload = {
+        'contents': [{'role': 'user', 'parts': [{'text': f'{style}: {text}'}]}],
+        'generationConfig': {
+            'responseModalities': ['AUDIO'],
+            'speechConfig': {'voiceConfig': {'prebuiltVoiceConfig': {'voiceName': voice}}},
+        },
+    }
+    try:
+        import requests as _requests
+        resp = _requests.post(
+            f'https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent',
+            params={'key': ai_verify.GEMINI_API_KEY}, json=payload, timeout=45)
+        resp.raise_for_status()
+        parts = resp.json()['candidates'][0]['content'].get('parts') or []
+        inline = next((p['inlineData'] for p in parts if p.get('inlineData')), None)
+        if not inline or not inline.get('data'):
+            return jsonify({'error': 'speech service returned no audio'}), 502
+        pcm = _base64.b64decode(inline['data'])
+        m = _re.search(r'rate=(\d+)', inline.get('mimeType') or '')
+        rate = int(m.group(1)) if m else 24000
+        header = (b'RIFF' + _struct.pack('<I', 36 + len(pcm)) + b'WAVEfmt '
+                  + _struct.pack('<IHHIIHH', 16, 1, 1, rate, rate * 2, 2, 16)
+                  + b'data' + _struct.pack('<I', len(pcm)))
+        return _Response(header + pcm, mimetype='audio/wav')
+    except Exception as e:
+        print(f"Speech synthesis error: {e}", file=sys.stderr)
+        return jsonify({'error': 'speech synthesis failed'}), 502
+
+
 @app.route('/insert_artist', methods=['POST'])
 def insert_artist():
     data = request.json

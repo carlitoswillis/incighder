@@ -221,8 +221,35 @@ export function cleanForSpeech(text: string): string {
     .trim();
 }
 
+/** A beat of silence: playing this inside a user gesture unlocks programmatic
+ * audio playback on iOS, so fetched TTS can start later without a tap. */
+const SILENT_WAV =
+  "data:audio/wav;base64,UklGRkQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YSAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==";
+
+/** Browser-voice fallback for when the TTS endpoint is unreachable — prefer a
+ * British system voice so the accent survives the downgrade. */
+function speakWithBrowser(cleaned: string): Promise<void> {
+  if (typeof window === "undefined" || !window.speechSynthesis) return Promise.resolve();
+  window.speechSynthesis.cancel();
+  return new Promise((resolve) => {
+    const utterance = new SpeechSynthesisUtterance(cleaned);
+    const voices = window.speechSynthesis.getVoices();
+    const british =
+      voices.find((v) => v.lang.startsWith("en-GB") && /premium|enhanced|natural/i.test(v.name)) ??
+      voices.find((v) => v.lang.startsWith("en-GB"));
+    if (british) utterance.voice = british;
+    utterance.rate = 1.02;
+    utterance.onend = () => resolve();
+    utterance.onerror = () => resolve();
+    window.speechSynthesis.speak(utterance);
+  });
+}
+
 export function useSpeaker() {
   const [enabled, setEnabled] = useState(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  // Resolver for the in-flight playback promise, so cancel() can settle it.
+  const playingRef = useRef<(() => void) | null>(null);
 
   // Restore the persisted preference after mount (SSR-safe).
   useEffect(() => {
@@ -233,11 +260,28 @@ export function useSpeaker() {
     }
   }, []);
 
+  /** Call from a click/tap handler: primes the shared <audio> element so iOS
+   * allows later programmatic playback of fetched speech. */
+  const unlock = useCallback(() => {
+    if (typeof window === "undefined") return;
+    if (!audioRef.current) audioRef.current = new Audio();
+    const audio = audioRef.current;
+    if (!audio.src) {
+      audio.src = SILENT_WAV;
+      void audio.play().catch(() => {});
+    }
+  }, []);
+
   const cancel = useCallback(() => {
+    const audio = audioRef.current;
+    if (audio && !audio.paused) audio.pause();
+    playingRef.current?.();
+    playingRef.current = null;
     if (typeof window !== "undefined") window.speechSynthesis?.cancel();
   }, []);
 
   const toggle = useCallback(() => {
+    unlock();
     setEnabled((prev) => {
       const next = !prev;
       try {
@@ -245,33 +289,67 @@ export function useSpeaker() {
       } catch {
         // ignore
       }
-      if (!next) window.speechSynthesis?.cancel();
+      if (!next) cancel();
       return next;
     });
-  }, []);
+  }, [cancel, unlock]);
 
-  /** Speak text; resolves when the utterance finishes (or is cancelled), so
-   * hands-free voice mode can wait before re-opening the mic. */
-  const speak = useCallback((text: string): Promise<void> => {
-    if (typeof window === "undefined" || !window.speechSynthesis) return Promise.resolve();
-    const cleaned = cleanForSpeech(text);
-    if (!cleaned) return Promise.resolve();
-    window.speechSynthesis.cancel();
-    return new Promise((resolve) => {
-      const utterance = new SpeechSynthesisUtterance(cleaned);
-      utterance.rate = 1.05;
-      utterance.onend = () => resolve();
-      utterance.onerror = () => resolve();
-      window.speechSynthesis.speak(utterance);
-    });
-  }, []);
+  /** Speak text via the server's natural-voice TTS (British delivery),
+   * falling back to a British browser voice if the endpoint is unreachable.
+   * Resolves when playback finishes (or is cancelled), so hands-free voice
+   * mode can wait before re-opening the mic. */
+  const speak = useCallback(
+    async (text: string): Promise<void> => {
+      const cleaned = cleanForSpeech(text);
+      if (!cleaned) return;
+      cancel();
+      try {
+        const res = await fetch("/api/agent/speak", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text: cleaned }),
+          signal: AbortSignal.timeout(60_000),
+        });
+        if (!res.ok || !(res.headers.get("content-type") ?? "").includes("audio/")) {
+          throw new Error(`tts ${res.status}`);
+        }
+        const url = URL.createObjectURL(await res.blob());
+        if (!audioRef.current) audioRef.current = new Audio();
+        const audio = audioRef.current;
+        await new Promise<void>((resolve) => {
+          let settled = false;
+          const done = () => {
+            if (settled) return;
+            settled = true;
+            URL.revokeObjectURL(url);
+            if (playingRef.current === done) playingRef.current = null;
+            resolve();
+          };
+          playingRef.current = done;
+          audio.onended = done;
+          audio.onerror = done;
+          audio.src = url;
+          audio.play().catch(() => {
+            // Autoplay refused (no prior unlock) — degrade to the browser voice.
+            done();
+            void speakWithBrowser(cleaned);
+          });
+        });
+      } catch {
+        await speakWithBrowser(cleaned);
+      }
+    },
+    [cancel],
+  );
 
   // Silence on unmount.
   useEffect(() => {
     return () => {
+      const audio = audioRef.current;
+      if (audio) audio.pause();
       if (typeof window !== "undefined") window.speechSynthesis?.cancel();
     };
   }, []);
 
-  return { enabled, toggle, speak, cancel };
+  return { enabled, toggle, speak, cancel, unlock };
 }

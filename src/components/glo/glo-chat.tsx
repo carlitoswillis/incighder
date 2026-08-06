@@ -175,6 +175,9 @@ export function GloChat({ onClose }: { onClose: () => void }) {
       voice.stop(false);
       speakerRef.current.cancel();
     } else {
+      // The toggle tap doubles as the iOS audio unlock, so the spoken reply
+      // can start without another tap.
+      speakerRef.current.unlock();
       voiceModeRef.current = true;
       setVoiceMode(true);
       void voice.start();
