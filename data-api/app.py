@@ -117,7 +117,9 @@ def transcribe():
     }
     try:
         import requests as _requests
-        resp = _requests.post(ai_verify.GEMINI_URL, params={'key': ai_verify.GEMINI_API_KEY},
+        # Key in a header, not the URL — request errors log the URL verbatim.
+        resp = _requests.post(ai_verify.GEMINI_URL,
+                              headers={'x-goog-api-key': ai_verify.GEMINI_API_KEY},
                               json=payload, timeout=45)
         resp.raise_for_status()
         parts = resp.json()['candidates'][0]['content'].get('parts') or []
@@ -130,23 +132,49 @@ def transcribe():
 
 @app.route('/speak', methods=['POST'])
 def speak():
-    """Text-to-speech bridge for GLO's spoken replies: Gemini TTS in a natural
-    British delivery, using this machine's key when the Vercel runtime has
-    none. Body {text}; reply audio/wav (Gemini returns raw 16-bit mono PCM,
-    wrapped in a WAV header here)."""
+    """Text-to-speech for GLO's spoken replies. Primary: Microsoft Edge neural
+    voices via edge-tts — free, no quota, and en-GB-SoniaNeural is a genuinely
+    natural British woman (Gemini's preview TTS has a tiny free-tier daily
+    quota — observed 429ing after normal use — so it is only the fallback).
+    Body {text}; reply audio/mpeg (edge) or audio/wav (Gemini fallback)."""
+    from flask import Response as _Response
+    body = request.get_json(silent=True) or {}
+    text = str(body.get('text') or '').strip()[:2000]
+    if not text:
+        return jsonify({'error': 'text required'}), 400
+
+    voice = os.getenv('GLO_TTS_VOICE', 'en-GB-SoniaNeural')
+    try:
+        import asyncio
+        import edge_tts
+        out = tempfile.NamedTemporaryFile(suffix='.mp3', delete=False)
+        out.close()
+        try:
+            asyncio.run(edge_tts.Communicate(text, voice).save(out.name))
+            with open(out.name, 'rb') as f:
+                data = f.read()
+        finally:
+            os.unlink(out.name)
+        if data:
+            return _Response(data, mimetype='audio/mpeg')
+        print("edge-tts produced no audio, falling back to Gemini TTS", file=sys.stderr)
+    except Exception as e:
+        print(f"edge-tts failed, falling back to Gemini TTS: {e}", file=sys.stderr)
+
+    return _gemini_tts(text)
+
+
+def _gemini_tts(text: str):
+    """Fallback TTS via Gemini (tiny free-tier daily quota). audio/wav."""
     import ai_verify
     import re as _re
     import struct as _struct
     import base64 as _base64
     from flask import Response as _Response
     if not ai_verify.GEMINI_API_KEY:
-        return jsonify({'error': 'no Gemini key configured on the data-api host'}), 501
-    body = request.get_json(silent=True) or {}
-    text = str(body.get('text') or '').strip()[:2000]
-    if not text:
-        return jsonify({'error': 'text required'}), 400
+        return jsonify({'error': 'speech synthesis unavailable (edge-tts failed, no Gemini key)'}), 502
     model = os.getenv('GLO_TTS_MODEL', 'gemini-2.5-flash-preview-tts')
-    voice = os.getenv('GLO_TTS_VOICE', 'Despina')
+    voice = os.getenv('GLO_TTS_GEMINI_VOICE', 'Despina')
     style = os.getenv('GLO_TTS_STYLE',
                       'Read this aloud as a poised British woman with a natural, warm '
                       'English accent — conversational and unhurried, like a sharp '
@@ -160,9 +188,10 @@ def speak():
     }
     try:
         import requests as _requests
+        # Key goes in a header, not the URL — errors log the URL verbatim.
         resp = _requests.post(
             f'https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent',
-            params={'key': ai_verify.GEMINI_API_KEY}, json=payload, timeout=45)
+            headers={'x-goog-api-key': ai_verify.GEMINI_API_KEY}, json=payload, timeout=45)
         resp.raise_for_status()
         parts = resp.json()['candidates'][0]['content'].get('parts') or []
         inline = next((p['inlineData'] for p in parts if p.get('inlineData')), None)

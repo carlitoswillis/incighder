@@ -245,11 +245,31 @@ function speakWithBrowser(cleaned: string): Promise<void> {
   });
 }
 
+/** Split cleaned prose into speakable chunks at sentence boundaries, merging
+ * short sentences so each TTS request carries a meaningful stretch. */
+function splitForSpeech(text: string, target = 220): string[] {
+  const sentences = text.match(/[^.!?]+[.!?]+(?:\s|$)|[^.!?]+$/g) ?? [text];
+  const chunks: string[] = [];
+  let current = "";
+  for (const s of sentences) {
+    if (current && current.length + s.length > target) {
+      chunks.push(current.trim());
+      current = s;
+    } else {
+      current += s;
+    }
+  }
+  if (current.trim()) chunks.push(current.trim());
+  return chunks.length ? chunks : [text];
+}
+
 export function useSpeaker() {
   const [enabled, setEnabled] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   // Resolver for the in-flight playback promise, so cancel() can settle it.
   const playingRef = useRef<(() => void) | null>(null);
+  // The active speak() run — cancel() flags it and aborts its fetches.
+  const speakRunRef = useRef<{ cancelled: boolean; abort: AbortController } | null>(null);
 
   // Restore the persisted preference after mount (SSR-safe).
   useEffect(() => {
@@ -273,6 +293,12 @@ export function useSpeaker() {
   }, []);
 
   const cancel = useCallback(() => {
+    const run = speakRunRef.current;
+    if (run) {
+      run.cancelled = true;
+      run.abort.abort();
+      speakRunRef.current = null;
+    }
     const audio = audioRef.current;
     if (audio && !audio.paused) audio.pause();
     playingRef.current?.();
@@ -296,27 +322,39 @@ export function useSpeaker() {
 
   /** Speak text via the server's natural-voice TTS (British delivery),
    * falling back to a British browser voice if the endpoint is unreachable.
-   * Resolves when playback finishes (or is cancelled), so hands-free voice
-   * mode can wait before re-opening the mic. */
+   * The text is split into sentence chunks and pipelined — the first chunk
+   * plays while the next renders, so speech starts ~a second behind the text
+   * instead of waiting for the whole answer to synthesize. Resolves when
+   * playback finishes (or is cancelled), so hands-free voice mode can wait
+   * before re-opening the mic. */
   const speak = useCallback(
     async (text: string): Promise<void> => {
       const cleaned = cleanForSpeech(text);
       if (!cleaned) return;
       cancel();
-      try {
-        const res = await fetch("/api/agent/speak", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text: cleaned }),
-          signal: AbortSignal.timeout(60_000),
-        });
-        if (!res.ok || !(res.headers.get("content-type") ?? "").includes("audio/")) {
-          throw new Error(`tts ${res.status}`);
+      const run = { cancelled: false, abort: new AbortController() };
+      speakRunRef.current = run;
+
+      const fetchChunk = async (chunk: string): Promise<Blob | null> => {
+        try {
+          const res = await fetch("/api/agent/speak", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ text: chunk }),
+            signal: AbortSignal.any([run.abort.signal, AbortSignal.timeout(30_000)]),
+          });
+          if (!res.ok || !(res.headers.get("content-type") ?? "").includes("audio/")) return null;
+          return await res.blob();
+        } catch {
+          return null;
         }
-        const url = URL.createObjectURL(await res.blob());
+      };
+
+      const playBlob = (blob: Blob): Promise<void> => {
+        const url = URL.createObjectURL(blob);
         if (!audioRef.current) audioRef.current = new Audio();
         const audio = audioRef.current;
-        await new Promise<void>((resolve) => {
+        return new Promise<void>((resolve) => {
           let settled = false;
           const done = () => {
             if (settled) return;
@@ -329,14 +367,25 @@ export function useSpeaker() {
           audio.onended = done;
           audio.onerror = done;
           audio.src = url;
-          audio.play().catch(() => {
-            // Autoplay refused (no prior unlock) — degrade to the browser voice.
-            done();
-            void speakWithBrowser(cleaned);
-          });
+          audio.play().catch(done);
         });
-      } catch {
-        await speakWithBrowser(cleaned);
+      };
+
+      const chunks = splitForSpeech(cleaned);
+      let next = fetchChunk(chunks[0]);
+      for (let i = 0; i < chunks.length; i++) {
+        const blob = await next;
+        if (run.cancelled) return;
+        // Prefetch the next chunk while this one plays.
+        next = i + 1 < chunks.length ? fetchChunk(chunks[i + 1]) : Promise.resolve(null);
+        if (!blob) {
+          // Endpoint down or autoplay refused — finish the rest in the
+          // browser voice rather than going silent.
+          await speakWithBrowser(chunks.slice(i).join(" "));
+          return;
+        }
+        await playBlob(blob);
+        if (run.cancelled) return;
       }
     },
     [cancel],

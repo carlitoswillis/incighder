@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 
 const MAX_TEXT_CHARS = 2000; // spoken answers are headlines + detail, not essays
 
-const RATE_LIMIT = 20;
+const RATE_LIMIT = 60; // chunked playback sends one small request per sentence group
 const RATE_WINDOW_MS = 60_000;
 const rateBuckets = new Map<string, { count: number; windowStart: number }>();
 
@@ -32,7 +32,8 @@ function isRateLimited(ip: string): boolean {
 function ttsConfig() {
   return {
     model: process.env.GLO_TTS_MODEL || "gemini-2.5-flash-preview-tts",
-    voice: process.env.GLO_TTS_VOICE || "Despina",
+    // GLO_TTS_VOICE is the edge-tts (bridge) voice; Gemini names differ.
+    voice: process.env.GLO_TTS_GEMINI_VOICE || "Despina",
     style:
       process.env.GLO_TTS_STYLE ||
       "Read this aloud as a poised British woman with a natural, warm English accent — conversational and unhurried, like a sharp manager briefing a friend",
@@ -86,7 +87,7 @@ async function speakWithGemini(apiKey: string, text: string): Promise<Buffer> {
   return pcmToWav(Buffer.from(inline.data, "base64"), rate);
 }
 
-async function speakViaDataApi(text: string): Promise<Buffer> {
+async function speakViaDataApi(text: string): Promise<{ audio: Buffer; mime: string }> {
   const url = await getDataApiUrl();
   const res = await fetch(`${url}/speak`, {
     method: "POST",
@@ -95,10 +96,10 @@ async function speakViaDataApi(text: string): Promise<Buffer> {
     signal: AbortSignal.timeout(50_000),
   });
   const contentType = res.headers.get("content-type") ?? "";
-  if (!res.ok || !contentType.includes("audio/wav")) {
+  if (!res.ok || !contentType.includes("audio/")) {
     throw new Error(`speech bridge error (${res.status})`);
   }
-  return Buffer.from(await res.arrayBuffer());
+  return { audio: Buffer.from(await res.arrayBuffer()), mime: contentType };
 }
 
 export async function POST(request: Request) {
@@ -119,17 +120,31 @@ export async function POST(request: Request) {
   if (!text) return Response.json({ error: "text required" }, { status: 400 });
   text = text.slice(0, MAX_TEXT_CHARS);
 
+  // Bridge first: the Mac renders with edge-tts (free, no quota, natural
+  // British neural voice). Gemini TTS direct is the fallback — its preview
+  // model's free-tier daily quota is tiny and 429s under normal use.
   try {
-    const geminiKey = process.env.GOOGLE_AI_API_KEY || process.env.GEMINI_API_KEY;
-    const wav = geminiKey ? await speakWithGemini(geminiKey, text) : await speakViaDataApi(text);
-    return new Response(new Uint8Array(wav), {
-      headers: { "Content-Type": "audio/wav", "Cache-Control": "no-store" },
+    const { audio, mime } = await speakViaDataApi(text);
+    return new Response(new Uint8Array(audio), {
+      headers: { "Content-Type": mime, "Cache-Control": "no-store" },
     });
-  } catch (e) {
-    console.error("Speech synthesis failed:", e);
-    return Response.json(
-      { error: e instanceof Error ? e.message : "Speech synthesis failed." },
-      { status: 502 },
-    );
+  } catch (bridgeError) {
+    const geminiKey = process.env.GOOGLE_AI_API_KEY || process.env.GEMINI_API_KEY;
+    if (!geminiKey) {
+      console.error("Speech synthesis failed (no fallback):", bridgeError);
+      return Response.json({ error: "Speech synthesis unavailable." }, { status: 502 });
+    }
+    try {
+      const wav = await speakWithGemini(geminiKey, text);
+      return new Response(new Uint8Array(wav), {
+        headers: { "Content-Type": "audio/wav", "Cache-Control": "no-store" },
+      });
+    } catch (e) {
+      console.error("Speech synthesis failed:", e);
+      return Response.json(
+        { error: e instanceof Error ? e.message : "Speech synthesis failed." },
+        { status: 502 },
+      );
+    }
   }
 }
