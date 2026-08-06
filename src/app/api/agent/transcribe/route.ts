@@ -109,17 +109,27 @@ export async function POST(request: Request) {
   }
   const audioB64 = Buffer.from(audio).toString("base64");
 
+  // Bridge first: the Mac transcribes locally with faster-whisper (offline,
+  // no quota). Gemini direct is only the fallback — its free-tier daily caps
+  // 429 under real use.
   try {
-    const geminiKey = process.env.GOOGLE_AI_API_KEY || process.env.GEMINI_API_KEY;
-    const text = geminiKey
-      ? await transcribeWithGemini(geminiKey, mime, audioB64)
-      : await transcribeViaDataApi(mime, audioB64);
+    const text = await transcribeViaDataApi(mime, audioB64);
     return Response.json({ text });
-  } catch (e) {
-    console.error("Transcription failed:", e);
-    return Response.json(
-      { error: e instanceof Error ? e.message : "Transcription failed." },
-      { status: 502 },
-    );
+  } catch (bridgeError) {
+    const geminiKey = process.env.GOOGLE_AI_API_KEY || process.env.GEMINI_API_KEY;
+    if (!geminiKey) {
+      console.error("Transcription failed (no fallback):", bridgeError);
+      return Response.json({ error: "Transcription unavailable." }, { status: 502 });
+    }
+    try {
+      const text = await transcribeWithGemini(geminiKey, mime, audioB64);
+      return Response.json({ text });
+    } catch (e) {
+      console.error("Transcription failed:", e);
+      return Response.json(
+        { error: e instanceof Error ? e.message : "Transcription failed." },
+        { status: 502 },
+      );
+    }
   }
 }

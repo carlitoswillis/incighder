@@ -8,3 +8,5 @@ gunicorn
 beautifulsoup4
 lxml
 edge-tts
+kokoro-onnx
+faster-whisper

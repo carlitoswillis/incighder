@@ -147,3 +147,4 @@ __pycache__/
 .aider*
 .vercel
 .env*
+data-api/models/

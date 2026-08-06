@@ -89,15 +89,41 @@ def agent_turn():
         return jsonify({'error': 'claude returned non-JSON output'}), 502
 
 
+_whisper = None
+_whisper_lock = None
+
+
+def _whisper_transcribe(audio_bytes: bytes, mime: str):
+    """Local open-source STT (faster-whisper base.en, int8) — offline, no
+    quota, <1s per utterance once warm. Returns text or None on failure.
+    PyAV decodes whatever the browser recorded (webm/opus, mp4/AAC, wav)."""
+    global _whisper, _whisper_lock
+    import threading as _threading
+    if _whisper_lock is None:
+        _whisper_lock = _threading.Lock()
+    from faster_whisper import WhisperModel
+    suffix = {'audio/mp4': '.m4a', 'audio/mpeg': '.mp3', 'audio/wav': '.wav'}.get(mime, '.webm')
+    tmp = tempfile.NamedTemporaryFile(suffix=suffix, delete=False)
+    try:
+        tmp.write(audio_bytes)
+        tmp.close()
+        with _whisper_lock:  # one shared model; requests are short
+            if _whisper is None:
+                _whisper = WhisperModel(os.getenv('GLO_STT_MODEL', 'base.en'),
+                                        compute_type='int8')
+            segments, _info = _whisper.transcribe(tmp.name)
+            return ' '.join(s.text.strip() for s in segments).strip()
+    finally:
+        os.unlink(tmp.name)
+
+
 @app.route('/transcribe', methods=['POST'])
 def transcribe():
-    """Speech-to-text bridge for GLO's mic: the Vercel /api/agent/transcribe
-    route forwards audio here when its own runtime has no Gemini key, so the
-    deployed site transcribes using this machine's .env. Body:
+    """Speech-to-text for GLO's mic (bridged from the Vercel
+    /api/agent/transcribe route). Primary: local faster-whisper — offline, no
+    quota. Fallback: Gemini (free-tier daily caps 429 under real use). Body:
     {mime, audio_b64}; reply {text}."""
     import ai_verify
-    if not ai_verify.GEMINI_API_KEY:
-        return jsonify({'error': 'no Gemini key configured on the data-api host'}), 501
     body = request.get_json(silent=True) or {}
     audio_b64 = body.get('audio_b64')
     mime = str(body.get('mime') or 'audio/webm')
@@ -105,6 +131,17 @@ def transcribe():
         return jsonify({'error': 'audio_b64 required'}), 400
     if len(audio_b64) > 12 * 1024 * 1024:  # ~8MB of audio, base64-inflated
         return jsonify({'error': 'audio too large'}), 413
+
+    try:
+        import base64 as _base64
+        text = _whisper_transcribe(_base64.b64decode(audio_b64), mime)
+        if text is not None:
+            return jsonify({'text': text}), 200
+    except Exception as e:
+        print(f"faster-whisper failed, falling back to Gemini: {e}", file=sys.stderr)
+
+    if not ai_verify.GEMINI_API_KEY:
+        return jsonify({'error': 'transcription unavailable (whisper failed, no Gemini key)'}), 502
     payload = {
         'contents': [{'role': 'user', 'parts': [
             {'text': ('Transcribe this audio verbatim. Return ONLY the spoken words as '
@@ -130,18 +167,62 @@ def transcribe():
         return jsonify({'error': 'transcription failed'}), 502
 
 
+_kokoro = None
+_kokoro_lock = None
+
+
+def _kokoro_tts(text: str):
+    """Local open-source TTS (Kokoro-82M via ONNX, Apache-2.0): phenomenal
+    naturalness, fully offline, no quota. Returns WAV bytes or None when the
+    model files aren't downloaded (see data-api/models/). Lazy-loads once
+    (~0.6s) and keeps the session in memory; renders ~3x real-time on CPU."""
+    global _kokoro, _kokoro_lock
+    import threading as _threading
+    if _kokoro_lock is None:
+        _kokoro_lock = _threading.Lock()
+    model_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'models')
+    model = os.path.join(model_dir, 'kokoro-v1.0.onnx')
+    voices = os.path.join(model_dir, 'voices-v1.0.bin')
+    if not (os.path.exists(model) and os.path.exists(voices)):
+        return None
+    import io
+    import wave as _wave
+    import numpy as _np
+    from kokoro_onnx import Kokoro
+    voice = os.getenv('GLO_TTS_KOKORO_VOICE', 'bf_emma')
+    speed = float(os.getenv('GLO_TTS_SPEED', '1.05'))
+    with _kokoro_lock:  # serialize: one shared ONNX session
+        if _kokoro is None:
+            _kokoro = Kokoro(model, voices)
+        samples, sr = _kokoro.create(text, voice=voice, speed=speed)
+    buf = io.BytesIO()
+    with _wave.open(buf, 'wb') as w:
+        w.setnchannels(1)
+        w.setsampwidth(2)
+        w.setframerate(sr)
+        w.writeframes((_np.clip(samples, -1, 1) * 32767).astype('<i2').tobytes())
+    return buf.getvalue()
+
+
 @app.route('/speak', methods=['POST'])
 def speak():
-    """Text-to-speech for GLO's spoken replies. Primary: Microsoft Edge neural
-    voices via edge-tts — free, no quota, and en-GB-SoniaNeural is a genuinely
-    natural British woman (Gemini's preview TTS has a tiny free-tier daily
-    quota — observed 429ing after normal use — so it is only the fallback).
-    Body {text}; reply audio/mpeg (edge) or audio/wav (Gemini fallback)."""
+    """Text-to-speech for GLO's spoken replies. Primary: Kokoro — open-source,
+    local, offline, natural British voices (bf_emma default). Fallbacks:
+    edge-tts (free Microsoft neural endpoint, unofficial), then Gemini TTS
+    (tiny free-tier daily quota — observed 429ing after normal use).
+    Body {text}; reply audio/wav (kokoro/Gemini) or audio/mpeg (edge)."""
     from flask import Response as _Response
     body = request.get_json(silent=True) or {}
     text = str(body.get('text') or '').strip()[:2000]
     if not text:
         return jsonify({'error': 'text required'}), 400
+
+    try:
+        wav = _kokoro_tts(text)
+        if wav:
+            return _Response(wav, mimetype='audio/wav')
+    except Exception as e:
+        print(f"kokoro failed, falling back to edge-tts: {e}", file=sys.stderr)
 
     voice = os.getenv('GLO_TTS_VOICE', 'en-GB-SoniaNeural')
     try:
