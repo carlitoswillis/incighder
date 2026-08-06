@@ -22,6 +22,7 @@ import { useAdmin } from "@/components/admin-context";
 import { EventsSection } from "@/components/events-section";
 import { DeleteArtistDialog } from "@/components/delete-artist-dialog";
 import { GrowthSection } from "@/components/growth-section";
+import { useDocumentTitle } from "@/lib/export-name";
 
 const fieldClass =
   "flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm outline-none transition-[color,box-shadow] placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50";
@@ -96,14 +97,8 @@ function ArtistDetail() {
   }, [artistId]);
 
   // Surface the artist's name as the browser tab title (client-rendered page, so
-  // we can't use generateMetadata). Restore the site default on unmount.
-  useEffect(() => {
-    if (!artist?.name) return;
-    document.title = `${artist.name} · Incighder`;
-    return () => {
-      document.title = "Incighder — Artist Traction Insights";
-    };
-  }, [artist?.name]);
+  // we can't use generateMetadata).
+  useDocumentTitle(artist?.name ? `${artist.name} · Incighder` : null);
 
   async function uploadPhoto(file: File) {
     try {

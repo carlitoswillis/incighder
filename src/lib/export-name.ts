@@ -9,13 +9,32 @@ const SITE = "Incighder — Artist Traction Insights";
  * the suggested filename from document.title, so a report that never sets one
  * exports as the site default no matter whose report it is.
  *
+ * Setting document.title once isn't enough on Next 15.2+: metadata streams in
+ * after hydration, so the layout's default <title> lands after this effect and
+ * clobbers the name. Watch <head> and re-assert, and re-assert again on
+ * beforeprint — the moment the browser reads the PDF filename.
+ *
  * Restores the site default on unmount, matching the artist page.
  */
 export function useDocumentTitle(title: string | null) {
   useEffect(() => {
     if (!title) return;
     document.title = title;
+
+    const assertTitle = () => {
+      if (document.title !== title) document.title = title;
+    };
+    const observer = new MutationObserver(assertTitle);
+    observer.observe(document.head, {
+      subtree: true,
+      childList: true,
+      characterData: true,
+    });
+    window.addEventListener("beforeprint", assertTitle);
+
     return () => {
+      observer.disconnect();
+      window.removeEventListener("beforeprint", assertTitle);
       document.title = SITE;
     };
   }, [title]);
