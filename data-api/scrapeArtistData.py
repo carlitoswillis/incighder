@@ -61,6 +61,9 @@ def _db_config():
         database=database,
         charset="utf8mb4",
         conv=_CONV,
+        # Pin the session to UTC so naive-UTC datetimes written to TIMESTAMP
+        # columns (e.g. artist_posts.posted_at) never shift with the server tz.
+        init_command="SET time_zone = '+00:00'",
     )
     if use_ssl:
         # Verified TLS against the system/certifi CA bundle — what hosted MySQL

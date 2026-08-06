@@ -10,6 +10,7 @@ import json
 import os
 import re
 import sys
+import threading
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta, timezone
@@ -67,6 +68,103 @@ PLATFORM_COLUMNS = {
     "tiktok": ["tiktok_followers", "tiktok_likes", "tiktok_video_count"],
     "twitch": ["twitch_followers"],
 }
+
+# Per-post/per-video rows (IG recent posts, YT uploads). There is no migration
+# framework, so the table is created lazily before the first posts write —
+# prod TiDB and local MySQL both self-heal. Keep this DDL in sync with schema.sql.
+_POSTS_TABLE_DDL = """
+CREATE TABLE IF NOT EXISTS artist_posts (
+    artist_id VARCHAR(255) NOT NULL,
+    platform VARCHAR(32) NOT NULL,
+    post_id VARCHAR(128) NOT NULL,
+    url VARCHAR(512) NULL,
+    caption TEXT NULL,
+    is_video TINYINT(1) NULL,
+    posted_at TIMESTAMP NULL,
+    likes BIGINT NULL,
+    comments BIGINT NULL,
+    views BIGINT NULL,
+    thumbnail_url TEXT NULL,
+    fetched_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (artist_id, platform, post_id),
+    INDEX idx_posts_artist (artist_id, platform, posted_at),
+    CONSTRAINT fk_posts_artist FOREIGN KEY (artist_id) REFERENCES artists(id) ON DELETE CASCADE
+) ENGINE=InnoDB
+"""
+
+_posts_table_ready = False
+_posts_table_lock = threading.Lock()
+
+
+def _ensure_posts_table(conn) -> None:
+    """Lazy CREATE TABLE IF NOT EXISTS, once per process. DDL implicitly commits,
+    so this is called before any pending row writes in the transaction."""
+    global _posts_table_ready
+    with _posts_table_lock:
+        if _posts_table_ready:
+            return
+        with conn.cursor() as cur:
+            cur.execute(_POSTS_TABLE_DDL)
+        conn.commit()
+        _posts_table_ready = True
+
+
+def _parse_posted_at(value):
+    """Normalize a scraper's posted_at (epoch seconds or ISO 8601 string) to a
+    naive-UTC datetime for the TIMESTAMP column; anything unparseable -> None."""
+    if value is None:
+        return None
+    if isinstance(value, (int, float)):
+        try:
+            return datetime.fromtimestamp(value, tz=timezone.utc).replace(tzinfo=None)
+        except (ValueError, OSError, OverflowError):
+            return None
+    if isinstance(value, str):
+        try:
+            dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError:
+            return None
+        if dt.tzinfo is not None:
+            dt = dt.astimezone(timezone.utc).replace(tzinfo=None)
+        return dt
+    return None
+
+
+def _upsert_posts(cur, artist_id: str, posts: list) -> None:
+    """Upsert post rows; counts refresh on re-scrape (fetched_at tracks the last
+    time we saw the post). Posts never create metric_snapshots rows."""
+    for post in posts:
+        platform = post.get("platform")
+        post_id = post.get("post_id")
+        if not platform or not post_id:
+            continue
+        post_id = str(post_id)
+        is_video = post.get("is_video")
+        cur.execute(
+            "INSERT INTO artist_posts (artist_id, platform, post_id, url, "
+            "caption, is_video, posted_at, likes, comments, views, thumbnail_url) "
+            "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) "
+            "ON DUPLICATE KEY UPDATE likes = VALUES(likes), "
+            "comments = VALUES(comments), views = VALUES(views), "
+            "caption = VALUES(caption), "
+            "posted_at = COALESCE(VALUES(posted_at), posted_at), "
+            "url = VALUES(url), is_video = VALUES(is_video), "
+            "thumbnail_url = VALUES(thumbnail_url), fetched_at = NOW()",
+            (
+                artist_id,
+                platform,
+                post_id[:128],
+                post.get("url"),
+                post.get("caption"),
+                int(bool(is_video)) if is_video is not None else None,
+                _parse_posted_at(post.get("posted_at")),
+                post.get("likes"),
+                post.get("comments"),
+                post.get("views"),
+                post.get("thumbnail_url"),
+            ),
+        )
+
 
 # The headline follower-type metric per platform, snapshotted for growth tracking.
 PRIMARY_METRIC = {
@@ -204,8 +302,15 @@ def scrape_artist(artist_id: str, links: dict | None = None, force: bool = False
                         dispatched[platform] = ScrapeResult.failure(platform, str(e))
 
         avatar_urls: dict = {}
+        artist_posts: list = []
         for platform, _link in to_scrape:
             res = dispatched[platform]
+            # Post-level rows ride alongside metrics under a 'posts' key: strip
+            # them before the metric-column write (and before to_dict, so the
+            # response payload isn't bloated). Persisted below into artist_posts.
+            scraped_posts = res.data.pop("posts", None) if res.ok else None
+            if scraped_posts:
+                artist_posts.extend(scraped_posts)
             results[platform] = res.to_dict()
             if res.ok:
                 pic = res.data.get("profile_pic_url")
@@ -236,6 +341,15 @@ def scrape_artist(artist_id: str, links: dict | None = None, force: bool = False
                         updates["images"] = json.dumps([{"url": data_uri}])
                         break
 
+        # Ensure the posts table BEFORE the row writes below: CREATE TABLE is an
+        # implicit commit, so running it mid-transaction would split the commit.
+        if artist_posts:
+            try:
+                _ensure_posts_table(conn)
+            except Exception as e:
+                print(f"artist_posts table ensure failed: {e}", file=sys.stderr)
+                artist_posts = []  # skip posts; never block the metrics write
+
         set_cols = list(updates.keys()) + ["social_links", "scrape_meta"]
         set_vals = list(updates.values()) + [json.dumps(merged_links), json.dumps(meta)]
         assignments = ", ".join(f"{c} = %s" for c in set_cols)
@@ -265,6 +379,14 @@ def scrape_artist(artist_id: str, links: dict | None = None, force: bool = False
                     _account_key(platform, merged_links.get(platform), r.get("data", {}), artist),
                     value,
                 )
+
+        if artist_posts:
+            try:
+                with conn.cursor() as cur:
+                    _upsert_posts(cur, artist_id, artist_posts)
+            except Exception as e:  # posts are additive; never fail the scrape
+                print(f"artist_posts upsert failed for {artist_id}: {e}",
+                      file=sys.stderr)
         conn.commit()
         return {"results": results, "artist": dict(zip(updated_cols, updated_row))}
     finally:

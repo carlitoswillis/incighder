@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { DataApiStatusBanner } from "@/components/data-api-status-banner";
 import { AdminProvider, useAdmin } from "@/components/admin-context";
+import { GloWidget } from "@/components/glo/glo-widget";
 import {
   Sheet,
   SheetContent,
@@ -148,6 +149,7 @@ function Shell({ children }: { children: React.ReactNode }) {
       </header>
       <DataApiStatusBanner />
       <main className="mx-auto max-w-6xl px-4 py-8">{children}</main>
+      <GloWidget />
     </div>
   );
 }

@@ -67,7 +67,7 @@ def fetch_youtube(url_or_handle: str, api_key: Optional[str]) -> ScrapeResult:
             query = {"id": items[0]["snippet"]["channelId"]}
 
         chan = _api_get(session, "channels",
-                        {"part": "snippet,statistics", **query}, api_key)
+                        {"part": "snippet,statistics,contentDetails", **query}, api_key)
         items = chan.get("items", [])
         if not items:
             return ScrapeResult.failure(platform, "channel not found")
@@ -111,6 +111,53 @@ def fetch_youtube(url_or_handle: str, api_key: Optional[str]) -> ScrapeResult:
                         best["statistics"].get("viewCount"))
         except Exception:
             pass  # subscriber count already captured; top video is optional
+
+        # Recent uploads for post-level tracking: uploads playlist (from
+        # contentDetails, already fetched) -> playlistItems.list (1 unit) ->
+        # videos.list for stats (1 unit). Optional: never breaks channel metrics.
+        try:
+            uploads = (((ch.get("contentDetails") or {}).get("relatedPlaylists")
+                        or {}).get("uploads"))
+            if uploads:
+                pl = _api_get(session, "playlistItems", {
+                    "part": "contentDetails", "playlistId": uploads, "maxResults": 10,
+                }, api_key)
+                vid_ids = [
+                    (it.get("contentDetails") or {}).get("videoId")
+                    for it in pl.get("items", [])
+                ]
+                vid_ids = [v for v in vid_ids if v]
+                if vid_ids:
+                    vresp = _api_get(session, "videos",
+                                     {"part": "snippet,statistics",
+                                      "id": ",".join(vid_ids)},
+                                     api_key)
+                    posts = []
+                    for v in vresp.get("items", []):
+                        vid = v.get("id")
+                        if not vid:
+                            continue
+                        sn = v.get("snippet", {})
+                        st = v.get("statistics", {})
+                        thumbs = sn.get("thumbnails") or {}
+                        posts.append({
+                            "platform": "youtube",
+                            "post_id": vid,
+                            "url": f"https://www.youtube.com/watch?v={vid}",
+                            "caption": sn.get("title"),
+                            "is_video": 1,
+                            "posted_at": sn.get("publishedAt"),  # ISO 8601 UTC
+                            "likes": _to_int(st.get("likeCount")),
+                            "comments": _to_int(st.get("commentCount")),
+                            "views": _to_int(st.get("viewCount")),
+                            "thumbnail_url": ((thumbs.get("high")
+                                               or thumbs.get("default")
+                                               or {}).get("url")),
+                        })
+                    if posts:
+                        data["posts"] = posts
+        except Exception:
+            pass  # posts are optional garnish on top of channel metrics
 
         return ScrapeResult.success(platform, data)
     except Exception as e:

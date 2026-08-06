@@ -106,6 +106,43 @@ def _fetch_via_user_id(user_id: str, headers: dict) -> Optional[dict]:
     }
 
 
+def _parse_posts(user: dict) -> list:
+    """Recent posts from web_profile_info's edge_owner_to_timeline_media (typically
+    the latest 12). Best-effort: a malformed node is skipped, never raised."""
+    posts = []
+    edges = (user.get("edge_owner_to_timeline_media") or {}).get("edges") or []
+    for edge in edges:
+        try:
+            node = edge.get("node") or {}
+            shortcode = node.get("shortcode")
+            if not shortcode:
+                continue
+            caption = None
+            cap_edges = (node.get("edge_media_to_caption") or {}).get("edges") or []
+            if cap_edges:
+                caption = (cap_edges[0].get("node") or {}).get("text")
+            likes = (node.get("edge_liked_by") or {}).get("count")
+            if likes is None:
+                likes = (node.get("edge_media_preview_like") or {}).get("count")
+            if likes is not None and likes < 0:
+                likes = None  # -1 = like count hidden, not a real count
+            posts.append({
+                "platform": "instagram",
+                "post_id": shortcode,
+                "url": f"https://www.instagram.com/p/{shortcode}/",
+                "caption": caption,
+                "is_video": 1 if node.get("is_video") else 0,
+                "posted_at": node.get("taken_at_timestamp"),  # epoch seconds, UTC
+                "likes": likes,
+                "comments": (node.get("edge_media_to_comment") or {}).get("count"),
+                "views": node.get("video_view_count"),
+                "thumbnail_url": node.get("display_url"),
+            })
+        except Exception:
+            continue
+    return posts
+
+
 def fetch_instagram(handle_or_url: str) -> ScrapeResult:
     platform = "instagram"
     handle = _handle(handle_or_url)
@@ -128,13 +165,21 @@ def fetch_instagram(handle_or_url: str) -> ScrapeResult:
         if resp.status_code == 200:
             user = resp.json().get("data", {}).get("user")
             if user:
-                return ScrapeResult.success(platform, {
+                data = {
                     "instagram_followers": user.get("edge_followed_by", {}).get("count"),
                     "instagram_posts": user.get("edge_owner_to_timeline_media", {}).get("count"),
                     "instagram_verified": user.get("is_verified"),
                     # not a DB column — scrape_service uses it as an avatar fallback
                     "profile_pic_url": user.get("profile_pic_url_hd") or user.get("profile_pic_url"),
-                })
+                }
+                # Post-level data is optional garnish: never let it break metrics.
+                try:
+                    posts = _parse_posts(user)
+                    if posts:
+                        data["posts"] = posts
+                except Exception:
+                    pass
+                return ScrapeResult.success(platform, data)
         # Some accounts 400 on the JSON API even when authenticated; the
         # profile page's meta tags still expose (possibly rounded) counts —
         # and the numeric profile_id, which the mobile info endpoint accepts

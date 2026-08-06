@@ -122,3 +122,25 @@ CREATE TABLE IF NOT EXISTS event_artists (
     FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE,
     FOREIGN KEY (artist_id) REFERENCES artists(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
+
+-- Per-post/per-video data (IG recent posts, YT recent uploads) so the stats
+-- agent can cite specific posts. Keyed per artist so two artists sharing a
+-- post never collide. scrape_service also creates this table lazily (no
+-- migration framework), so prod TiDB and local MySQL self-heal on first write.
+CREATE TABLE IF NOT EXISTS artist_posts (
+    artist_id VARCHAR(255) NOT NULL,
+    platform VARCHAR(32) NOT NULL,
+    post_id VARCHAR(128) NOT NULL,
+    url VARCHAR(512) NULL,
+    caption TEXT NULL,
+    is_video TINYINT(1) NULL,
+    posted_at TIMESTAMP NULL,
+    likes BIGINT NULL,
+    comments BIGINT NULL,
+    views BIGINT NULL,
+    thumbnail_url TEXT NULL,
+    fetched_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (artist_id, platform, post_id),
+    INDEX idx_posts_artist (artist_id, platform, posted_at),
+    CONSTRAINT fk_posts_artist FOREIGN KEY (artist_id) REFERENCES artists(id) ON DELETE CASCADE
+) ENGINE=InnoDB;

@@ -2,8 +2,10 @@ from flask import Flask, request, jsonify
 import subprocess
 import json
 import os
+import shutil
 import sys
 import atexit
+import tempfile
 import traceback
 
 # Load repo-root .env so API keys / DB settings are available when run natively
@@ -36,6 +38,50 @@ def health():
     """Liveness probe — the deployed site pings this to show the 'home data
     server offline' banner."""
     return jsonify({'ok': True}), 200
+
+def _claude_bin():
+    """pm2's PATH usually lacks ~/.local/bin, where the Claude Code installer
+    puts the binary — resolve explicitly before giving up."""
+    found = shutil.which('claude')
+    if found:
+        return found
+    fallback = os.path.expanduser('~/.local/bin/claude')
+    return fallback if os.access(fallback, os.X_OK) else None
+
+
+@app.route('/agent_turn', methods=['POST'])
+def agent_turn():
+    """One GLO model turn on this machine's logged-in Claude Code CLI
+    (subscription auth), so the deployed site needs no API key. Called by the
+    Vercel /api/agent route through the tunnel; request/envelope shapes match
+    src/lib/agent/cli-provider.ts. Guarded by the shared secret like every
+    other route; gunicorn's --timeout 180 leaves headroom for the 150s cap."""
+    body = request.get_json(silent=True) or {}
+    prompt = body.get('prompt')
+    if not isinstance(prompt, str) or not prompt.strip():
+        return jsonify({'error': 'prompt required'}), 400
+    claude = _claude_bin()
+    if not claude:
+        return jsonify({'error': 'claude CLI not found on the data-api host'}), 501
+    args = [claude, '-p', '--output-format', 'json',
+            '--model', str(body.get('model') or os.getenv('GLO_CLI_MODEL', 'sonnet'))]
+    if body.get('schema'):
+        args += ['--json-schema', json.dumps(body['schema'])]
+    if body.get('resume_session_id'):
+        args += ['--resume', str(body['resume_session_id'])]
+    try:
+        # Neutral cwd so the run never loads this repo's agent context.
+        proc = subprocess.run(args, input=prompt, capture_output=True, text=True,
+                              timeout=150, cwd=tempfile.gettempdir())
+    except subprocess.TimeoutExpired:
+        return jsonify({'error': 'claude CLI timed out'}), 504
+    if proc.returncode != 0:
+        return jsonify({'error': f'claude exited {proc.returncode}: {proc.stderr.strip()[:300]}'}), 502
+    try:
+        return jsonify(json.loads(proc.stdout)), 200
+    except ValueError:
+        return jsonify({'error': 'claude returned non-JSON output'}), 502
+
 
 @app.route('/insert_artist', methods=['POST'])
 def insert_artist():
