@@ -204,43 +204,52 @@ def _kokoro_tts(text: str):
     return buf.getvalue()
 
 
+def _edge_tts(text: str):
+    """Microsoft Edge neural voices (free, unofficial endpoint) — the most
+    human-sounding free option; en-GB-SoniaNeural by default. mp3 bytes."""
+    import asyncio
+    import edge_tts
+    voice = os.getenv('GLO_TTS_VOICE', 'en-GB-SoniaNeural')
+    out = tempfile.NamedTemporaryFile(suffix='.mp3', delete=False)
+    out.close()
+    try:
+        asyncio.run(edge_tts.Communicate(text, voice).save(out.name))
+        with open(out.name, 'rb') as f:
+            return f.read() or None
+    finally:
+        os.unlink(out.name)
+
+
 @app.route('/speak', methods=['POST'])
 def speak():
-    """Text-to-speech for GLO's spoken replies. Primary: Kokoro — open-source,
-    local, offline, natural British voices (bf_emma default). Fallbacks:
-    edge-tts (free Microsoft neural endpoint, unofficial), then Gemini TTS
-    (tiny free-tier daily quota — observed 429ing after normal use).
-    Body {text}; reply audio/wav (kokoro/Gemini) or audio/mpeg (edge)."""
+    """Text-to-speech for GLO's spoken replies. Engine order is configurable
+    via GLO_TTS_ENGINE ('edge' default — most human; 'kokoro' — fully offline
+    open-source); whichever isn't primary is the fallback, then Gemini TTS
+    last (tiny free-tier daily quota — observed 429ing under normal use).
+    Body {text}; reply audio/mpeg (edge) or audio/wav (kokoro/Gemini)."""
     from flask import Response as _Response
     body = request.get_json(silent=True) or {}
     text = str(body.get('text') or '').strip()[:2000]
     if not text:
         return jsonify({'error': 'text required'}), 400
 
-    try:
-        wav = _kokoro_tts(text)
-        if wav:
-            return _Response(wav, mimetype='audio/wav')
-    except Exception as e:
-        print(f"kokoro failed, falling back to edge-tts: {e}", file=sys.stderr)
-
-    voice = os.getenv('GLO_TTS_VOICE', 'en-GB-SoniaNeural')
-    try:
-        import asyncio
-        import edge_tts
-        out = tempfile.NamedTemporaryFile(suffix='.mp3', delete=False)
-        out.close()
+    engines = {
+        'edge': (_edge_tts, 'audio/mpeg'),
+        'kokoro': (_kokoro_tts, 'audio/wav'),
+    }
+    primary = os.getenv('GLO_TTS_ENGINE', 'edge')
+    order = [primary] + [e for e in engines if e != primary]
+    for name in order:
+        render, mime = engines.get(name) or (None, None)
+        if not render:
+            continue
         try:
-            asyncio.run(edge_tts.Communicate(text, voice).save(out.name))
-            with open(out.name, 'rb') as f:
-                data = f.read()
-        finally:
-            os.unlink(out.name)
-        if data:
-            return _Response(data, mimetype='audio/mpeg')
-        print("edge-tts produced no audio, falling back to Gemini TTS", file=sys.stderr)
-    except Exception as e:
-        print(f"edge-tts failed, falling back to Gemini TTS: {e}", file=sys.stderr)
+            audio = render(text)
+            if audio:
+                return _Response(audio, mimetype=mime)
+            print(f"{name} tts produced no audio, trying next engine", file=sys.stderr)
+        except Exception as e:
+            print(f"{name} tts failed, trying next engine: {e}", file=sys.stderr)
 
     return _gemini_tts(text)
 
