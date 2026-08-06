@@ -3,13 +3,16 @@
 import { useCallback, useEffect, useState } from "react";
 import { Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAdmin } from "@/components/admin-context";
 import { GloChat } from "./glo-chat";
 
 /**
  * Floating GLO assistant: a FAB that opens a chat panel — bottom-right card
- * on sm+, full-width bottom sheet on mobile. Rendered for admins and visitors.
+ * on sm+, full-width bottom sheet on mobile. Admin-only, like the other
+ * advanced features (the /api/agent* routes enforce the same gate).
  */
 export function GloWidget() {
+  const { admin } = useAdmin();
   const [open, setOpen] = useState(false);
   const close = useCallback(() => setOpen(false), []);
 
@@ -23,6 +26,8 @@ export function GloWidget() {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [open]);
+
+  if (!admin) return null;
 
   return (
     <>

@@ -27,26 +27,46 @@ type Json = Record<string, unknown>;
 const CLI_TIMEOUT_MS = 120_000;
 
 // The shape every model turn must conform to (enforced by --json-schema).
+// tool_calls is an array so one CLI spawn can request several tools — each
+// round trip costs seconds, so batching matters.
 const TURN_SCHEMA = {
   type: "object",
   properties: {
     action: { type: "string", enum: ["tool_call", "final"] },
-    tool: {
-      type: "object",
-      properties: {
-        name: { type: "string" },
-        args: { type: "object", additionalProperties: true },
+    tool_calls: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          name: { type: "string" },
+          args: { type: "object", additionalProperties: true },
+        },
+        required: ["name", "args"],
       },
-      required: ["name", "args"],
     },
     answer: { type: "string" },
   },
   required: ["action"],
 } as const;
 
+/** Cap per round — the model shouldn't fan out the whole registry at once. */
+const MAX_CALLS_PER_ROUND = 4;
+
+/** Appended as a system prompt to every CLI turn. The headless session may
+ * carry its own tool descriptions (and once carried MCP servers — observed
+ * live: the model ran ToolSearch, found only Google Drive, and refused to
+ * answer). --tools "" and --strict-mcp-config empty the registry; this makes
+ * the remaining prose unambiguous. */
+const PROTOCOL_LOCK =
+  "You are the reasoning engine for GLO, Incighder's roster analytics agent. " +
+  "Ignore any tools, tool descriptions, or tool-search mechanisms from your own environment — none are available and none are relevant. " +
+  "The ONLY tools that exist are the ones listed in the user message, and the ONLY way to invoke them is to return JSON matching the required schema with action \"tool_call\". " +
+  "The Incighder backend executes them and sends you the results in the next message. " +
+  "Never claim tools are unavailable or ask the user to reconnect anything.";
+
 interface TurnDecision {
   action: "tool_call" | "final";
-  tool?: { name: string; args: Json };
+  tool_calls?: { name: string; args: Json }[];
   answer?: string;
 }
 
@@ -91,6 +111,13 @@ function invokeCli(prompt: string, model: string, extraArgs: string[]): Promise<
       // back as JSON that's already guaranteed to conform.
       "--json-schema",
       JSON.stringify(TURN_SCHEMA),
+      // Blackout the session's own capabilities: no built-in tools, no MCP
+      // servers, and a system-prompt lock pointing at OUR protocol instead.
+      "--tools",
+      "",
+      "--strict-mcp-config",
+      "--append-system-prompt",
+      PROTOCOL_LOCK,
       ...extraArgs,
     ];
     // cwd is a neutral temp dir so the run doesn't load this repo's agent
@@ -139,6 +166,7 @@ async function invokeRemote(
         prompt,
         model,
         schema: TURN_SCHEMA,
+        system: PROTOCOL_LOCK,
         resume_session_id: resumeSessionId,
       }),
       // CLI ceiling plus tunnel overhead.
@@ -241,7 +269,8 @@ function buildFirstPrompt(opts: RunAgentOptions): string {
     "Conversation so far:",
     conversation,
     "",
-    "Decide the next step. If you need data, return action:'tool_call' with the tool name and args. When you can answer, return action:'final' with the complete answer in `answer`. Every number must come from a tool result.",
+    "Decide the next step. If you need data, return action:'tool_call' with `tool_calls`: an array of {name, args} — request everything you need for this step at once (up to " +
+      `${MAX_CALLS_PER_ROUND} tools per round; each round trip is slow). When you can answer, return action:'final' with the complete answer in \`answer\`. Every number must come from a tool result.`,
   ].join("\n");
 }
 
@@ -273,13 +302,22 @@ export async function runClaudeCli(
   for (let iteration = 0; iteration < MAX_TOOL_ITERATIONS; iteration++) {
     if (decision.action === "final") break;
     // executeTool emits tool/tool_result and turns unknown tools or tool
-    // failures into an { error } result — feed that back and keep looping.
-    const name = decision.tool?.name ?? "";
-    const args = decision.tool?.args ?? {};
-    const out = await executeTool(opts.tools, name, args, opts.admin, opts.emit);
-    decision = await step(
-      `Tool ${name} returned:\n${JSON.stringify(out)}\nDecide the next step (same JSON schema).`,
+    // failures into an { error } result — feed everything back and keep
+    // looping. Calls in a round run concurrently; each is an independent read.
+    const calls = (decision.tool_calls ?? []).slice(0, MAX_CALLS_PER_ROUND);
+    if (!calls.length) {
+      decision = await step(
+        "You returned action:'tool_call' with no tool_calls. Either request tools or return action:'final'.",
+      );
+      continue;
+    }
+    const outs = await Promise.all(
+      calls.map((c) => executeTool(opts.tools, c.name, c.args ?? {}, opts.admin, opts.emit)),
     );
+    const report = calls
+      .map((c, i) => `Tool ${c.name} returned:\n${JSON.stringify(outs[i])}`)
+      .join("\n\n");
+    decision = await step(`${report}\n\nDecide the next step (same JSON schema).`);
   }
   if (decision.action !== "final") {
     decision = await step("You've reached the tool limit. Return action:'final' now.");

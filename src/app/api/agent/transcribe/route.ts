@@ -1,4 +1,5 @@
 import { dataApiHeaders, getDataApiUrl } from "@/lib/data-api";
+import { isAdmin } from "@/lib/auth";
 
 // Speech-to-text for GLO's mic. The browser records (MediaRecorder — the only
 // capture path that works in every browser, incl. Chrome on iOS) and posts the
@@ -89,6 +90,9 @@ async function transcribeViaDataApi(mime: string, audioB64: string): Promise<str
 }
 
 export async function POST(request: Request) {
+  if (!(await isAdmin())) {
+    return Response.json({ error: "Unauthorized" }, { status: 401 });
+  }
   const ip = (request.headers.get("x-forwarded-for") ?? "local").split(",")[0].trim();
   if (isRateLimited(ip)) {
     return Response.json({ error: "Rate limited — try again shortly." }, { status: 429 });

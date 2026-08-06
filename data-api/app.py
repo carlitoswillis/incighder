@@ -64,9 +64,15 @@ def agent_turn():
     if not claude:
         return jsonify({'error': 'claude CLI not found on the data-api host'}), 501
     args = [claude, '-p', '--output-format', 'json',
-            '--model', str(body.get('model') or os.getenv('GLO_CLI_MODEL', 'sonnet'))]
+            '--model', str(body.get('model') or os.getenv('GLO_CLI_MODEL', 'sonnet')),
+            # Blackout the headless session's own capabilities: without this the
+            # model can go hunting in its real environment (observed live: it
+            # ran ToolSearch, found only unrelated MCP tools, and refused).
+            '--tools', '', '--strict-mcp-config']
     if body.get('schema'):
         args += ['--json-schema', json.dumps(body['schema'])]
+    if body.get('system'):
+        args += ['--append-system-prompt', str(body['system'])]
     if body.get('resume_session_id'):
         args += ['--resume', str(body['resume_session_id'])]
     try:

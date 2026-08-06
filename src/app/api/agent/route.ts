@@ -75,12 +75,15 @@ export async function POST(request: Request) {
   if (totalContentChars(body.messages) > MAX_BODY_CHARS) {
     return Response.json({ error: "Transcript too large." }, { status: 413 });
   }
+  // GLO is an advanced feature: passphrase-gated like the rest of them.
   const admin = await isAdmin();
   if (!admin) {
-    const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "local";
-    if (isRateLimited(ip)) {
-      return Response.json({ error: "Rate limited — try again shortly." }, { status: 429 });
-    }
+    return Response.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  // Rate-limit even admins lightly — a stuck client shouldn't spin the LLM.
+  const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "local";
+  if (isRateLimited(ip)) {
+    return Response.json({ error: "Rate limited — try again shortly." }, { status: 429 });
   }
   const messages = parseMessages(body.messages);
 

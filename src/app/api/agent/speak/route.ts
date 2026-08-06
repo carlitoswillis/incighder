@@ -1,4 +1,5 @@
 import { dataApiHeaders, getDataApiUrl } from "@/lib/data-api";
+import { isAdmin } from "@/lib/auth";
 
 // Text-to-speech for GLO's spoken replies: Gemini's TTS model reading in a
 // natural British delivery (style + voice overridable via env). Same runtime
@@ -101,6 +102,9 @@ async function speakViaDataApi(text: string): Promise<Buffer> {
 }
 
 export async function POST(request: Request) {
+  if (!(await isAdmin())) {
+    return Response.json({ error: "Unauthorized" }, { status: 401 });
+  }
   const ip = (request.headers.get("x-forwarded-for") ?? "local").split(",")[0].trim();
   if (isRateLimited(ip)) {
     return Response.json({ error: "Rate limited — try again shortly." }, { status: 429 });
