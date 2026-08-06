@@ -143,4 +143,6 @@ CREATE TABLE IF NOT EXISTS artist_posts (
     PRIMARY KEY (artist_id, platform, post_id),
     INDEX idx_posts_artist (artist_id, platform, posted_at),
     CONSTRAINT fk_posts_artist FOREIGN KEY (artist_id) REFERENCES artists(id) ON DELETE CASCADE
-) ENGINE=InnoDB;
+    -- Collation must match artists.id (utf8mb4_unicode_ci) or the FK is
+    -- rejected: TiDB's database default is utf8mb4_bin, which is incompatible.
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
