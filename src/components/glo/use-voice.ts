@@ -3,171 +3,204 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 // ---------------------------------------------------------------------------
-// Minimal ambient types for the Web Speech recognition API (not in lib.dom,
-// and we don't want an @types dep or `any` leaks).
+// Speech input (mic → text) — MediaRecorder + server-side transcription.
+//
+// Deliberately NOT the Web Speech SpeechRecognition API: on iOS every browser
+// is WebKit and Apple reserves the system speech service for Safari, so
+// Chrome-on-iPhone always fails with "service-not-allowed" no matter what the
+// user enables. getUserMedia + MediaRecorder works everywhere; the audio is
+// transcribed by POST /api/agent/transcribe. A light RMS-based voice-activity
+// detector auto-stops after a trailing silence so it feels like ChatGPT's
+// voice input: tap, talk, done.
 // ---------------------------------------------------------------------------
 
-interface RecognitionAlternative {
-  transcript: string;
-  confidence: number;
-}
+/** Trailing silence (ms) after detected speech that ends the take. */
+const SILENCE_MS = 1500;
+/** Give up if nothing above the threshold was ever heard. */
+const NO_SPEECH_MS = 8000;
+/** Hard cap per utterance. */
+const MAX_TAKE_MS = 30_000;
+/** RMS (0..1) above this counts as speech. */
+const SPEECH_RMS = 0.02;
 
-interface RecognitionResult {
-  isFinal: boolean;
-  length: number;
-  [index: number]: RecognitionAlternative;
-}
-
-interface RecognitionResultList {
-  length: number;
-  [index: number]: RecognitionResult;
-}
-
-interface RecognitionResultEvent {
-  resultIndex: number;
-  results: RecognitionResultList;
-}
-
-interface RecognitionErrorEvent {
-  error: string;
-}
-
-/** Friendly explanations per SpeechRecognition error code; null = stay silent
- * (user-initiated or harmless). */
-const VOICE_ERRORS: Record<string, string | null> = {
-  aborted: null,
-  "no-speech": "Didn't hear anything — try again closer to the mic.",
-  "not-allowed":
-    "Microphone access is blocked. Allow the mic for this site in your browser settings.",
-  "service-not-allowed":
-    "The browser's speech service is unavailable — on Safari, enable Siri or Dictation in System Settings.",
-  "audio-capture": "No microphone was found.",
-  network: "Speech recognition couldn't reach the browser's online service.",
-};
-
-interface SpeechRecognitionLike {
-  lang: string;
-  interimResults: boolean;
-  continuous: boolean;
-  onresult: ((event: RecognitionResultEvent) => void) | null;
-  onstart: (() => void) | null;
-  onend: (() => void) | null;
-  onerror: ((event: RecognitionErrorEvent) => void) | null;
-  start(): void;
-  stop(): void;
-  abort(): void;
-}
-
-type SpeechRecognitionCtor = new () => SpeechRecognitionLike;
-
-declare global {
-  interface Window {
-    SpeechRecognition?: SpeechRecognitionCtor;
-    webkitSpeechRecognition?: SpeechRecognitionCtor;
+function pickMimeType(): string {
+  // Chrome/Firefox record webm/opus; iOS WebKit records mp4/AAC.
+  for (const t of ["audio/webm;codecs=opus", "audio/webm", "audio/mp4"]) {
+    if (typeof MediaRecorder !== "undefined" && MediaRecorder.isTypeSupported(t)) return t;
   }
+  return "";
 }
 
-function getRecognitionCtor(): SpeechRecognitionCtor | null {
-  if (typeof window === "undefined") return null;
-  return window.SpeechRecognition ?? window.webkitSpeechRecognition ?? null;
+interface Take {
+  recorder: MediaRecorder;
+  stream: MediaStream;
+  audioCtx: AudioContext;
+  vadTimer: number;
+  chunks: Blob[];
+  cancelled: boolean;
 }
-
-// ---------------------------------------------------------------------------
-// Speech input (mic → text)
-// ---------------------------------------------------------------------------
 
 export function useSpeechInput(handlers: {
-  onInterim: (text: string) => void;
   onFinal: (text: string) => void;
-  /** Called with a human-readable reason when recognition fails to run. */
+  /** Called with a human-readable reason when voice input fails. */
   onError?: (message: string) => void;
 }) {
   const [supported, setSupported] = useState(false);
   const [listening, setListening] = useState(false);
-  const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
-  // Keep the latest handlers without re-wiring the recognition instance.
+  // True while the recorded take is being transcribed server-side.
+  const [processing, setProcessing] = useState(false);
+  const takeRef = useRef<Take | null>(null);
+  // Keep the latest handlers without re-wiring the recorder.
   const handlersRef = useRef(handlers);
   handlersRef.current = handlers;
 
   // Feature-detect after mount so SSR markup never disagrees with the client.
   useEffect(() => {
-    setSupported(getRecognitionCtor() !== null);
+    setSupported(
+      typeof navigator !== "undefined" &&
+        !!navigator.mediaDevices?.getUserMedia &&
+        typeof MediaRecorder !== "undefined",
+    );
   }, []);
 
-  const stop = useCallback(() => {
-    // abort(), not stop(): stop() flushes a pending final result, which would
-    // auto-send a message the user just cancelled.
-    recognitionRef.current?.abort();
-    recognitionRef.current = null;
+  const teardown = useCallback((take: Take) => {
+    window.clearInterval(take.vadTimer);
+    take.stream.getTracks().forEach((t) => t.stop());
+    void take.audioCtx.close().catch(() => {});
+    if (takeRef.current === take) takeRef.current = null;
+  }, []);
+
+  /** Stop the current take. send=false discards it (close/unmount). */
+  const stop = useCallback((send = false) => {
+    const take = takeRef.current;
+    if (!take) return;
+    take.cancelled = !send;
     setListening(false);
+    if (take.recorder.state !== "inactive") take.recorder.stop();
   }, []);
 
-  const start = useCallback(() => {
-    const Ctor = getRecognitionCtor();
-    if (!Ctor || recognitionRef.current) return;
-    const rec = new Ctor();
-    rec.lang = "en-US";
-    rec.interimResults = true;
-    rec.continuous = false;
-    rec.onresult = (event) => {
-      // Ignore results from a superseded/cancelled instance.
-      if (recognitionRef.current !== rec) return;
-      let interim = "";
-      let final = "";
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        const result = event.results[i];
-        const alt = result[0];
-        if (!alt) continue;
-        if (result.isFinal) final += alt.transcript;
-        else interim += alt.transcript;
+  const start = useCallback(async () => {
+    if (takeRef.current) return;
+    let stream: MediaStream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch {
+      handlersRef.current.onError?.(
+        "Microphone access is blocked. Allow the mic for this site in your browser settings.",
+      );
+      return;
+    }
+
+    const mimeType = pickMimeType();
+    let recorder: MediaRecorder;
+    try {
+      recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+    } catch {
+      stream.getTracks().forEach((t) => t.stop());
+      handlersRef.current.onError?.("This browser can't record audio.");
+      return;
+    }
+
+    // RMS-based VAD: arm on first speech, stop after a trailing silence.
+    const audioCtx = new AudioContext();
+    const analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 1024;
+    audioCtx.createMediaStreamSource(stream).connect(analyser);
+    const samples = new Uint8Array(analyser.fftSize);
+    const startedAt = Date.now();
+    let lastSpeechAt = 0;
+
+    const take: Take = { recorder, stream, audioCtx, vadTimer: 0, chunks: [], cancelled: false };
+
+    take.vadTimer = window.setInterval(() => {
+      analyser.getByteTimeDomainData(samples);
+      let sum = 0;
+      for (let i = 0; i < samples.length; i++) {
+        const dev = (samples[i] - 128) / 128;
+        sum += dev * dev;
       }
-      if (final.trim()) {
-        recognitionRef.current = null;
-        rec.stop();
-        setListening(false);
-        handlersRef.current.onFinal(final.trim());
-      } else if (interim) {
-        handlersRef.current.onInterim(interim);
-      }
+      const rms = Math.sqrt(sum / samples.length);
+      const now = Date.now();
+      if (rms > SPEECH_RMS) lastSpeechAt = now;
+      if (lastSpeechAt && now - lastSpeechAt > SILENCE_MS) stop(true);
+      else if (!lastSpeechAt && now - startedAt > NO_SPEECH_MS) {
+        stop(false);
+        handlersRef.current.onError?.("Didn't hear anything — try again closer to the mic.");
+      } else if (now - startedAt > MAX_TAKE_MS) stop(true);
+    }, 100);
+
+    recorder.ondataavailable = (e) => {
+      if (e.data.size) take.chunks.push(e.data);
     };
-    // Light the recording dot only once capture actually begins — flipping it
-    // on before start() means a denied/failing mic flashes red for a frame.
-    rec.onstart = () => {
-      if (recognitionRef.current === rec) setListening(true);
+    recorder.onstart = () => {
+      if (takeRef.current === take) setListening(true);
     };
-    rec.onend = () => {
-      if (recognitionRef.current === rec) recognitionRef.current = null;
+    recorder.onerror = () => {
+      teardown(take);
       setListening(false);
+      handlersRef.current.onError?.("Recording failed.");
     };
-    rec.onerror = (event) => {
-      if (recognitionRef.current === rec) recognitionRef.current = null;
+    recorder.onstop = () => {
+      teardown(take);
       setListening(false);
-      // Surface why the mic died instead of silently flashing the dot.
-      const reason = VOICE_ERRORS[event.error];
-      if (reason !== null) {
-        handlersRef.current.onError?.(
-          reason ?? `Voice input failed (${event.error || "unknown error"}).`,
-        );
-      }
+      if (take.cancelled) return;
+      const blob = new Blob(take.chunks, { type: recorder.mimeType || mimeType || "audio/webm" });
+      // A sub-kilobyte take is a tap with no audio — don't waste a request.
+      if (blob.size < 1024) return;
+      setProcessing(true);
+      void (async () => {
+        try {
+          const res = await fetch("/api/agent/transcribe", {
+            method: "POST",
+            headers: { "Content-Type": blob.type },
+            body: blob,
+            signal: AbortSignal.timeout(45_000),
+          });
+          const data = (await res.json()) as { text?: string; error?: string };
+          if (!res.ok || typeof data.text !== "string") {
+            throw new Error(data.error || `transcription failed (${res.status})`);
+          }
+          if (data.text.trim()) handlersRef.current.onFinal(data.text.trim());
+          else handlersRef.current.onError?.("Couldn't make out any words — try again.");
+        } catch (e) {
+          handlersRef.current.onError?.(
+            e instanceof Error ? e.message : "Transcription failed — try again.",
+          );
+        } finally {
+          setProcessing(false);
+        }
+      })();
     };
-    recognitionRef.current = rec;
-    rec.start();
-  }, []);
+
+    takeRef.current = take;
+    // Timeslice keeps chunks flowing on iOS, where a single final blob can be empty.
+    recorder.start(1000);
+  }, [stop, teardown]);
 
   const toggle = useCallback(() => {
-    if (recognitionRef.current) stop();
-    else start();
+    // Tap while recording = "I'm done talking" (the VAD usually beats you to it).
+    if (takeRef.current) stop(true);
+    else void start();
   }, [start, stop]);
 
-  // Kill the mic if the panel unmounts mid-dictation.
+  // Kill the mic if the panel unmounts mid-take.
   useEffect(() => {
     return () => {
-      recognitionRef.current?.abort();
-      recognitionRef.current = null;
+      const take = takeRef.current;
+      if (take) {
+        take.cancelled = true;
+        if (take.recorder.state !== "inactive") take.recorder.stop();
+        else {
+          window.clearInterval(take.vadTimer);
+          take.stream.getTracks().forEach((t) => t.stop());
+          void take.audioCtx.close().catch(() => {});
+        }
+        takeRef.current = null;
+      }
     };
   }, []);
 
-  return { supported, listening, start, stop, toggle };
+  return { supported, listening, processing, start, stop, toggle };
 }
 
 // ---------------------------------------------------------------------------
@@ -217,14 +250,20 @@ export function useSpeaker() {
     });
   }, []);
 
-  const speak = useCallback((text: string) => {
-    if (typeof window === "undefined" || !window.speechSynthesis) return;
+  /** Speak text; resolves when the utterance finishes (or is cancelled), so
+   * hands-free voice mode can wait before re-opening the mic. */
+  const speak = useCallback((text: string): Promise<void> => {
+    if (typeof window === "undefined" || !window.speechSynthesis) return Promise.resolve();
     const cleaned = cleanForSpeech(text);
-    if (!cleaned) return;
+    if (!cleaned) return Promise.resolve();
     window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(cleaned);
-    utterance.rate = 1.05;
-    window.speechSynthesis.speak(utterance);
+    return new Promise((resolve) => {
+      const utterance = new SpeechSynthesisUtterance(cleaned);
+      utterance.rate = 1.05;
+      utterance.onend = () => resolve();
+      utterance.onerror = () => resolve();
+      window.speechSynthesis.speak(utterance);
+    });
   }, []);
 
   // Silence on unmount.

@@ -83,6 +83,45 @@ def agent_turn():
         return jsonify({'error': 'claude returned non-JSON output'}), 502
 
 
+@app.route('/transcribe', methods=['POST'])
+def transcribe():
+    """Speech-to-text bridge for GLO's mic: the Vercel /api/agent/transcribe
+    route forwards audio here when its own runtime has no Gemini key, so the
+    deployed site transcribes using this machine's .env. Body:
+    {mime, audio_b64}; reply {text}."""
+    import ai_verify
+    if not ai_verify.GEMINI_API_KEY:
+        return jsonify({'error': 'no Gemini key configured on the data-api host'}), 501
+    body = request.get_json(silent=True) or {}
+    audio_b64 = body.get('audio_b64')
+    mime = str(body.get('mime') or 'audio/webm')
+    if not isinstance(audio_b64, str) or not audio_b64:
+        return jsonify({'error': 'audio_b64 required'}), 400
+    if len(audio_b64) > 12 * 1024 * 1024:  # ~8MB of audio, base64-inflated
+        return jsonify({'error': 'audio too large'}), 413
+    payload = {
+        'contents': [{'role': 'user', 'parts': [
+            {'text': ('Transcribe this audio verbatim. Return ONLY the spoken words as '
+                      'plain text — no quotes, no commentary, no timestamps. If there is '
+                      'no intelligible speech, return an empty string.')},
+            {'inline_data': {'mime_type': mime, 'data': audio_b64}},
+        ]}],
+        'generationConfig': {'temperature': 0, 'maxOutputTokens': 1024,
+                             'thinkingConfig': {'thinkingBudget': 0}},
+    }
+    try:
+        import requests as _requests
+        resp = _requests.post(ai_verify.GEMINI_URL, params={'key': ai_verify.GEMINI_API_KEY},
+                              json=payload, timeout=45)
+        resp.raise_for_status()
+        parts = resp.json()['candidates'][0]['content'].get('parts') or []
+        text = ''.join(p.get('text', '') for p in parts).strip()
+        return jsonify({'text': text}), 200
+    except Exception as e:
+        print(f"Transcription error: {e}", file=sys.stderr)
+        return jsonify({'error': 'transcription failed'}), 502
+
+
 @app.route('/insert_artist', methods=['POST'])
 def insert_artist():
     data = request.json

@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import {
   Check,
   Eraser,
+  Headphones,
   Loader2,
   Mic,
   SendHorizontal,
@@ -122,6 +123,14 @@ export function GloChat({ onClose }: { onClose: () => void }) {
   const speakerRef = useRef(speaker);
   speakerRef.current = speaker;
 
+  // Hands-free conversation mode: listen → answer → speak → listen again.
+  // The ref mirrors the state so async turn completions see the live value.
+  const [voiceMode, setVoiceMode] = useState(false);
+  const voiceModeRef = useRef(false);
+  const voiceRef = useRef<{ start: () => Promise<void>; stop: (send?: boolean) => void } | null>(
+    null,
+  );
+
   const submit = useCallback(
     (text: string) => {
       const trimmed = text.trim();
@@ -129,9 +138,19 @@ export function GloChat({ onClose }: { onClose: () => void }) {
       setInput("");
       // A fresh turn silences whatever GLO was still saying.
       speakerRef.current.cancel();
-      void send(trimmed, context).then((finalText) => {
-        if (finalText && speakerRef.current.enabled) {
-          speakerRef.current.speak(finalText);
+      void send(trimmed, context).then(async (finalText) => {
+        if (finalText && (speakerRef.current.enabled || voiceModeRef.current)) {
+          await speakerRef.current.speak(finalText);
+        }
+        if (voiceModeRef.current) {
+          if (finalText) {
+            void voiceRef.current?.start();
+          } else {
+            // A failed turn ends the loop rather than re-arming the mic
+            // against whatever just went wrong.
+            voiceModeRef.current = false;
+            setVoiceMode(false);
+          }
         }
       });
     },
@@ -139,10 +158,28 @@ export function GloChat({ onClose }: { onClose: () => void }) {
   );
 
   const voice = useSpeechInput({
-    onInterim: (text) => setInput(text),
     onFinal: (text) => submit(text),
-    onError: (message) => toast.error(message),
+    onError: (message) => {
+      toast.error(message);
+      // Same principle: errors break the hands-free loop.
+      voiceModeRef.current = false;
+      setVoiceMode(false);
+    },
   });
+  voiceRef.current = voice;
+
+  const toggleVoiceMode = useCallback(() => {
+    if (voiceModeRef.current) {
+      voiceModeRef.current = false;
+      setVoiceMode(false);
+      voice.stop(false);
+      speakerRef.current.cancel();
+    } else {
+      voiceModeRef.current = true;
+      setVoiceMode(true);
+      void voice.start();
+    }
+  }, [voice]);
 
   // Name for the "Pitch prep" chip when sitting on an artist page.
   useEffect(() => {
@@ -197,6 +234,18 @@ export function GloChat({ onClose }: { onClose: () => void }) {
         />
         <span className="text-sm font-semibold tracking-tight">GLO</span>
         <div className="ml-auto flex items-center gap-1">
+          {voice.supported && (
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-label={voiceMode ? "End voice conversation" : "Start voice conversation"}
+              aria-pressed={voiceMode}
+              onClick={toggleVoiceMode}
+              className={cn(voiceMode ? "text-primary" : "text-muted-foreground")}
+            >
+              <Headphones />
+            </Button>
+          )}
           <Button
             variant="ghost"
             size="icon-sm"
@@ -285,7 +334,9 @@ export function GloChat({ onClose }: { onClose: () => void }) {
             }
           }}
           rows={1}
-          placeholder={voice.listening ? "Listening…" : "Ask GLO…"}
+          placeholder={
+            voice.listening ? "Listening…" : voice.processing ? "Transcribing…" : "Ask GLO…"
+          }
           aria-label="Message GLO"
           className="max-h-28 min-h-9 flex-1 resize-none rounded-lg border border-input bg-background/50 px-3 py-2 text-sm outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
         />
@@ -294,12 +345,17 @@ export function GloChat({ onClose }: { onClose: () => void }) {
             type="button"
             variant={voice.listening ? "secondary" : "ghost"}
             size="icon"
-            aria-label={voice.listening ? "Stop listening" : "Speak your question"}
+            aria-label={voice.listening ? "Done talking" : "Speak your question"}
             aria-pressed={voice.listening}
             onClick={voice.toggle}
+            disabled={voice.processing}
             className="relative shrink-0"
           >
-            <Mic className={cn(voice.listening && "text-red-400")} />
+            {voice.processing ? (
+              <Loader2 className="animate-spin motion-reduce:animate-none" />
+            ) : (
+              <Mic className={cn(voice.listening && "text-red-400")} />
+            )}
             {voice.listening && (
               <span
                 className="absolute top-1 right-1 size-1.5 rounded-full bg-red-500 motion-safe:animate-pulse"
