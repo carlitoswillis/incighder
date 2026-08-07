@@ -22,6 +22,7 @@ const NAV = [
   { href: "/", label: "Artists" },
   { href: "/table", label: "Table" },
   { href: "/discover", label: "Discover", admin: true },
+  { href: "/knowledge", label: "Knowledge", admin: true },
   { href: "/artists/add", label: "Manual", admin: true },
   { href: "/artists/bulk", label: "Bulk", admin: true },
 ];

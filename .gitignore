@@ -147,4 +147,7 @@ __pycache__/
 .aider*
 .vercel
 .env*
+
+# local-only run notes
+RUNNING.local.md
 data-api/models/

@@ -89,6 +89,105 @@ def agent_turn():
         return jsonify({'error': 'claude returned non-JSON output'}), 502
 
 
+# Enforced shape of an /extract_doc reply (mirrors Extraction in
+# src/lib/knowledge/extract.ts, snake_case).
+_EXTRACT_SCHEMA = {
+    'type': 'object',
+    'properties': {
+        'title': {'type': 'string'},
+        'text': {'type': 'string'},
+        'summary': {'type': 'string'},
+        'tags': {'type': 'array', 'items': {'type': 'string'}},
+        'suggested_artist': {'type': ['string', 'null']},
+    },
+    'required': ['title', 'text', 'summary', 'tags', 'suggested_artist'],
+}
+
+
+@app.route('/extract_doc', methods=['POST'])
+def extract_doc():
+    """Extract text/metadata from an uploaded document or image using this
+    machine's logged-in Claude Code CLI (subscription auth) — the deployed
+    site's bridge for the knowledgebase upload flow (provider chain step 2 in
+    src/lib/knowledge/extract.ts). Body: {mime, data_b64, file_name?}; reply
+    matches the Extraction shape (snake_case suggested_artist). Unlike
+    /agent_turn the session keeps the Read tool — that's how the model sees
+    the file — so no `--tools ''` blackout here."""
+    import base64 as _base64
+    body = request.get_json(silent=True) or {}
+    data_b64 = body.get('data_b64')
+    mime = str(body.get('mime') or 'application/octet-stream')
+    file_name = str(body.get('file_name') or '')
+    if not isinstance(data_b64, str) or not data_b64:
+        return jsonify({'error': 'data_b64 required'}), 400
+    if len(data_b64) > 12 * 1024 * 1024:  # ~8MB decoded, base64-inflated
+        return jsonify({'error': 'file too large'}), 413
+    try:
+        data = _base64.b64decode(data_b64)
+    except Exception:
+        return jsonify({'error': 'data_b64 is not valid base64'}), 400
+    if not data:
+        return jsonify({'error': 'file is empty'}), 400
+    if len(data) > 8 * 1024 * 1024:
+        return jsonify({'error': 'file too large'}), 413
+    claude = _claude_bin()
+    if not claude:
+        return jsonify({'error': 'claude CLI not found on the data-api host'}), 503
+
+    # Correct extension so the CLI's Read tool recognizes the format.
+    import mimetypes as _mimetypes
+    suffix = (os.path.splitext(file_name)[1]
+              or {'application/pdf': '.pdf', 'image/png': '.png', 'image/jpeg': '.jpg',
+                  'image/webp': '.webp', 'image/gif': '.gif', 'text/plain': '.txt'}.get(mime)
+              or _mimetypes.guess_extension(mime) or '.bin')
+    tmp = tempfile.NamedTemporaryFile(suffix=suffix, delete=False)
+    try:
+        tmp.write(data)
+        tmp.close()
+        # realpath so the prompt path matches the path-scoped Read rule below
+        # (macOS /var is a symlink to /private/var).
+        tmp_path = os.path.realpath(tmp.name)
+        prompt = (
+            f'Read the file at {tmp_path} with the Read tool. Transcribe ALL visible '
+            'text verbatim and completely — every slide, page, and region, including '
+            'numbers, tables, and contact info — as `text`. Then produce `title`, a '
+            '2-3 sentence `summary`, 3-8 lowercase `tags`, and `suggested_artist`: '
+            'the primary artist/person name if evident from the content, else null.'
+        )
+        # Read stays enabled (that's how the model sees the file) but is scoped
+        # to the temp file only (`Read(//abs/path)` permission-rule syntax) —
+        # uploaded documents are untrusted, and an unscoped Read would let
+        # injected instructions pull host files (.env etc.) into the result.
+        args = [claude, '-p', '--output-format', 'json',
+                '--model', os.getenv('GLO_CLI_MODEL', 'sonnet'),
+                '--strict-mcp-config', '--allowedTools', f'Read(/{tmp_path})',
+                '--json-schema', json.dumps(_EXTRACT_SCHEMA)]
+        try:
+            # Neutral cwd so the run never loads this repo's agent context.
+            proc = subprocess.run(args, input=prompt, capture_output=True, text=True,
+                                  timeout=150, cwd=tempfile.gettempdir())
+        except subprocess.TimeoutExpired:
+            return jsonify({'error': 'claude CLI timed out'}), 504
+    finally:
+        os.unlink(tmp.name)
+    if proc.returncode != 0:
+        return jsonify({'error': f'claude exited {proc.returncode}: {proc.stderr.strip()[:300]}'}), 502
+    try:
+        envelope = json.loads(proc.stdout)
+    except ValueError:
+        return jsonify({'error': 'claude returned non-JSON output'}), 502
+    result = envelope.get('result') if isinstance(envelope, dict) else None
+    if not isinstance(result, str) or (isinstance(envelope, dict) and envelope.get('is_error')):
+        return jsonify({'error': 'claude returned an error envelope'}), 502
+    # `result` is schema-conformant JSON per --json-schema; strip optional
+    # ```json fences the model sometimes wraps around it (see cli-provider.ts).
+    import re as _re
+    try:
+        return jsonify(json.loads(_re.sub(r'^```(?:json)?\s*|\s*```$', '', result.strip()))), 200
+    except ValueError:
+        return jsonify({'error': 'claude returned a non-JSON extraction despite the schema'}), 502
+
+
 _whisper = None
 _whisper_lock = None
 

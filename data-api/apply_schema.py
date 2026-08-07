@@ -1,4 +1,5 @@
 import os
+import re
 import sys
 
 import pymysql
@@ -24,6 +25,9 @@ def apply_schema(reset: bool = False):
             sql = f.read()
 
         # PyMySQL runs one statement per execute(), so split the file ourselves.
+        # Strip -- comments first: a ';' inside a comment would otherwise cut a
+        # statement in half (this bit us — TiDB rejected the truncated CREATE).
+        sql = re.sub(r"--[^\n]*", "", sql)
         statements = [s.strip() for s in sql.split(";") if s.strip()]
 
         with conn.cursor() as cur:
@@ -46,7 +50,19 @@ def apply_schema(reset: bool = False):
                 for table in ("metric_snapshots", "tracks", "albums", "artists"):
                     cur.execute(f"DROP TABLE IF EXISTS {table}")
                 cur.execute("SET FOREIGN_KEY_CHECKS = 1")
+            # TiDB validates FK/collation compatibility on CREATE TABLE even
+            # when IF NOT EXISTS would skip creation, so legacy tables whose
+            # collations predate the utf8mb4_unicode_ci pinning error out with
+            # 3780. Skip statements for tables that already exist.
+            cur.execute("SHOW TABLES")
+            existing = {list(row.values())[0] if isinstance(row, dict) else row[0]
+                        for row in cur.fetchall()}
             for stmt in statements:
+                m = re.match(
+                    r"CREATE TABLE IF NOT EXISTS\s+`?(\w+)`?", stmt, re.IGNORECASE
+                )
+                if m and m.group(1) in existing:
+                    continue
                 cur.execute(stmt)
 
         conn.commit()

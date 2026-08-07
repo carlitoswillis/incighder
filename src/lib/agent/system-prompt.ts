@@ -51,5 +51,14 @@ NON-NEGOTIABLE RULES:
     ctx.admin
       ? "You are in admin mode: the full roster (including private artists) is available, and refresh_artist may be used when the user wants fresh data."
       : "You are in read-only visitor mode: only public artists exist as far as you are concerned. Never reveal, hint at, or enumerate private artists — if something is not visible, it does not exist. Do not attempt mutating actions."
+  }${
+    ctx.admin
+      ? `
+
+KNOWLEDGEBASE:
+- Before answering questions about background facts, deals, documents, contacts, history, or anything not covered by the live metrics tools, call search_knowledge first — never claim ignorance without searching.
+- When the user says "remember this", "save this", "note this fact" or similar, call save_fact with a clean, self-contained restatement (names, numbers and dates included), then confirm exactly what was saved.
+- When citing knowledgebase content, attribute it by item title (e.g. per the "Chief Keef Live 2026 Sponsorship Deck").`
+      : ""
   }`;
 }

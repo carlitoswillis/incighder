@@ -6,6 +6,7 @@ import { dailySeries, daysBetween, deltaOver, valueOnDay, type DayPoint } from "
 import { calculateArtistScore } from "@/utils/score";
 import { formatRelativeTime } from "@/lib/format";
 import { getDataApiUrl, dataApiHeaders } from "@/lib/data-api";
+import { searchKb, getKbItem, insertKbItem } from "@/lib/knowledge/db";
 
 // Tool registry for the /api/agent brain. Every tool runs server-side against
 // the DB and returns COMPACT, projected JSON — all arithmetic (deltas, %,
@@ -1047,6 +1048,162 @@ const dataStatus: AgentTool = {
   },
 };
 
+const searchKnowledge: AgentTool = {
+  name: "search_knowledge",
+  description:
+    "ADMIN ONLY: search the internal knowledgebase of saved facts, uploaded documents/decks, images and links. Use it for questions about background info, deals, contacts, documents, or anything beyond live platform metrics. Returns matching items with snippets; follow up with get_knowledge_item for full text.",
+  inputSchema: {
+    type: "object",
+    properties: {
+      query: { type: "string", description: "Search terms" },
+      artist: { type: "string", description: "Limit to one artist (id or name)" },
+      kind: {
+        type: "string",
+        enum: ["fact", "document", "image", "link"],
+        description: "Limit to one item kind",
+      },
+      limit: { type: "number", description: "Max items to return (default 20)" },
+    },
+    required: ["query"],
+  },
+  label: (a) => `Searching the knowledgebase for ${str(a.query) || "…"}`,
+  run: async (args, ctx) => {
+    if (!ctx.admin) return { error: "Admin only." };
+    const query = str(args.query).trim();
+    let artistId: string | undefined;
+    let artistName: string | undefined;
+    const artist = str(args.artist).trim();
+    if (artist) {
+      const res = await resolveArtist(artist, true);
+      if (!res.row) return { error: res.error, suggestions: res.suggestions };
+      artistId = res.row.id;
+      artistName = res.row.name;
+    }
+    const hits = await searchKb({
+      q: query || undefined,
+      artistId,
+      kind: str(args.kind).trim() || undefined,
+      limit: intArg(args.limit, 20, 1, 50),
+    });
+    if (!hits.length) {
+      return {
+        count: 0,
+        note: `No knowledgebase matches for "${query}"${artistName ? ` (artist ${artistName})` : ""}.`,
+      };
+    }
+    return {
+      count: hits.length,
+      items: hits.map((h) => ({
+        id: h.id,
+        kind: h.kind,
+        title: h.title,
+        summary: h.summary,
+        tags: h.tags,
+        artist: h.artist_name,
+        source_url: h.source_url,
+        has_file: h.file_name != null,
+        file_name: h.file_name,
+        created_at: h.created_at,
+        snippet: h.snippet,
+      })),
+    };
+  },
+};
+
+const getKnowledgeItem: AgentTool = {
+  name: "get_knowledge_item",
+  description:
+    "ADMIN ONLY: fetch one knowledgebase item by id with its full text body — use after search_knowledge when the snippet isn't enough (e.g. reading a whole document or deck transcription).",
+  inputSchema: {
+    type: "object",
+    properties: {
+      id: { type: "number", description: "Knowledgebase item id" },
+    },
+    required: ["id"],
+  },
+  label: (a) => `Reading knowledgebase item #${str(a.id) || "?"}`,
+  run: async (args, ctx) => {
+    if (!ctx.admin) return { error: "Admin only." };
+    const id = Math.round(Number(args.id));
+    if (!Number.isFinite(id) || id < 1) return { error: "Provide a valid knowledgebase item id." };
+    const item = await getKbItem(id);
+    if (!item) return { error: `No knowledgebase item with id ${id}.` };
+    const BODY_CAP = 20_000;
+    const body =
+      item.body && item.body.length > BODY_CAP
+        ? `${item.body.slice(0, BODY_CAP)}… [truncated]`
+        : item.body;
+    return {
+      id: item.id,
+      kind: item.kind,
+      title: item.title,
+      body,
+      summary: item.summary,
+      tags: item.tags,
+      artist: item.artist_name,
+      source_url: item.source_url,
+      has_file: item.file_name != null,
+      file_name: item.file_name,
+      file_mime: item.file_mime,
+      file_size: item.file_size,
+      created_by: item.created_by,
+      created_at: item.created_at,
+      updated_at: item.updated_at,
+    };
+  },
+};
+
+const saveFact: AgentTool = {
+  name: "save_fact",
+  description:
+    "ADMIN ONLY: save a fact to the knowledgebase. Use when the user asks to remember/save/note something. Restate the fact cleanly and completely (include names, numbers, dates) before saving — it must make sense on its own later.",
+  inputSchema: {
+    type: "object",
+    properties: {
+      fact: { type: "string", description: "The fact, restated cleanly and self-contained" },
+      title: { type: "string", description: "Short title (defaults to the fact's first 80 chars)" },
+      artist: { type: "string", description: "Artist to attach (id or name)" },
+      tags: {
+        type: "array",
+        items: { type: "string" },
+        description: "Lowercase topic tags",
+      },
+    },
+    required: ["fact"],
+  },
+  label: () => "Saving a fact to the knowledgebase",
+  run: async (args, ctx) => {
+    if (!ctx.admin) return { error: "Admin only." };
+    const fact = str(args.fact).trim();
+    if (!fact) return { error: "Provide the fact to save." };
+    let artistId: string | null = null;
+    let artistName: string | null = null;
+    const artist = str(args.artist).trim();
+    if (artist) {
+      const res = await resolveArtist(artist, true);
+      if (!res.row) return { error: res.error, suggestions: res.suggestions };
+      artistId = res.row.id;
+      artistName = res.row.name;
+    }
+    const tags = Array.isArray(args.tags)
+      ? args.tags
+          .map((t) => str(t).trim().toLowerCase())
+          .filter(Boolean)
+          .join(",") || null
+      : null;
+    const title = str(args.title).trim() || fact.slice(0, 80);
+    const id = await insertKbItem({
+      kind: "fact",
+      title,
+      body: fact,
+      tags,
+      artistId,
+      createdBy: "chat",
+    });
+    return { saved: true, id, title, artist: artistName };
+  },
+};
+
 export const agentTools: AgentTool[] = [
   listArtists,
   getArtist,
@@ -1058,4 +1215,7 @@ export const agentTools: AgentTool[] = [
   similarArtists,
   refreshArtist,
   dataStatus,
+  searchKnowledge,
+  getKnowledgeItem,
+  saveFact,
 ];

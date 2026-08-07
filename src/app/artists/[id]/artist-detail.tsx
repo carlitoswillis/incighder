@@ -484,6 +484,8 @@ function ArtistDetail() {
       {/* Sources */}
       <EventsSection artistId={artistId} group={artist.group_name} />
 
+      {admin && <KnowledgeSection artistId={artistId} />}
+
       {admin && <SourcesPanel artist={artist} onScraped={setArtist} />}
 
       <DeleteArtistDialog
@@ -494,6 +496,79 @@ function ArtistDetail() {
         onDeleted={() => router.push("/")}
       />
     </div>
+  );
+}
+
+interface KnowledgeRow {
+  id: number;
+  kind: string;
+  title: string;
+  created_at: string;
+}
+
+// Admin-only list of this artist's knowledgebase items (facts, documents,
+// links GLO can search), linking into the /knowledge pages.
+function KnowledgeSection({ artistId }: { artistId: string }) {
+  const [items, setItems] = useState<KnowledgeRow[] | null>(null);
+
+  useEffect(() => {
+    fetch(`/api/knowledge?artist_id=${encodeURIComponent(artistId)}&limit=50`)
+      .then((r) => (r.ok ? r.json() : { items: [] }))
+      .then((d) => setItems(Array.isArray(d.items) ? d.items : []))
+      .catch(() => setItems([]));
+  }, [artistId]);
+
+  if (items === null) return null;
+
+  return (
+    <section className="rounded-xl bg-card p-6 ring-1 ring-foreground/10">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-semibold tracking-tight">Knowledge</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Saved facts, documents and links about this artist.
+          </p>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          render={
+            <Link href={`/knowledge?artist_id=${encodeURIComponent(artistId)}`} />
+          }
+        >
+          Open knowledgebase
+        </Button>
+      </div>
+      {items.length === 0 ? (
+        <p className="mt-4 text-sm text-muted-foreground">
+          Nothing saved yet — upload a deck or tell GLO to remember a fact.
+        </p>
+      ) : (
+        <div className="mt-4 divide-y divide-border/60">
+          {items.map((k) => (
+            <Link
+              key={k.id}
+              href={`/knowledge/${k.id}`}
+              className="flex items-center gap-3 py-3 transition-colors hover:text-primary"
+            >
+              <Badge variant="secondary" className="shrink-0 capitalize">
+                {k.kind}
+              </Badge>
+              <span className="min-w-0 flex-1 truncate text-sm font-medium">
+                {k.title}
+              </span>
+              <span className="shrink-0 text-xs text-muted-foreground">
+                {new Date(k.created_at).toLocaleDateString("en-US", {
+                  month: "short",
+                  day: "numeric",
+                  year: "numeric",
+                })}
+              </span>
+            </Link>
+          ))}
+        </div>
+      )}
+    </section>
   );
 }
 

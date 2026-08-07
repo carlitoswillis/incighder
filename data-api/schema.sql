@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS artists (
     -- scrapeable presence. bio_source: 'lastfm' | 'manual'.
     bio TEXT NULL,
     bio_source VARCHAR(32) NULL,
-    -- Optional roster separation (e.g. 'glogang'). NULL = main artist list;
+    -- Optional roster separation (e.g. 'glogang'). NULL = main artist list,
     -- grouped rows appear only on /g/<group_name>.
     group_name VARCHAR(64) NULL,
     -- Manual list position (lower = higher); NULL sorts after all pinned rows.
@@ -127,6 +127,34 @@ CREATE TABLE IF NOT EXISTS event_artists (
 -- agent can cite specific posts. Keyed per artist so two artists sharing a
 -- post never collide. scrape_service also creates this table lazily (no
 -- migration framework), so prod TiDB and local MySQL self-heal on first write.
+-- GLO knowledgebase: facts saved from chat, uploaded documents/images (original
+-- bytes in `file`, vision-extracted text in `body`), and saved links/articles.
+-- Search is LIKE-based over title/body/summary/tags (TiDB Serverless has no
+-- FULLTEXT). `file` is only ever SELECTed by the download route — list/search
+-- queries must project explicit columns to avoid dragging blobs over the wire.
+CREATE TABLE IF NOT EXISTS kb_items (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    kind VARCHAR(16) NOT NULL,          -- 'fact' | 'document' | 'image' | 'link'
+    title VARCHAR(512) NOT NULL,
+    body LONGTEXT NULL,                 -- searchable text (fact text / extraction)
+    summary TEXT NULL,
+    tags VARCHAR(512) NULL,             -- comma-separated, lowercase
+    source_url VARCHAR(1024) NULL,
+    artist_id VARCHAR(255) NULL,
+    file_name VARCHAR(255) NULL,
+    file_mime VARCHAR(128) NULL,
+    file_size INT NULL,
+    file LONGBLOB NULL,                 -- original upload, capped ~4MB
+    created_by VARCHAR(32) NULL,        -- 'chat' | 'upload' | 'link' | 'manual'
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_kb_artist (artist_id, created_at),
+    INDEX idx_kb_kind (kind, created_at),
+    CONSTRAINT fk_kb_artist FOREIGN KEY (artist_id) REFERENCES artists(id) ON DELETE SET NULL
+    -- Collation must match artists.id (utf8mb4_unicode_ci) or the FK is
+    -- rejected on TiDB (database default utf8mb4_bin, error 3780).
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS artist_posts (
     artist_id VARCHAR(255) NOT NULL,
     platform VARCHAR(32) NOT NULL,
