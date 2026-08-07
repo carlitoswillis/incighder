@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { notFound, useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { ArrowLeft, Download, ExternalLink, Pencil, Trash2 } from "lucide-react";
+import { ArrowLeft, Download, ExternalLink, Eye, Pencil, Trash2 } from "lucide-react";
 
 import { useAdmin } from "@/components/admin-context";
 import { Badge } from "@/components/ui/badge";
@@ -154,6 +154,16 @@ export default function KnowledgeItemDetail() {
 
   const Icon = kindIcon(item.kind);
   const tags = splitTags(item.tags);
+  const fileUrl = `/api/knowledge/${item.id}/file`;
+  // Only types the file route serves inline (and browsers render natively)
+  // get an embedded viewer; everything else stays download-only.
+  const previewKind = !item.file_name
+    ? null
+    : item.file_mime?.startsWith("image/")
+      ? ("image" as const)
+      : item.file_mime === "application/pdf"
+        ? ("pdf" as const)
+        : null;
 
   return (
     <div className="space-y-6">
@@ -208,17 +218,20 @@ export default function KnowledgeItemDetail() {
           </p>
         )}
         <div className="flex flex-wrap gap-2 pt-1">
+          {item.file_name && previewKind && (
+            <Button
+              variant="outline"
+              size="sm"
+              render={<a href={fileUrl} target="_blank" rel="noopener noreferrer" />}
+            >
+              <Eye /> Open in new tab
+            </Button>
+          )}
           {item.file_name && (
             <Button
               variant="outline"
               size="sm"
-              render={
-                <a
-                  href={`/api/knowledge/${item.id}/file`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                />
-              }
+              render={<a href={fileUrl} download={item.file_name} />}
             >
               <Download /> Download original
             </Button>
@@ -281,6 +294,27 @@ export default function KnowledgeItemDetail() {
             </Button>
           </div>
         </form>
+      )}
+
+      {/* Original document viewer */}
+      {previewKind && (
+        <div className="overflow-hidden rounded-xl bg-card ring-1 ring-foreground/10">
+          {previewKind === "image" ? (
+            // Blob served by our own authed route; next/image can't optimize it.
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={fileUrl}
+              alt={item.title}
+              className="mx-auto max-h-[36rem] w-auto max-w-full"
+            />
+          ) : (
+            <iframe
+              src={`${fileUrl}#view=FitH`}
+              title={item.title}
+              className="h-[75vh] min-h-96 w-full"
+            />
+          )}
+        </div>
       )}
 
       {/* Summary */}
