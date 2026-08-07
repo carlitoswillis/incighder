@@ -58,7 +58,12 @@ NON-NEGOTIABLE RULES:
 KNOWLEDGEBASE:
 - Before answering questions about background facts, deals, documents, contacts, history, or anything not covered by the live metrics tools, call search_knowledge first — never claim ignorance without searching.
 - When the user says "remember this", "save this", "note this fact" or similar, call save_fact with a clean, self-contained restatement (names, numbers and dates included), then confirm exactly what was saved.
-- When citing knowledgebase content, attribute it by item title (e.g. per the "Chief Keef Live 2026 Sponsorship Deck").`
+- When citing knowledgebase content, attribute it by item title (e.g. per the "Chief Keef Live 2026 Sponsorship Deck").
+
+WEB:
+- web_search and open_url reach the public internet, but they are NOT a default source. Use them only when the user explicitly asks you to look something up online, or when the question clearly needs current external information that neither the knowledgebase nor the platform tools cover — and say you're checking the web when you do.
+- Cite every web-sourced claim inline as a markdown link: [source title](url). Web information is attributed, never stated as bare fact — your own metrics tools always outrank the web for this roster's numbers.
+- When a web finding is worth keeping, offer to save it to the knowledgebase with save_fact.`
       : ""
   }`;
 }

@@ -104,6 +104,80 @@ _EXTRACT_SCHEMA = {
 }
 
 
+# Enforced shape of a /web_search reply (mirrors WEB_SEARCH_SCHEMA in
+# src/lib/agent/web-search.ts).
+_WEB_SEARCH_SCHEMA = {
+    'type': 'object',
+    'properties': {
+        'results': {
+            'type': 'array',
+            'items': {
+                'type': 'object',
+                'properties': {
+                    'title': {'type': 'string'},
+                    'url': {'type': 'string'},
+                    'snippet': {'type': 'string'},
+                },
+                'required': ['title', 'url', 'snippet'],
+            },
+        },
+        'note': {'type': ['string', 'null']},
+    },
+    'required': ['results', 'note'],
+}
+
+
+@app.route('/web_search', methods=['POST'])
+def web_search():
+    """Web search via this machine's logged-in Claude Code CLI and its
+    WebSearch tool — the deployed site's bridge for the agent's web_search
+    tool (provider chain step 2 in src/lib/agent/web-search.ts). Body:
+    {query, limit?}; reply {results: [{title, url, snippet}], note}."""
+    body = request.get_json(silent=True) or {}
+    query = str(body.get('query') or '').strip()[:400]
+    if not query:
+        return jsonify({'error': 'query required'}), 400
+    try:
+        limit = max(1, min(8, int(body.get('limit') or 5)))
+    except (TypeError, ValueError):
+        limit = 5
+    claude = _claude_bin()
+    if not claude:
+        return jsonify({'error': 'claude CLI not found on the data-api host'}), 503
+    prompt = (
+        f'Search the web for: {query}\n'
+        f'Use the WebSearch tool (one or two queries as needed). Return the {limit} '
+        'most relevant, current results. Real source URLs only — never '
+        'search-engine or redirect links. Each snippet is 1-2 sentences of what '
+        'that page actually says that is relevant to the query. Set `note` to a '
+        'one-sentence overall takeaway across results, or null.'
+    )
+    args = [claude, '-p', '--output-format', 'json',
+            '--model', os.getenv('GLO_CLI_MODEL', 'sonnet'),
+            '--strict-mcp-config', '--allowedTools', 'WebSearch',
+            '--json-schema', json.dumps(_WEB_SEARCH_SCHEMA)]
+    try:
+        # Neutral cwd so the run never loads this repo's agent context.
+        proc = subprocess.run(args, input=prompt, capture_output=True, text=True,
+                              timeout=110, cwd=tempfile.gettempdir())
+    except subprocess.TimeoutExpired:
+        return jsonify({'error': 'claude CLI timed out'}), 504
+    if proc.returncode != 0:
+        return jsonify({'error': f'claude exited {proc.returncode}: {proc.stderr.strip()[:300]}'}), 502
+    try:
+        envelope = json.loads(proc.stdout)
+    except ValueError:
+        return jsonify({'error': 'claude returned non-JSON output'}), 502
+    result = envelope.get('result') if isinstance(envelope, dict) else None
+    if not isinstance(result, str) or (isinstance(envelope, dict) and envelope.get('is_error')):
+        return jsonify({'error': 'claude returned an error envelope'}), 502
+    import re as _re
+    try:
+        return jsonify(json.loads(_re.sub(r'^```(?:json)?\s*|\s*```$', '', result.strip()))), 200
+    except ValueError:
+        return jsonify({'error': 'claude returned non-JSON results despite the schema'}), 502
+
+
 @app.route('/extract_doc', methods=['POST'])
 def extract_doc():
     """Extract text/metadata from an uploaded document or image using this

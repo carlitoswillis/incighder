@@ -7,6 +7,8 @@ import { calculateArtistScore } from "@/utils/score";
 import { formatRelativeTime } from "@/lib/format";
 import { getDataApiUrl, dataApiHeaders } from "@/lib/data-api";
 import { searchKb, getKbItem, insertKbItem } from "@/lib/knowledge/db";
+import { extractTextFromUrl } from "@/lib/knowledge/extract";
+import { searchWeb } from "@/lib/agent/web-search";
 
 // Tool registry for the /api/agent brain. Every tool runs server-side against
 // the DB and returns COMPACT, projected JSON — all arithmetic (deltas, %,
@@ -1204,6 +1206,75 @@ const saveFact: AgentTool = {
   },
 };
 
+const webSearch: AgentTool = {
+  name: "web_search",
+  description:
+    "ADMIN ONLY: search the public web. NOT a default source — use only when the user explicitly asks to look something up online, or when the answer needs current external information that neither the knowledgebase nor the platform tools cover. Returns result titles, real URLs and snippets; open promising results with open_url, and cite every web-sourced claim as a markdown link.",
+  inputSchema: {
+    type: "object",
+    properties: {
+      query: { type: "string", description: "Search terms" },
+      limit: { type: "number", description: "Max results (default 5)" },
+    },
+    required: ["query"],
+  },
+  label: (a) => `Searching the web for ${str(a.query) || "…"}`,
+  run: async (args, ctx) => {
+    if (!ctx.admin) return { error: "Admin only." };
+    const query = str(args.query).trim().slice(0, 400);
+    if (!query) return { error: "Provide search terms." };
+    const limit = intArg(args.limit, 5, 1, 8);
+    try {
+      const outcome = await searchWeb(query, limit);
+      if (!outcome.results.length) {
+        return { count: 0, note: `No web results for "${query}".` };
+      }
+      return { count: outcome.results.length, results: outcome.results, note: outcome.note };
+    } catch (e) {
+      return { error: e instanceof Error ? e.message : "Web search failed." };
+    }
+  },
+};
+
+const openUrl: AgentTool = {
+  name: "open_url",
+  description:
+    "ADMIN ONLY: fetch one web page and return its readable text (title + first ~8k chars). Use to read a web_search result or a knowledgebase source_url before citing it — cite as a markdown link.",
+  inputSchema: {
+    type: "object",
+    properties: {
+      url: { type: "string", description: "http(s) URL to read" },
+    },
+    required: ["url"],
+  },
+  label: (a) => {
+    try {
+      return `Reading ${new URL(str(a.url)).hostname}`;
+    } catch {
+      return "Reading a web page";
+    }
+  },
+  run: async (args, ctx) => {
+    if (!ctx.admin) return { error: "Admin only." };
+    const url = str(args.url).trim();
+    if (!/^https?:\/\//.test(url)) return { error: "Provide a valid http(s) URL." };
+    const TEXT_CAP = 8_000;
+    try {
+      const page = await extractTextFromUrl(url);
+      return {
+        url,
+        title: page.title || null,
+        text:
+          page.text.length > TEXT_CAP
+            ? `${page.text.slice(0, TEXT_CAP)}… [truncated]`
+            : page.text,
+      };
+    } catch (e) {
+      return { error: e instanceof Error ? e.message : "Could not read that page." };
+    }
+  },
+};
+
 export const agentTools: AgentTool[] = [
   listArtists,
   getArtist,
@@ -1218,4 +1289,6 @@ export const agentTools: AgentTool[] = [
   searchKnowledge,
   getKnowledgeItem,
   saveFact,
+  webSearch,
+  openUrl,
 ];
