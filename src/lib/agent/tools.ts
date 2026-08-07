@@ -1206,6 +1206,83 @@ const saveFact: AgentTool = {
   },
 };
 
+const saveLink: AgentTool = {
+  name: "save_link",
+  description:
+    "ADMIN ONLY: save a web link/article into the knowledgebase. Use when the user asks to save/keep a URL (from the conversation, a web_search result, or one they pasted). Fetches the page, stores its text so it becomes searchable, and optionally attaches it to an artist.",
+  inputSchema: {
+    type: "object",
+    properties: {
+      url: { type: "string", description: "http(s) URL to save" },
+      title: { type: "string", description: "Short title (defaults to the page title)" },
+      artist: { type: "string", description: "Artist to attach (id or name)" },
+      tags: {
+        type: "array",
+        items: { type: "string" },
+        description: "Lowercase topic tags",
+      },
+    },
+    required: ["url"],
+  },
+  label: (a) => {
+    try {
+      return `Saving ${new URL(str(a.url)).hostname} to the knowledgebase`;
+    } catch {
+      return "Saving a link to the knowledgebase";
+    }
+  },
+  run: async (args, ctx) => {
+    if (!ctx.admin) return { error: "Admin only." };
+    const url = str(args.url).trim();
+    if (!/^https?:\/\//.test(url)) return { error: "Provide a valid http(s) URL." };
+    let artistId: string | null = null;
+    let artistName: string | null = null;
+    const artist = str(args.artist).trim();
+    if (artist) {
+      const res = await resolveArtist(artist, true);
+      if (!res.row) return { error: res.error, suggestions: res.suggestions };
+      artistId = res.row.id;
+      artistName = res.row.name;
+    }
+    const pool = getPool();
+    const [existing] = await pool.query<RowDataPacket[]>(
+      "SELECT id, title FROM kb_items WHERE source_url = ? LIMIT 1",
+      [url],
+    );
+    if (existing.length) {
+      return {
+        already_saved: true,
+        id: existing[0].id,
+        title: existing[0].title,
+        note: "This URL is already in the knowledgebase.",
+      };
+    }
+    let page: { title: string; text: string };
+    try {
+      page = await extractTextFromUrl(url);
+    } catch (e) {
+      return { error: e instanceof Error ? e.message : "Could not fetch that page." };
+    }
+    const tags = Array.isArray(args.tags)
+      ? args.tags
+          .map((t) => str(t).trim().toLowerCase())
+          .filter(Boolean)
+          .join(",") || null
+      : null;
+    const title = str(args.title).trim() || page.title || url;
+    const id = await insertKbItem({
+      kind: "link",
+      title,
+      body: page.text || null,
+      tags,
+      sourceUrl: url,
+      artistId,
+      createdBy: "chat",
+    });
+    return { saved: true, id, title, artist: artistName, text_chars: page.text.length };
+  },
+};
+
 const webSearch: AgentTool = {
   name: "web_search",
   description:
@@ -1289,6 +1366,7 @@ export const agentTools: AgentTool[] = [
   searchKnowledge,
   getKnowledgeItem,
   saveFact,
+  saveLink,
   webSearch,
   openUrl,
 ];
