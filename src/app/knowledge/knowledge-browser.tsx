@@ -63,6 +63,11 @@ export default function KnowledgeBrowser() {
   // Add panel state
   const [addArtist, setAddArtist] = useState(searchParams.get("artist_id") ?? "");
   const [extracting, setExtracting] = useState(false);
+  const [progress, setProgress] = useState<{
+    index: number;
+    total: number;
+    name: string;
+  } | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const [url, setUrl] = useState("");
   const [addingLink, setAddingLink] = useState(false);
@@ -128,28 +133,46 @@ export default function KnowledgeBrowser() {
     load();
   }
 
-  async function handleFile(file: File) {
+  // Sequential on purpose: each file runs a vision-extraction pass server-side,
+  // so a parallel burst would spawn one CLI process per file. Per-file failures
+  // skip and continue rather than abandoning the rest of the drop.
+  async function handleFiles(list: FileList | File[]) {
     if (extracting) return;
-    if (file.size > MAX_FILE_BYTES) {
-      toast.error(`${file.name} is over the ${MAX_FILE_LABEL} limit.`);
-      return;
-    }
-    if (file.size === 0) {
-      toast.error(`${file.name} is empty.`);
-      return;
-    }
+    const files = Array.from(list);
+    if (!files.length) return;
     setExtracting(true);
+    let saved = 0;
     try {
-      const b64 = await fileToB64(file);
-      await addItem({
-        file_b64: b64,
-        file_mime: file.type || "application/octet-stream",
-        file_name: file.name,
-      });
-    } catch (e) {
-      toast.error(`Upload failed: ${e instanceof Error ? e.message : String(e)}`);
+      for (const [i, file] of files.entries()) {
+        setProgress({ index: i + 1, total: files.length, name: file.name });
+        if (file.size > MAX_FILE_BYTES) {
+          toast.error(`${file.name} is over the ${MAX_FILE_LABEL} limit — skipped.`);
+          continue;
+        }
+        if (file.size === 0) {
+          toast.error(`${file.name} is empty — skipped.`);
+          continue;
+        }
+        try {
+          const b64 = await fileToB64(file);
+          await addItem({
+            file_b64: b64,
+            file_mime: file.type || "application/octet-stream",
+            file_name: file.name,
+          });
+          saved++;
+        } catch (e) {
+          toast.error(
+            `${file.name} failed: ${e instanceof Error ? e.message : String(e)}`,
+          );
+        }
+      }
+      if (files.length > 1) {
+        toast.success(`Saved ${saved} of ${files.length} files.`);
+      }
     } finally {
       setExtracting(false);
+      setProgress(null);
     }
   }
 
@@ -222,8 +245,7 @@ export default function KnowledgeBrowser() {
               onDrop={(e) => {
                 e.preventDefault();
                 setDragOver(false);
-                const f = e.dataTransfer.files?.[0];
-                if (f) handleFile(f);
+                if (e.dataTransfer.files?.length) handleFiles(e.dataTransfer.files);
               }}
               onClick={() => {
                 if (!extracting) fileInputRef.current?.click();
@@ -240,14 +262,16 @@ export default function KnowledgeBrowser() {
                 <>
                   <Loader2 className="size-5 animate-spin text-primary" />
                   <p className="text-sm text-muted-foreground">
-                    Extracting text — this can take up to a minute…
+                    {progress && progress.total > 1
+                      ? `Extracting ${progress.name} (${progress.index} of ${progress.total})…`
+                      : "Extracting text — this can take up to a minute…"}
                   </p>
                 </>
               ) : (
                 <>
                   <Upload className="size-5 text-muted-foreground" />
                   <p className="text-sm">
-                    Drop a PDF, deck or image here, or click to browse
+                    Drop PDFs, decks or images here, or click to browse
                   </p>
                   <p className="text-xs text-muted-foreground">
                     Max {MAX_FILE_LABEL} — text is transcribed and summarized
@@ -258,10 +282,10 @@ export default function KnowledgeBrowser() {
               <input
                 ref={fileInputRef}
                 type="file"
+                multiple
                 className="hidden"
                 onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  if (f) handleFile(f);
+                  if (e.target.files?.length) handleFiles(e.target.files);
                   e.target.value = "";
                 }}
               />
