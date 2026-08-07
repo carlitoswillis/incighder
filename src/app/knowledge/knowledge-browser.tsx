@@ -27,6 +27,18 @@ import {
 interface ArtistOption {
   id: string;
   name: string;
+  group_name?: string | null;
+}
+
+// Attach/filter selects hold either an artist id or a `g:<group>` value so a
+// single dropdown covers both. The API takes them as separate fields.
+const GROUP_PREFIX = "g:";
+
+function attachBody(value: string): Record<string, string> {
+  if (!value) return {};
+  return value.startsWith(GROUP_PREFIX)
+    ? { group_name: value.slice(GROUP_PREFIX.length) }
+    : { artist_id: value };
 }
 
 // The API's hard cap is 4 MB decoded, but the file travels as base64 inside a
@@ -54,14 +66,16 @@ export default function KnowledgeBrowser() {
   const [q, setQ] = useState("");
   const [submittedQ, setSubmittedQ] = useState("");
   const [kindFilter, setKindFilter] = useState("");
-  const [artistFilter, setArtistFilter] = useState(
-    searchParams.get("artist_id") ?? "",
-  );
+  const initialAttach =
+    searchParams.get("artist_id") ??
+    (searchParams.get("group") ? `${GROUP_PREFIX}${searchParams.get("group")}` : "");
+  const [artistFilter, setArtistFilter] = useState(initialAttach);
   const [items, setItems] = useState<KbSearchHit[] | null>(null);
   const [artists, setArtists] = useState<ArtistOption[]>([]);
+  const groups = [...new Set(artists.map((a) => a.group_name).filter(Boolean))].sort() as string[];
 
   // Add panel state
-  const [addArtist, setAddArtist] = useState(searchParams.get("artist_id") ?? "");
+  const [addArtist, setAddArtist] = useState(initialAttach);
   const [extracting, setExtracting] = useState(false);
   const [progress, setProgress] = useState<{
     index: number;
@@ -80,7 +94,11 @@ export default function KnowledgeBrowser() {
     const params = new URLSearchParams();
     if (submittedQ) params.set("q", submittedQ);
     if (kindFilter) params.set("kind", kindFilter);
-    if (artistFilter) params.set("artist_id", artistFilter);
+    if (artistFilter.startsWith(GROUP_PREFIX)) {
+      params.set("group", artistFilter.slice(GROUP_PREFIX.length));
+    } else if (artistFilter) {
+      params.set("artist_id", artistFilter);
+    }
     params.set("limit", "50");
     try {
       const r = await fetch(`/api/knowledge?${params}`);
@@ -101,13 +119,15 @@ export default function KnowledgeBrowser() {
 
   useEffect(() => {
     if (!admin) return;
-    fetch("/api/artists")
+    // ?all=1 spans roster groups too — grouped artists (e.g. glogang) are
+    // otherwise excluded from the default list.
+    fetch("/api/artists?all=1")
       .then((r) => (r.ok ? r.json() : []))
       .then((rows: ArtistOption[]) =>
         setArtists(
           Array.isArray(rows)
             ? rows
-                .map((a) => ({ id: a.id, name: a.name }))
+                .map((a) => ({ id: a.id, name: a.name, group_name: a.group_name ?? null }))
                 .sort((a, b) => a.name.localeCompare(b.name))
             : [],
         ),
@@ -121,7 +141,7 @@ export default function KnowledgeBrowser() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         ...body,
-        ...(addArtist ? { artist_id: addArtist } : {}),
+        ...attachBody(addArtist),
       }),
     });
     // A platform-level rejection (e.g. Vercel's 413 for oversized bodies)
@@ -338,7 +358,7 @@ export default function KnowledgeBrowser() {
 
         <div className="mt-4 flex flex-wrap items-center gap-2">
           <Label htmlFor="kb-attach" className="text-xs text-muted-foreground">
-            Attach to artist
+            Attach to
           </Label>
           <select
             id="kb-attach"
@@ -349,11 +369,23 @@ export default function KnowledgeBrowser() {
             <option value="" className="bg-card">
               None (general)
             </option>
-            {artists.map((a) => (
-              <option key={a.id} value={a.id} className="bg-card">
-                {a.name}
-              </option>
-            ))}
+            {groups.length > 0 && (
+              <optgroup label="Groups" className="bg-card">
+                {groups.map((g) => (
+                  <option key={g} value={`${GROUP_PREFIX}${g}`} className="bg-card">
+                    {g} (group)
+                  </option>
+                ))}
+              </optgroup>
+            )}
+            <optgroup label="Artists" className="bg-card">
+              {artists.map((a) => (
+                <option key={a.id} value={a.id} className="bg-card">
+                  {a.name}
+                  {a.group_name ? ` — ${a.group_name}` : ""}
+                </option>
+              ))}
+            </optgroup>
           </select>
         </div>
       </div>
@@ -394,16 +426,28 @@ export default function KnowledgeBrowser() {
           className={cn(selectClass, "max-w-44")}
           value={artistFilter}
           onChange={(e) => setArtistFilter(e.target.value)}
-          aria-label="Filter by artist"
+          aria-label="Filter by artist or group"
         >
           <option value="" className="bg-card">
-            All artists
+            All artists &amp; groups
           </option>
-          {artists.map((a) => (
-            <option key={a.id} value={a.id} className="bg-card">
-              {a.name}
-            </option>
-          ))}
+          {groups.length > 0 && (
+            <optgroup label="Groups" className="bg-card">
+              {groups.map((g) => (
+                <option key={g} value={`${GROUP_PREFIX}${g}`} className="bg-card">
+                  {g} (group)
+                </option>
+              ))}
+            </optgroup>
+          )}
+          <optgroup label="Artists" className="bg-card">
+            {artists.map((a) => (
+              <option key={a.id} value={a.id} className="bg-card">
+                {a.name}
+                {a.group_name ? ` — ${a.group_name}` : ""}
+              </option>
+            ))}
+          </optgroup>
         </select>
       </form>
 
@@ -443,6 +487,9 @@ export default function KnowledgeBrowser() {
                 <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                   {it.artist_name && (
                     <Badge variant="outline">{it.artist_name}</Badge>
+                  )}
+                  {it.group_name && (
+                    <Badge variant="outline">{it.group_name} (group)</Badge>
                   )}
                   <span>{formatKbDate(it.created_at)}</span>
                 </div>

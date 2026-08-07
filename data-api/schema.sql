@@ -141,6 +141,7 @@ CREATE TABLE IF NOT EXISTS kb_items (
     tags VARCHAR(512) NULL,             -- comma-separated, lowercase
     source_url VARCHAR(1024) NULL,
     artist_id VARCHAR(255) NULL,
+    group_name VARCHAR(64) NULL,        -- roster group attachment (e.g. 'glogang')
     file_name VARCHAR(255) NULL,
     file_mime VARCHAR(128) NULL,
     file_size INT NULL,
@@ -149,6 +150,7 @@ CREATE TABLE IF NOT EXISTS kb_items (
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     INDEX idx_kb_artist (artist_id, created_at),
+    INDEX idx_kb_group (group_name, created_at),
     INDEX idx_kb_kind (kind, created_at),
     CONSTRAINT fk_kb_artist FOREIGN KEY (artist_id) REFERENCES artists(id) ON DELETE SET NULL
     -- Collation must match artists.id (utf8mb4_unicode_ci) or the FK is

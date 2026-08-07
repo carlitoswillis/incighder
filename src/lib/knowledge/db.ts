@@ -15,6 +15,7 @@ export interface KbItemMeta {
   source_url: string | null;
   artist_id: string | null;
   artist_name: string | null;
+  group_name: string | null;
   file_name: string | null;
   file_mime: string | null;
   file_size: number | null;
@@ -43,6 +44,7 @@ export const KB_TABLE_DDL = `CREATE TABLE IF NOT EXISTS kb_items (
     tags VARCHAR(512) NULL,             -- comma-separated, lowercase
     source_url VARCHAR(1024) NULL,
     artist_id VARCHAR(255) NULL,
+    group_name VARCHAR(64) NULL,        -- roster group attachment (e.g. 'glogang')
     file_name VARCHAR(255) NULL,
     file_mime VARCHAR(128) NULL,
     file_size INT NULL,
@@ -51,6 +53,7 @@ export const KB_TABLE_DDL = `CREATE TABLE IF NOT EXISTS kb_items (
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     INDEX idx_kb_artist (artist_id, created_at),
+    INDEX idx_kb_group (group_name, created_at),
     INDEX idx_kb_kind (kind, created_at),
     CONSTRAINT fk_kb_artist FOREIGN KEY (artist_id) REFERENCES artists(id) ON DELETE SET NULL
     -- Collation must match artists.id (utf8mb4_unicode_ci) or the FK is
@@ -59,8 +62,8 @@ export const KB_TABLE_DDL = `CREATE TABLE IF NOT EXISTS kb_items (
 
 // Every meta column except body/file, with the artist name joined in.
 const META_COLUMNS = `k.id, k.kind, k.title, k.summary, k.tags, k.source_url,
-       k.artist_id, a.name AS artist_name, k.file_name, k.file_mime,
-       k.file_size, k.created_by, k.created_at, k.updated_at`;
+       k.artist_id, a.name AS artist_name, k.group_name, k.file_name,
+       k.file_mime, k.file_size, k.created_by, k.created_at, k.updated_at`;
 
 function isNoTable(e: unknown): boolean {
   return (e as { code?: string }).code === "ER_NO_SUCH_TABLE";
@@ -76,6 +79,7 @@ function toMeta(r: RowDataPacket): KbItemMeta {
     source_url: r.source_url == null ? null : String(r.source_url),
     artist_id: r.artist_id == null ? null : String(r.artist_id),
     artist_name: r.artist_name == null ? null : String(r.artist_name),
+    group_name: r.group_name == null ? null : String(r.group_name),
     file_name: r.file_name == null ? null : String(r.file_name),
     file_mime: r.file_mime == null ? null : String(r.file_mime),
     file_size: r.file_size == null ? null : Number(r.file_size),
@@ -106,6 +110,7 @@ function makeSnippet(body: unknown, terms: string[]): string | null {
 export async function searchKb(opts: {
   q?: string;
   artistId?: string;
+  group?: string;
   kind?: string;
   limit?: number;
 }): Promise<KbSearchHit[]> {
@@ -123,6 +128,10 @@ export async function searchKb(opts: {
   if (opts.artistId) {
     where.push("k.artist_id = ?");
     whereValues.push(opts.artistId);
+  }
+  if (opts.group) {
+    where.push("k.group_name = ?");
+    whereValues.push(opts.group);
   }
   if (opts.kind) {
     where.push("k.kind = ?");
@@ -207,6 +216,7 @@ export async function insertKbItem(item: {
   tags?: string | null;
   sourceUrl?: string | null;
   artistId?: string | null;
+  groupName?: string | null;
   fileName?: string | null;
   fileMime?: string | null;
   fileSize?: number | null;
@@ -215,9 +225,9 @@ export async function insertKbItem(item: {
 }): Promise<number> {
   const pool = getPool();
   const sql = `INSERT INTO kb_items
-      (kind, title, body, summary, tags, source_url, artist_id,
+      (kind, title, body, summary, tags, source_url, artist_id, group_name,
        file_name, file_mime, file_size, file, created_by)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
   const values = [
     item.kind,
     item.title,
@@ -226,6 +236,7 @@ export async function insertKbItem(item: {
     item.tags ?? null,
     item.sourceUrl ?? null,
     item.artistId ?? null,
+    item.groupName ?? null,
     item.fileName ?? null,
     item.fileMime ?? null,
     item.fileSize ?? null,
@@ -254,6 +265,7 @@ export async function updateKbItem(
     tags: string | null;
     sourceUrl: string | null;
     artistId: string | null;
+    groupName: string | null;
     kind: string;
   }>,
 ): Promise<boolean> {
@@ -264,6 +276,7 @@ export async function updateKbItem(
     tags: "tags",
     sourceUrl: "source_url",
     artistId: "artist_id",
+    groupName: "group_name",
     kind: "kind",
   };
   const sets: string[] = [];

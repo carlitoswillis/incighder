@@ -78,6 +78,22 @@ export async function PATCH(
       }
       patch.artistId = artistId;
     }
+    if ("group_name" in body) {
+      const groupName =
+        typeof body.group_name === "string" && body.group_name.trim()
+          ? body.group_name.trim()
+          : null;
+      if (groupName) {
+        const [rows] = await pool.query<RowDataPacket[]>(
+          "SELECT 1 FROM artists WHERE group_name = ? LIMIT 1",
+          [groupName],
+        );
+        if (!rows.length) {
+          return NextResponse.json({ error: "Unknown group_name" }, { status: 400 });
+        }
+      }
+      patch.groupName = groupName;
+    }
 
     if (!Object.keys(patch).length) {
       return NextResponse.json({ error: "Nothing to update" }, { status: 400 });

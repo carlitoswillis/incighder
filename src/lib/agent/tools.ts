@@ -1059,6 +1059,7 @@ const searchKnowledge: AgentTool = {
     properties: {
       query: { type: "string", description: "Search terms" },
       artist: { type: "string", description: "Limit to one artist (id or name)" },
+      group: { type: "string", description: "Limit to one roster group (e.g. glogang)" },
       kind: {
         type: "string",
         enum: ["fact", "document", "image", "link"],
@@ -1081,9 +1082,17 @@ const searchKnowledge: AgentTool = {
       artistId = res.row.id;
       artistName = res.row.name;
     }
+    let groupName: string | undefined;
+    const group = str(args.group).trim();
+    if (group) {
+      const res = await resolveGroup(group);
+      if (!res.name) return { error: res.error, available_groups: res.available };
+      groupName = res.name;
+    }
     const hits = await searchKb({
       q: query || undefined,
       artistId,
+      group: groupName,
       kind: str(args.kind).trim() || undefined,
       limit: intArg(args.limit, 20, 1, 50),
     });
@@ -1102,6 +1111,7 @@ const searchKnowledge: AgentTool = {
         summary: h.summary,
         tags: h.tags,
         artist: h.artist_name,
+        group: h.group_name,
         source_url: h.source_url,
         has_file: h.file_name != null,
         file_name: h.file_name,
@@ -1143,6 +1153,7 @@ const getKnowledgeItem: AgentTool = {
       summary: item.summary,
       tags: item.tags,
       artist: item.artist_name,
+      group: item.group_name,
       source_url: item.source_url,
       has_file: item.file_name != null,
       file_name: item.file_name,
@@ -1165,6 +1176,7 @@ const saveFact: AgentTool = {
       fact: { type: "string", description: "The fact, restated cleanly and self-contained" },
       title: { type: "string", description: "Short title (defaults to the fact's first 80 chars)" },
       artist: { type: "string", description: "Artist to attach (id or name)" },
+      group: { type: "string", description: "Roster group to attach (e.g. glogang)" },
       tags: {
         type: "array",
         items: { type: "string" },
@@ -1187,6 +1199,13 @@ const saveFact: AgentTool = {
       artistId = res.row.id;
       artistName = res.row.name;
     }
+    let groupName: string | null = null;
+    const group = str(args.group).trim();
+    if (group) {
+      const res = await resolveGroup(group);
+      if (!res.name) return { error: res.error, available_groups: res.available };
+      groupName = res.name;
+    }
     const tags = Array.isArray(args.tags)
       ? args.tags
           .map((t) => str(t).trim().toLowerCase())
@@ -1200,11 +1219,30 @@ const saveFact: AgentTool = {
       body: fact,
       tags,
       artistId,
+      groupName,
       createdBy: "chat",
     });
-    return { saved: true, id, title, artist: artistName };
+    return { saved: true, id, title, artist: artistName, group: groupName };
   },
 };
+
+/** Case-insensitive roster-group lookup ("glo gang" matches "glogang"); lists
+ * the real groups on a miss so the model can correct itself. */
+async function resolveGroup(
+  q: string,
+): Promise<{ name?: string; error?: string; available?: string[] }> {
+  const [rows] = await getPool().query<RowDataPacket[]>(
+    "SELECT DISTINCT group_name FROM artists WHERE group_name IS NOT NULL",
+  );
+  const groups = rows.map((r) => String(r.group_name));
+  const norm = (s: string) => s.toLowerCase().replace(/\s+/g, "");
+  const match = groups.find((g) => norm(g) === norm(q));
+  if (match) return { name: match };
+  return {
+    error: `No roster group matching "${q}".`,
+    available: groups,
+  };
+}
 
 const saveLink: AgentTool = {
   name: "save_link",
@@ -1216,6 +1254,7 @@ const saveLink: AgentTool = {
       url: { type: "string", description: "http(s) URL to save" },
       title: { type: "string", description: "Short title (defaults to the page title)" },
       artist: { type: "string", description: "Artist to attach (id or name)" },
+      group: { type: "string", description: "Roster group to attach (e.g. glogang)" },
       tags: {
         type: "array",
         items: { type: "string" },
@@ -1243,6 +1282,13 @@ const saveLink: AgentTool = {
       if (!res.row) return { error: res.error, suggestions: res.suggestions };
       artistId = res.row.id;
       artistName = res.row.name;
+    }
+    let groupName: string | null = null;
+    const group = str(args.group).trim();
+    if (group) {
+      const res = await resolveGroup(group);
+      if (!res.name) return { error: res.error, available_groups: res.available };
+      groupName = res.name;
     }
     const pool = getPool();
     const [existing] = await pool.query<RowDataPacket[]>(
@@ -1277,9 +1323,17 @@ const saveLink: AgentTool = {
       tags,
       sourceUrl: url,
       artistId,
+      groupName,
       createdBy: "chat",
     });
-    return { saved: true, id, title, artist: artistName, text_chars: page.text.length };
+    return {
+      saved: true,
+      id,
+      title,
+      artist: artistName,
+      group: groupName,
+      text_chars: page.text.length,
+    };
   },
 };
 

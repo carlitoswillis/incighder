@@ -38,6 +38,14 @@ async function artistExists(id: string): Promise<boolean> {
   return rows.length > 0;
 }
 
+async function groupExists(name: string): Promise<boolean> {
+  const [rows] = await pool.query<RowDataPacket[]>(
+    "SELECT 1 FROM artists WHERE group_name = ? LIMIT 1",
+    [name],
+  );
+  return rows.length > 0;
+}
+
 /** Exact case-insensitive name match — attach only when unambiguous. */
 async function artistIdByName(name: string): Promise<string | null> {
   const [rows] = await pool.query<RowDataPacket[]>(
@@ -55,6 +63,7 @@ export async function GET(request: Request) {
     const items = await searchKb({
       q: params.get("q") || undefined,
       artistId: params.get("artist_id") || undefined,
+      group: params.get("group") || undefined,
       kind: params.get("kind") || undefined,
       limit: Number.isFinite(limitRaw) ? limitRaw : undefined,
     });
@@ -77,6 +86,14 @@ export async function POST(request: Request) {
         : null;
     if (artistId && !(await artistExists(artistId))) {
       return NextResponse.json({ error: "Unknown artist_id" }, { status: 400 });
+    }
+
+    const groupName: string | null =
+      typeof body.group_name === "string" && body.group_name.trim()
+        ? body.group_name.trim()
+        : null;
+    if (groupName && !(await groupExists(groupName))) {
+      return NextResponse.json({ error: "Unknown group_name" }, { status: 400 });
     }
 
     let id: number;
@@ -111,6 +128,7 @@ export async function POST(request: Request) {
         tags: normalizeTags(body.tags, extraction.tags),
         sourceUrl: typeof body.source_url === "string" ? body.source_url : null,
         artistId,
+        groupName,
         fileName: fileName ?? null,
         fileMime: mime,
         fileSize: file.length,
@@ -128,6 +146,7 @@ export async function POST(request: Request) {
         tags: normalizeTags(body.tags),
         sourceUrl,
         artistId,
+        groupName,
         createdBy: "link",
       });
     } else {
@@ -147,6 +166,7 @@ export async function POST(request: Request) {
         summary: typeof body.summary === "string" && body.summary.trim() ? body.summary.trim() : null,
         tags: normalizeTags(body.tags),
         artistId,
+        groupName,
         createdBy: "manual",
       });
     }

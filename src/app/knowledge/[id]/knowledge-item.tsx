@@ -34,7 +34,12 @@ import {
 interface ArtistOption {
   id: string;
   name: string;
+  group_name?: string | null;
 }
+
+// The attach select holds either an artist id or a `g:<group>` value; the
+// API takes them as separate fields (see knowledge-browser).
+const GROUP_PREFIX = "g:";
 
 export default function KnowledgeItemDetail() {
   const params = useParams();
@@ -67,7 +72,9 @@ export default function KnowledgeItemDetail() {
         setForm({
           title: d.item.title || "",
           tags: d.item.tags || "",
-          artist_id: d.item.artist_id || "",
+          artist_id:
+            d.item.artist_id ||
+            (d.item.group_name ? `${GROUP_PREFIX}${d.item.group_name}` : ""),
         });
       } catch (e) {
         setError(e instanceof Error ? e.message : String(e));
@@ -80,13 +87,15 @@ export default function KnowledgeItemDetail() {
 
   useEffect(() => {
     if (!admin) return;
-    fetch("/api/artists")
+    // ?all=1 spans roster groups too — grouped artists (e.g. glogang) are
+    // otherwise excluded from the default list.
+    fetch("/api/artists?all=1")
       .then((r) => (r.ok ? r.json() : []))
       .then((rows: ArtistOption[]) =>
         setArtists(
           Array.isArray(rows)
             ? rows
-                .map((a) => ({ id: a.id, name: a.name }))
+                .map((a) => ({ id: a.id, name: a.name, group_name: a.group_name ?? null }))
                 .sort((a, b) => a.name.localeCompare(b.name))
             : [],
         ),
@@ -107,7 +116,12 @@ export default function KnowledgeItemDetail() {
             .map((s) => s.trim().toLowerCase())
             .filter(Boolean)
             .join(","),
-          artist_id: form.artist_id || null,
+          artist_id: form.artist_id.startsWith(GROUP_PREFIX)
+            ? null
+            : form.artist_id || null,
+          group_name: form.artist_id.startsWith(GROUP_PREFIX)
+            ? form.artist_id.slice(GROUP_PREFIX.length)
+            : null,
         }),
       });
       const d = await r.json();
@@ -186,11 +200,16 @@ export default function KnowledgeItemDetail() {
           </span>
         </div>
         <h1 className="text-2xl font-semibold tracking-tight">{item.title}</h1>
-        {(item.artist_name || tags.length > 0) && (
+        {(item.artist_name || item.group_name || tags.length > 0) && (
           <div className="flex flex-wrap items-center gap-1.5">
             {item.artist_id && item.artist_name && (
               <Link href={`/artists/${item.artist_id}`}>
                 <Badge>{item.artist_name}</Badge>
+              </Link>
+            )}
+            {item.group_name && (
+              <Link href={`/g/${item.group_name}`}>
+                <Badge>{item.group_name} (group)</Badge>
               </Link>
             )}
             {tags.map((t) => (
@@ -269,7 +288,7 @@ export default function KnowledgeItemDetail() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="kb-artist">Artist</Label>
+              <Label htmlFor="kb-artist">Attach to</Label>
               <select
                 id="kb-artist"
                 className={cn(selectClass, "w-full")}
@@ -279,9 +298,17 @@ export default function KnowledgeItemDetail() {
                 <option value="" className="bg-card">
                   None (general)
                 </option>
+                {[...new Set(artists.map((a) => a.group_name).filter(Boolean))]
+                  .sort()
+                  .map((g) => (
+                    <option key={String(g)} value={`${GROUP_PREFIX}${g}`} className="bg-card">
+                      {g} (group)
+                    </option>
+                  ))}
                 {artists.map((a) => (
                   <option key={a.id} value={a.id} className="bg-card">
                     {a.name}
+                    {a.group_name ? ` — ${a.group_name}` : ""}
                   </option>
                 ))}
               </select>

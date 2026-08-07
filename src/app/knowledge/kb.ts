@@ -16,6 +16,7 @@ export interface KbItemMeta {
   source_url: string | null;
   artist_id: string | null;
   artist_name: string | null;
+  group_name: string | null;
   file_name: string | null;
   file_mime: string | null;
   file_size: number | null;
