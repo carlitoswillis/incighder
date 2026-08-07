@@ -151,3 +151,4 @@ __pycache__/
 # local-only run notes
 RUNNING.local.md
 data-api/models/
+data-api/uploads/

@@ -41,11 +41,13 @@ function attachBody(value: string): Record<string, string> {
     : { artist_id: value };
 }
 
-// The API's hard cap is 4 MB decoded, but the file travels as base64 inside a
-// JSON body (~4/3× inflation) and Vercel rejects serverless request bodies
-// over ~4.5 MB before the route runs — so the effective client cap is 3 MB.
-const MAX_FILE_BYTES = 3 * 1024 * 1024;
-const MAX_FILE_LABEL = "3 MB";
+// Files ≤4 MB are stored in TiDB; bigger ones land on the data-api host's
+// disk (up to the API's 24 MB cap). Caveat: the deployed (Vercel) site
+// rejects request bodies over ~4.5 MB at the platform edge, so uploads over
+// ~3 MB only work when the app runs on the same machine as the data-api —
+// the platform 413 surfaces as a per-file error toast there.
+const MAX_FILE_BYTES = 24 * 1024 * 1024;
+const MAX_FILE_LABEL = "24 MB";
 
 function fileToB64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -294,8 +296,8 @@ export default function KnowledgeBrowser() {
                     Drop PDFs, decks or images here, or click to browse
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    Max {MAX_FILE_LABEL} — text is transcribed and summarized
-                    automatically
+                    Max {MAX_FILE_LABEL} ({"≤"}3 MB on the deployed site) —
+                    text is transcribed and summarized automatically
                   </p>
                 </>
               )}

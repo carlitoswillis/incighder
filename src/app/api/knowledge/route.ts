@@ -4,6 +4,7 @@ import { getPool } from "@/lib/db";
 import { isAdmin } from "@/lib/auth";
 import { getKbItem, insertKbItem, searchKb } from "@/lib/knowledge/db";
 import { extractFromFile, extractTextFromUrl } from "@/lib/knowledge/extract";
+import { dataApiHeaders, getDataApiUrl } from "@/lib/data-api";
 
 // GLO knowledgebase: search/list items and create new ones — file uploads
 // (vision-extracted), saved links (fetched + stripped), and manual facts.
@@ -14,8 +15,31 @@ export const dynamic = "force-dynamic";
 
 const pool = getPool();
 
-const MAX_FILE_BYTES = 4 * 1024 * 1024;
+// Files up to the blob cap are stored in TiDB (row-size limits apply above
+// that); bigger ones — up to MAX_FILE_BYTES — go to the data-api host's disk
+// via /kb_store, with only the extracted text kept in the DB. Note the
+// deployed (Vercel) site can't receive bodies over ~4.5MB at the platform
+// edge, so big uploads only work when the app runs on the same machine.
+const DB_BLOB_MAX = 4 * 1024 * 1024;
+const MAX_FILE_BYTES = 24 * 1024 * 1024;
 const KINDS = ["fact", "document", "image", "link"];
+
+async function storeBigFile(b64: string, fileName?: string): Promise<string> {
+  const url = await getDataApiUrl();
+  const res = await fetch(`${url}/kb_store`, {
+    method: "POST",
+    headers: dataApiHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify({ data_b64: b64, file_name: fileName ?? null }),
+    signal: AbortSignal.timeout(60_000),
+  });
+  const data = (await res.json().catch(() => ({}))) as { path?: string; error?: string };
+  if (!res.ok || !data.path) {
+    throw new Error(
+      data.error || `File is over 4 MB and the data-api file store is unavailable (${res.status})`,
+    );
+  }
+  return data.path;
+}
 
 function normalizeTags(tags: unknown, extra: string[] = []): string | null {
   const provided = Array.isArray(tags)
@@ -105,7 +129,7 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: "Empty file" }, { status: 400 });
       }
       if (file.length > MAX_FILE_BYTES) {
-        return NextResponse.json({ error: "File too large (4 MB max)" }, { status: 413 });
+        return NextResponse.json({ error: "File too large (24 MB max)" }, { status: 413 });
       }
       const mime =
         typeof body.file_mime === "string" && body.file_mime
@@ -113,7 +137,38 @@ export async function POST(request: Request) {
           : "application/octet-stream";
       const fileName = typeof body.file_name === "string" ? body.file_name : undefined;
 
-      const extraction = await extractFromFile({ b64, mime, fileName });
+      // Store the original first: an oversized file that can't be stored
+      // should fail fast, before a minute of extraction.
+      const filePath =
+        file.length > DB_BLOB_MAX ? await storeBigFile(b64, fileName) : null;
+
+      let extraction;
+      if (mime.startsWith("text/")) {
+        // Already text — no vision pass needed (a 6MB transcript would also
+        // blow the extraction model's limits). Cap what we index for search.
+        const text = file.toString("utf8").slice(0, 200_000);
+        extraction = {
+          title: fileName?.replace(/\.[^.]+$/, "") || "",
+          text,
+          summary: "",
+          tags: [],
+          suggestedArtist: null,
+        };
+      } else {
+        try {
+          extraction = await extractFromFile({ b64, mime, fileName });
+        } catch (err) {
+          // Don't leave an orphaned original on the data-api host when the
+          // item was never created.
+          if (filePath) {
+            fetch(
+              `${await getDataApiUrl()}/kb_file/${encodeURIComponent(filePath)}`,
+              { method: "DELETE", headers: dataApiHeaders(), signal: AbortSignal.timeout(10_000) },
+            ).catch(() => {});
+          }
+          throw err;
+        }
+      }
       if (!artistId && extraction.suggestedArtist) {
         artistId = await artistIdByName(extraction.suggestedArtist);
       }
@@ -132,7 +187,8 @@ export async function POST(request: Request) {
         fileName: fileName ?? null,
         fileMime: mime,
         fileSize: file.length,
-        file,
+        file: filePath ? null : file,
+        filePath,
         createdBy: "upload",
       });
     } else if (typeof body.source_url === "string" && body.source_url.trim()) {

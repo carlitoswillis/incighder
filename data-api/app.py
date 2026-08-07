@@ -104,6 +104,76 @@ _EXTRACT_SCHEMA = {
 }
 
 
+# Big knowledgebase originals live on this machine's disk, not in TiDB —
+# Vercel caps request bodies at ~4.5MB and TiDB caps row size, so files over
+# the blob threshold are stored here and only their extracted text is in the
+# DB. Filenames are opaque uuids; kb_items.file_path holds the basename.
+_KB_UPLOAD_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'uploads', 'kb')
+_KB_NAME_RE = None  # compiled lazily
+
+
+def _kb_safe_name(name):
+    global _KB_NAME_RE
+    import re as _re
+    if _KB_NAME_RE is None:
+        _KB_NAME_RE = _re.compile(r'^[A-Za-z0-9][A-Za-z0-9._-]*$')
+    return bool(name) and '..' not in name and bool(_KB_NAME_RE.match(name))
+
+
+@app.route('/kb_store', methods=['POST'])
+def kb_store():
+    """Store a large knowledgebase original on this machine's disk. Body:
+    {data_b64, file_name?}; reply {path, size} where path is the opaque
+    basename to persist in kb_items.file_path."""
+    import base64 as _base64
+    import uuid as _uuid
+    body = request.get_json(silent=True) or {}
+    data_b64 = body.get('data_b64')
+    if not isinstance(data_b64, str) or not data_b64:
+        return jsonify({'error': 'data_b64 required'}), 400
+    if len(data_b64) > 33 * 1024 * 1024:  # ~24MB decoded, base64-inflated
+        return jsonify({'error': 'file too large'}), 413
+    try:
+        data = _base64.b64decode(data_b64)
+    except Exception:
+        return jsonify({'error': 'data_b64 is not valid base64'}), 400
+    if not data:
+        return jsonify({'error': 'file is empty'}), 400
+    ext = os.path.splitext(str(body.get('file_name') or ''))[1][:16]
+    if not _kb_safe_name(f'x{ext}' if ext else 'x'):
+        ext = ''
+    name = f'{_uuid.uuid4().hex}{ext}'
+    os.makedirs(_KB_UPLOAD_DIR, exist_ok=True)
+    with open(os.path.join(_KB_UPLOAD_DIR, name), 'wb') as f:
+        f.write(data)
+    return jsonify({'path': name, 'size': len(data)}), 200
+
+
+@app.route('/kb_file/<name>', methods=['GET'])
+def kb_file(name):
+    """Serve a disk-stored knowledgebase original by its opaque basename.
+    The Next file route proxies this and applies auth + safe headers."""
+    if not _kb_safe_name(name):
+        return jsonify({'error': 'bad name'}), 400
+    path = os.path.join(_KB_UPLOAD_DIR, name)
+    if not os.path.isfile(path):
+        return jsonify({'error': 'not found'}), 404
+    with open(path, 'rb') as f:
+        data = f.read()
+    return app.response_class(data, mimetype='application/octet-stream')
+
+
+@app.route('/kb_file/<name>', methods=['DELETE'])
+def kb_file_delete(name):
+    """Remove a disk-stored original (called when its kb item is deleted)."""
+    if not _kb_safe_name(name):
+        return jsonify({'error': 'bad name'}), 400
+    path = os.path.join(_KB_UPLOAD_DIR, name)
+    if os.path.isfile(path):
+        os.unlink(path)
+    return jsonify({'ok': True}), 200
+
+
 # Enforced shape of a /web_search reply (mirrors WEB_SEARCH_SCHEMA in
 # src/lib/agent/web-search.ts).
 _WEB_SEARCH_SCHEMA = {

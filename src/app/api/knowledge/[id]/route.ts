@@ -3,6 +3,7 @@ import { RowDataPacket } from "mysql2/promise";
 import { getPool } from "@/lib/db";
 import { isAdmin } from "@/lib/auth";
 import { deleteKbItem, getKbItem, updateKbItem } from "@/lib/knowledge/db";
+import { dataApiHeaders, getDataApiUrl } from "@/lib/data-api";
 
 const pool = getPool();
 
@@ -116,8 +117,26 @@ export async function DELETE(
   if (!(await isAdmin())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { id } = await context.params;
   try {
+    // Originals over the blob cap live on the data-api host — clean that
+    // file up too (best-effort; an unreachable data-api shouldn't block the
+    // DB delete).
+    const [rows] = await pool.query<RowDataPacket[]>(
+      "SELECT file_path FROM kb_items WHERE id = ?",
+      [Number(id)],
+    );
+    const filePath = rows.length ? rows[0].file_path : null;
     const ok = await deleteKbItem(Number(id));
     if (!ok) return NextResponse.json({ error: "Item not found" }, { status: 404 });
+    if (filePath) {
+      try {
+        await fetch(
+          `${await getDataApiUrl()}/kb_file/${encodeURIComponent(String(filePath))}`,
+          { method: "DELETE", headers: dataApiHeaders(), signal: AbortSignal.timeout(10_000) },
+        );
+      } catch (cleanupErr) {
+        console.error("Orphaned kb file on data-api host:", filePath, cleanupErr);
+      }
+    }
     return NextResponse.json({ ok: true });
   } catch (e) {
     console.error("Knowledge item delete failed:", e);

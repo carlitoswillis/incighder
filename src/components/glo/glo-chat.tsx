@@ -166,8 +166,8 @@ export function GloChat({ onClose }: { onClose: () => void }) {
 
   const uploadDoc = useCallback(
     async (file: File) => {
-      if (file.size > 3 * 1024 * 1024) {
-        toast.error("Max 3 MB from chat — use the Knowledge page for larger files.");
+      if (file.size > 24 * 1024 * 1024) {
+        toast.error("Max 24 MB — that file is too large to save.");
         return;
       }
       setUploading(true);

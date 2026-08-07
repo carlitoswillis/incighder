@@ -48,7 +48,9 @@ export const KB_TABLE_DDL = `CREATE TABLE IF NOT EXISTS kb_items (
     file_name VARCHAR(255) NULL,
     file_mime VARCHAR(128) NULL,
     file_size INT NULL,
-    file LONGBLOB NULL,                 -- original upload, capped ~4MB
+    file LONGBLOB NULL,                 -- original upload ≤4MB (TiDB row cap)
+    file_path VARCHAR(255) NULL,        -- >4MB originals: basename on the
+                                        -- data-api host (uploads/kb/)
     created_by VARCHAR(32) NULL,        -- 'chat' | 'upload' | 'link' | 'manual'
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -221,13 +223,14 @@ export async function insertKbItem(item: {
   fileMime?: string | null;
   fileSize?: number | null;
   file?: Buffer | null;
+  filePath?: string | null;
   createdBy?: string | null;
 }): Promise<number> {
   const pool = getPool();
   const sql = `INSERT INTO kb_items
       (kind, title, body, summary, tags, source_url, artist_id, group_name,
-       file_name, file_mime, file_size, file, created_by)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+       file_name, file_mime, file_size, file, file_path, created_by)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
   const values = [
     item.kind,
     item.title,
@@ -241,6 +244,7 @@ export async function insertKbItem(item: {
     item.fileMime ?? null,
     item.fileSize ?? null,
     item.file ?? null,
+    item.filePath ?? null,
     item.createdBy ?? null,
   ];
   try {

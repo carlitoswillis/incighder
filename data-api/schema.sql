@@ -145,7 +145,9 @@ CREATE TABLE IF NOT EXISTS kb_items (
     file_name VARCHAR(255) NULL,
     file_mime VARCHAR(128) NULL,
     file_size INT NULL,
-    file LONGBLOB NULL,                 -- original upload, capped ~4MB
+    file LONGBLOB NULL,                 -- original upload ≤4MB (TiDB row cap)
+    file_path VARCHAR(255) NULL,        -- >4MB originals: basename on the
+                                        -- data-api host (uploads/kb/)
     created_by VARCHAR(32) NULL,        -- 'chat' | 'upload' | 'link' | 'manual'
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
