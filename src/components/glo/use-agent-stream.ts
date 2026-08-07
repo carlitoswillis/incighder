@@ -105,6 +105,13 @@ export function useAgentStream() {
     }
   }, []);
 
+  /** Append a local assistant note (no server turn) — e.g. an upload
+   * confirmation. It persists into the transcript, so later turns' history
+   * tells the model what was added. */
+  const note = useCallback((content: string) => {
+    setTranscript((t) => [...t, { role: "assistant", content }]);
+  }, []);
+
   /** Patch the trailing assistant item (the one currently streaming). */
   const patchLast = useCallback(
     (fn: (item: TranscriptItem) => TranscriptItem) => {
@@ -250,5 +257,5 @@ export function useAgentStream() {
     [patchLast],
   );
 
-  return { transcript, streaming, send, stop, clear };
+  return { transcript, streaming, send, stop, clear, note };
 }

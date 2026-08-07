@@ -9,6 +9,7 @@ import {
   Headphones,
   Loader2,
   Mic,
+  Paperclip,
   SendHorizontal,
   Sparkles,
   Volume2,
@@ -113,7 +114,7 @@ export function GloChat({ onClose }: { onClose: () => void }) {
   const pathname = usePathname();
   const context = useMemo(() => contextFromPathname(pathname ?? "/"), [pathname]);
 
-  const { transcript, streaming, send, clear } = useAgentStream();
+  const { transcript, streaming, send, clear, note } = useAgentStream();
   const speaker = useSpeaker();
   const [input, setInput] = useState("");
   const [artistName, setArtistName] = useState<string | null>(null);
@@ -155,6 +156,58 @@ export function GloChat({ onClose }: { onClose: () => void }) {
       });
     },
     [streaming, send, context],
+  );
+
+  // Paperclip → knowledgebase: uploads go through the same extraction flow as
+  // the /knowledge page, attached to the current page's artist when there is
+  // one. Extraction runs a vision model, so this can take a minute.
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const uploadDoc = useCallback(
+    async (file: File) => {
+      if (file.size > 3 * 1024 * 1024) {
+        toast.error("Max 3 MB from chat — use the Knowledge page for larger files.");
+        return;
+      }
+      setUploading(true);
+      try {
+        const b64 = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(String(reader.result).replace(/^data:[^,]*,/, ""));
+          reader.onerror = () => reject(new Error("Could not read the file."));
+          reader.readAsDataURL(file);
+        });
+        const res = await fetch("/api/knowledge", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            file_b64: b64,
+            file_mime: file.type || "application/octet-stream",
+            file_name: file.name,
+            ...(context?.artistId ? { artist_id: context.artistId } : {}),
+          }),
+        });
+        const data = (await res.json().catch(() => null)) as {
+          item?: { id: number; title: string; artist_name: string | null };
+          error?: string;
+        } | null;
+        if (!res.ok || !data?.item) {
+          throw new Error(data?.error || `Upload failed (${res.status}).`);
+        }
+        note(
+          `Saved **${data.item.title}** to the knowledgebase` +
+            (data.item.artist_name ? `, attached to ${data.item.artist_name}` : "") +
+            ` (item #${data.item.id}). Ask me about it any time.`,
+        );
+        toast.success("Saved to the knowledgebase");
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Upload failed.");
+      } finally {
+        setUploading(false);
+      }
+    },
+    [context, note],
   );
 
   const voice = useSpeechInput({
@@ -343,6 +396,32 @@ export function GloChat({ onClose }: { onClose: () => void }) {
           aria-label="Message GLO"
           className="max-h-28 min-h-9 flex-1 resize-none rounded-lg border border-input bg-background/50 px-3 py-2 text-sm outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
         />
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="application/pdf,image/*,text/plain,text/markdown,text/csv"
+          className="hidden"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            e.target.value = "";
+            if (file) void uploadDoc(file);
+          }}
+        />
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          aria-label="Save a document to the knowledgebase"
+          disabled={uploading || streaming}
+          onClick={() => fileInputRef.current?.click()}
+          className="shrink-0 text-muted-foreground"
+        >
+          {uploading ? (
+            <Loader2 className="animate-spin motion-reduce:animate-none" />
+          ) : (
+            <Paperclip />
+          )}
+        </Button>
         {voice.supported && (
           <Button
             type="button"
