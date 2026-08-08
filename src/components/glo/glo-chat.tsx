@@ -337,7 +337,7 @@ export function GloChat({ onClose }: { onClose: () => void }) {
       </div>
 
       {/* Transcript */}
-      <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
+      <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-3">
         {transcript.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center gap-4 px-4 text-center">
             <Sparkles className="size-6 text-primary" aria-hidden />
@@ -394,7 +394,9 @@ export function GloChat({ onClose }: { onClose: () => void }) {
             voice.listening ? "Listening…" : voice.processing ? "Transcribing…" : "Ask GLO…"
           }
           aria-label="Message GLO"
-          className="max-h-28 min-h-9 flex-1 resize-none rounded-lg border border-input bg-background/50 px-3 py-2 text-sm outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+          // text-base on mobile: iOS auto-zooms the page when focusing any
+          // input whose font-size is under 16px, which is half the "weird UI"
+          className="max-h-28 min-h-9 flex-1 resize-none rounded-lg border border-input bg-background/50 px-3 py-2 text-base outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 sm:text-sm"
         />
         <input
           ref={fileInputRef}
