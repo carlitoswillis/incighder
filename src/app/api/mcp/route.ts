@@ -48,7 +48,12 @@ function authorized(request: Request): boolean {
   const token = process.env.MCP_TOKEN || "";
   if (!token) return false; // fail closed when MCP_TOKEN is unset
   const header = request.headers.get("authorization") || "";
-  const presented = header.startsWith("Bearer ") ? header.slice(7) : "";
+  // claude.ai custom connectors (web/mobile/desktop chat app) can't send auth
+  // headers, so the token is also accepted as a ?token= query param. URLs can
+  // end up in request logs, so rotate MCP_TOKEN if the URL ever leaks.
+  const presented = header.startsWith("Bearer ")
+    ? header.slice(7)
+    : new URL(request.url).searchParams.get("token") || "";
   const a = Buffer.from(presented);
   const b = Buffer.from(token);
   return a.length === b.length && timingSafeEqual(a, b);
