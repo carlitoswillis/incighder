@@ -1,49 +1,43 @@
 # Incighder
 
-Incighder is a professional data application designed to help recording artists, A&Rs, and music labels understand an artist's online traction, audience reach, and growth trajectory. By aggregating public metrics from key music and social platforms, Incighder provides a holistic view of artist performance and traction over time.
+Incighder is a roster-intelligence platform for artist managers, A&Rs, and labels: it aggregates public metrics from the key music and social platforms, tracks how they move over time, and turns them into growth analytics, traction scores, and shareable reports. Live at **[incighder.vercel.app](https://incighder.vercel.app)**.
+
+Visitors browse the public roster read-only. The advanced surface — the GLO assistant, the knowledgebase, scraping controls, and the MCP endpoint — is admin-only and documented separately in **[`ADMIN.md`](ADMIN.md)**.
 
 ---
 
 ## Key Features
 
 - **Multi-Platform Metric Harvesting**:
-  - **Spotify**: Collects follower counts, popularity scores, genres, and top tracks (Web API), plus monthly listeners (via the scrape.do render API).
-  - **YouTube**: Fetches subscriber counts, lifetime video views, video counts, and details of their top-performing video (using the official YouTube Data API v3).
-  - **SoundCloud**: Resolves profile URLs to extract follower counts, total tracks, and top track statistics.
-  - **Instagram**: Retrieves follower counts and verified status.
-  - **TikTok**: Collects follower counts, total likes, and video counts.
-  - **X (Twitter)**: Supports manual input of followers to respect login-wall restrictions.
-- **Anti-Ban Scraping Architecture**:
-  - Implements a strict **24-hour cache TTL** (per platform) to keep traffic minimal.
-  - Throttles requests sequentially with random jitter (delay range configurable).
-  - Employs realistic headers, per-host serialization, and automatic backoffs (`429`/`403`). HTTP-only — no headless browser.
-  - Graceful degradation: A failure on one platform never blocks the retrieval of data from other platforms.
-- **Artist Discovery** (`/discover`):
-  - Enter a seed artist and get a grid of **similar artists** to scout, powered by the free **Last.fm `getSimilar`** graph (Spotify's related-artists API was retired in late 2024).
-  - Each result is enriched with Spotify metrics (followers, popularity, top track) plus Last.fm global listeners, playcount, and tags, and shows a similarity match score.
-  - **One-click "Track"** ingests any similar artist into the dataset via the existing insert pipeline; artists you already track are marked so you only add what's new.
-- **Auto-Discovery & AI Verification**:
-  - Automatically searches for and suggests official YouTube channels and SoundCloud profiles.
-  - For Instagram and TikTok, runs a free **web search** (Google Programmable Search) for the artist on that platform and collects real candidate profiles — so it finds accounts even when the handle differs from the artist's name (a preferred handle was taken, stage vs. legal name, etc.), which a blind name-guess never could.
-  - Uses **Google Gemini** (`gemini-2.5-flash`) to inspect each candidate's profile metadata/preview and decide whether it belongs to the artist (`match` / `uncertain` / `mismatch`); the best match is auto-filled and the runners-up are offered as **alternates** you can switch to in one click.
+  - **Spotify**: followers, popularity, genres, top tracks (Web API), plus monthly listeners (via the scrape.do render API — the one JS-gated metric).
+  - **YouTube**: subscribers, lifetime views, video counts, top video (YouTube Data API v3), plus recent uploads with per-video views/likes/comments.
+  - **Instagram**: followers, post counts, verified status, and recent-post engagement — with an exact-count fallback for schema-broken business profiles.
+  - **TikTok**: followers, total likes, video counts.
+  - **SoundCloud**: followers, track counts, top track plays.
+  - **Twitch**: followers (keyless web GQL).
+  - **X (Twitter)**: manual follower entry (login wall).
+- **Anti-Ban Scraping Architecture**: strict 24h per-platform cache TTL, per-host throttling with jitter, realistic headers, automatic backoffs, HTTP-only (no headless browser), and graceful per-platform degradation — one platform failing never blocks the rest. Partial scrapes are retried instead of losing a day.
+- **Artist Discovery** (`/discover`): seed an artist, get similar artists (Last.fm `getSimilar`) enriched with Spotify/Last.fm metrics; one-click "Track" ingests any of them.
+- **Auto-Discovery & AI Verification**: finds official YouTube/SoundCloud/Instagram/TikTok profiles by search (Google Programmable Search), then AI-verifies each candidate (Gemini) before auto-filling — with one-click alternates.
 - **Historical Growth Analytics**:
-  - Automatically captures account-keyed metric snapshots in the database when new data is pulled.
-  - A background **auto-scrape scheduler** sweeps all tracked artists on a recurring interval (default 24h, TTL-respected), so growth history accrues without manual scraping.
-  - Renders inline metric sparklines on the dashboard.
-  - Features a dedicated historical section showing growth trends since tracking began.
-- **Modern Sleek Design System**:
-  - A responsive dark slate and cyan visual identity powered by Next.js, Tailwind CSS, and shadcn-inspired components.
+  - Account-keyed metric snapshots on every scrape; a background scheduler sweeps the roster nightly (concurrent, TTL-respecting).
+  - **Windowed growth**: pick a From/To range and every chart, delta, and sparkline scopes to it; prior-window comparison shows acceleration vs deceleration.
+  - **Cross-platform traction score** (0–100) with weekly momentum.
+  - Post-level analytics: per-platform engagement medians and outlier detection (posts performing at a multiple of the artist's median).
+- **Events & Attribution**: track releases, shows, videos, and posts (attachable to multiple artists) with before/after audience impact in a 14-day window — framed honestly as correlation.
+- **Reports**: print/PDF-ready per-artist and per-group traction reports (masthead, ledger with deltas + sparklines, footprint), viewable as of any snapshot day and shareable by URL.
+- **Roster Groups**: artists can be grouped (e.g. a label's sub-roster) with their own `/g/<group>` pages and group-scoped reports; grouped artists stay off the main list.
+- **Public/Private Curation**: each artist is individually toggleable; visitors only ever see public artists.
 
 ---
 
 ## Technical Stack
 
-- **Frontend**: Next.js 15 (React 19, TypeScript, Tailwind CSS, Lucide icons, shadcn UI components) — a **flat app at the repo root**, Vercel-ready.
-- **Backend Orchestrator**: Next.js API Routes. DB access and Spotify search are **native TypeScript** (`mysql2`); the remaining scraping/discovery endpoints proxy to the Python service via `DATA_API_URL`.
-- **Data API Service**: Python (Flask + gunicorn on :5050, Spotipy, `PyMySQL`, BeautifulSoup4, Lxml, requests). **HTTP-only — no headless browser.**
-- **Database**: MySQL 8.4 (local via Homebrew `mysql@8.4`).
-- **AI Verification**: Google Gemini (`gemini-2.5-flash`).
-- **Spotify monthly listeners**: the [scrape.do](https://scrape.do) render API (the one JS-gated metric a browser-free fetch can't get).
+- **Frontend**: Next.js 15 (App Router, React 19, TypeScript, Tailwind CSS, shadcn-style components) — a **flat app at the repo root**, deployed on **Vercel**.
+- **Backend Orchestrator**: Next.js API routes. DB access, Spotify search, history, and the agent/knowledge surfaces are **native TypeScript** (`mysql2`); scraping/discovery endpoints proxy to the Python service.
+- **Data API Service**: Python (Flask + gunicorn on :5050) — scraping, discovery, AI verification, and local voice/LLM bridges. Runs on a home Mac (residential IP scrapes more reliably); reached from the deployed site through a self-healing cloudflared tunnel (`./go_live.sh`).
+- **Database**: **TiDB Cloud Serverless** (MySQL-compatible) in production via a single `DATABASE_URL`; local MySQL 8.4 works for offline dev. Tables: `artists`, `metric_snapshots`, `artist_posts`, `events`, `kb_items`, `app_config`.
+- **AI**: Google Gemini (`gemini-2.5-flash`) verifies discovered profiles. The GLO assistant and knowledge extraction run Claude-first — see `ADMIN.md`.
 - **Run**: native, **no Docker** (`./start_dev.sh`).
 
 ---
@@ -52,142 +46,91 @@ Incighder is a professional data application designed to help recording artists,
 
 ```mermaid
 graph TD
-    Browser[Client Browser] -->|HTTP / JSON| NextJS[Next.js App Router - flat, repo root]
-    NextJS -->|mysql2| DB[(MySQL 8.4)]
+    Browser[Client Browser] -->|HTTP / JSON| NextJS[Next.js App - Vercel, repo root]
+    NextJS -->|mysql2| DB[(TiDB Serverless / MySQL)]
     NextJS -->|Spotify Web API| SpotifySearch[Spotify search - native TS]
-    NextJS -->|DATA_API_URL proxy| Flask[Flask Data API :5050]
+    NextJS -->|tunnel URL from app_config| Flask[Flask data-api on the home Mac :5050]
     Flask -->|PyMySQL| DB
 
     subgraph Scrapers [Python Scrapers - HTTP only]
         Flask --> Spotipy[Spotify Web API]
-        Flask --> ScrapeDo[scrape.do render → monthly listeners]
+        Flask --> ScrapeDo[scrape.do render - monthly listeners]
         Flask --> YouTubeAPI[YouTube Data API v3]
-        Flask --> Requests[SoundCloud / IG / TikTok HTTP]
+        Flask --> Requests[SoundCloud / IG / TikTok / Twitch HTTP]
     end
 
-    Flask -->|Validate Guess| Gemini[Google Gemini 2.5 Flash]
+    Flask -->|Verify profile| Gemini[Google Gemini 2.5 Flash]
 ```
+
+The deployed site reads and edits the shared DB on its own; scrape/refresh/discover need the home data-api, discovered dynamically through the DB (`./go_live.sh` publishes the tunnel URL — no redeploy needed). When the Mac is offline the site shows an amber banner and keeps working read/write.
 
 ---
 
-## Setup and Running the Application
+## Setup and Running
 
 ### Prerequisites (macOS, native — no Docker)
 
-- [Homebrew](https://brew.sh/) — for MySQL: `brew install mysql@8.4`
 - Node 18+ and Python 3.12 (`brew install python@3.12`)
-- Git
+- Optional for offline dev: local MySQL (`brew install mysql@8.4`) — skipped when `DATABASE_URL` points at a hosted DB
 
-### 1. Clone the Repository
+### 1. Configure Environment Variables
 
-```bash
-git clone [YOUR_REPOSITORY_URL]
-cd incighder
-```
-
-### 2. Configure Environment Variables
-
-Create a `.env` file in the root of the project:
+Copy `.env.example` to `.env` and fill in what you have. The core public-feature vars:
 
 ```env
-# Spotify API Credentials (Required for search & initial metadata)
-SPOTIFY_CLIENT_ID=your_spotify_client_id
-SPOTIFY_CLIENT_SECRET=your_spotify_client_secret
+# Database — hosted MySQL (TiDB Serverless) or local
+DATABASE_URL=mysql://USER:PASSWORD@HOST:4000/incighder?sslmode=require
 
-# YouTube Data API Key (Required for YouTube scraping & channel discovery)
-YOUTUBE_API_KEY=your_youtube_api_key
+# Spotify API (search & metadata)
+SPOTIFY_CLIENT_ID=...
+SPOTIFY_CLIENT_SECRET=...
 
-# Last.fm API Key (Required for the /discover similar-artists feature)
-LAST_FM_API_KEY=your_lastfm_api_key
+# YouTube Data API (YouTube scraping & discovery)
+YOUTUBE_API_KEY=...
 
-# Google Gemini (Required for AI-verified auto-discovery — gemini-2.5-flash)
-GOOGLE_AI_API_KEY=your_google_ai_api_key
+# Last.fm (discover / similar artists / bios)
+LAST_FM_API_KEY=...
 
-# scrape.do render API (Required for Spotify monthly listeners — the one metric
-# that needs a rendered browser, which scrape.do provides over HTTP)
-SCRAPE_DO_TOKEN=your_scrape_do_token
+# Google Gemini (AI-verified discovery)
+GOOGLE_AI_API_KEY=...
 
-# Instagram session cookie (Optional but recommended; the `sessionid` cookie from
-# instagram.com makes the IG follower lookup reliable instead of login-walled)
-IG_SESSIONID=your_instagram_sessionid_cookie
+# scrape.do render API (Spotify monthly listeners)
+SCRAPE_DO_TOKEN=...
 
-# Google Programmable Search (Optional; powers search-backed Instagram/TikTok
-# auto-discovery. Without it, discovery falls back to a name-slug guess.)
-GOOGLE_CSE_KEY=your_google_api_key
-GOOGLE_CSE_ID=your_cse_cx_id
-
-# Database (Optional; defaults shown — local MySQL)
-DB_HOST=127.0.0.1
-DB_PORT=3306
-DB_USER=incighder
-DB_PASSWORD=password
-DB_NAME=incighder
-
-# Data API base URL the frontend proxies to (Optional; default localhost:5050.
-# Set to a public URL when the data-api is hosted separately, e.g. on Vercel.)
-DATA_API_URL=http://127.0.0.1:5050
-
-# Scraping Throttle Configuration (Optional; defaults to 2.0s and 6.0s)
-SCRAPE_THROTTLE_MIN=2.0
-SCRAPE_THROTTLE_MAX=6.0
-
-# Auto-scrape scheduler (Optional; defaults to a 24h sweep interval)
-AUTO_SCRAPE_INTERVAL_HOURS=24
+# Optional: IG_SESSIONID, GOOGLE_CSE_KEY/GOOGLE_CSE_ID (search-backed discovery),
+# SCRAPE_THROTTLE_MIN/MAX, AUTO_SCRAPE_INTERVAL_HOURS, DATA_API_PORT, WEB_PORT
 ```
 
-### 3. Running the Application
+Auth, GLO, and MCP env vars are covered in [`ADMIN.md`](ADMIN.md).
 
-One command brings up everything (MySQL, the data-api, and the frontend):
+### 2. Run
 
 ```bash
-./start_dev.sh
+./start_dev.sh    # data-api (:5050) + frontend (:3000); local MySQL only if no DATABASE_URL
 ```
 
-On first run it creates the Python venv, installs deps, and applies the schema. Once up, the frontend is at [http://localhost:3000](http://localhost:3000) and the data-api at `:5050`.
+First run creates the Python venv, installs deps, and applies the schema (idempotent — `apply_schema.py` never drops data; destructive resets require `--reset` plus typed confirmation).
 
-First-time MySQL setup (create the DB + user once):
-
-```sql
-CREATE DATABASE incighder CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-CREATE USER 'incighder'@'localhost' IDENTIFIED BY 'password';
-GRANT ALL PRIVILEGES ON incighder.* TO 'incighder'@'localhost';
-```
-
-#### Database Schema Application (First-time Setup or Reset)
-To wipe and reset the schema:
-
-```bash
-cd data-api && ./.venv/bin/python apply_schema.py
-```
-
-### 4. Running pieces individually
-
-- **Frontend only**: `npm run dev` (at the repo root)
-- **Data API only**: from `data-api/`, run the venv gunicorn (see `start_dev.sh`)
-- **Scheduler** (optional auto-scrape): `cd data-api && ./.venv/bin/python scheduler.py`
-
-### Deploying to Vercel
-
-The frontend is a flat project Vercel auto-detects. For a live deploy you'll need a **hosted MySQL** (set the `DB_*` env vars) and either a **hosted data-api** (set `DATA_API_URL`) or the remaining endpoints ported to TS. See `ai/PROJECT_STATE.md` for the deep tech-debt around datacenter-IP scraping limits.
-
+Pieces individually: `npm run dev` (frontend), venv gunicorn in `data-api/` (API), `./.venv/bin/python scheduler.py` (nightly sweep). For serving the live site's scraping from your Mac: `./go_live.sh` (see `DEPLOY.md`).
 
 ---
 
 ## Usage Guide
 
-- **Home Page (`/`)**: Displays card layouts of all tracked artists, showcasing their key indicators (Spotify popularity, followers, top track metrics) and visual sparklines showing metric history.
-- **Table View (`/table`)**: A spreadsheet-style breakdown displaying all platform follower counts side-by-side. Sortable by platform metrics.
-- **Discover (`/discover`)**: Enter a seed artist to surface similar artists (Last.fm) enriched with Spotify and Last.fm metrics; one-click "Track" adds any of them to the dataset, with already-tracked artists marked.
-- **Add Artist (`/artists/add`)**: Search for an artist on Spotify and ingest their baseline metrics into the local MySQL database, or add an artist manually when they aren't on Spotify.
-- **Artist Detail (`/artists/[id]`)**:
-  - Displays detailed stats grids and a track summary, with inline editing of artist fields and the option to remove a tracked artist.
-  - Shows growth metrics and a history panel tracing historical subscriber metrics.
-  - **Sources & Scraping Control Panel**: Paste platform profile URLs, trigger auto-discovery, or invoke a manually-triggered scrape (which obeys the 24h TTL or bypasses it with a "Force Refresh" toggle). Displays the success or error status of the latest scrapers.
+- **Home (`/`)**: cards for all tracked (ungrouped) artists — key metrics, traction score, sparklines.
+- **Table (`/table`)**: sortable spreadsheet view of every platform metric side by side.
+- **Groups (`/g/<group>`)**: a group's own roster page and report.
+- **Discover (`/discover`)**: similar-artist scouting with one-click tracking.
+- **Artist Detail (`/artists/[id]`)**: stat grids, windowed growth charts with accessible table view, events with impact, post-level outliers, bio, and (admin) the sources/scraping control panel.
+- **Reports (`/artists/[id]/report`, `/g/<group>/report`)**: print-ready traction one-sheets, rewindable to any snapshot date.
+
+Everything mutating — adding, editing, scraping, events, exports — is behind the admin gate: see **[`ADMIN.md`](ADMIN.md)**.
 
 ---
 
-## Future Enhancements (Roadmap)
+## Roadmap
 
-- **Bulk Artist Import**: Ingest a batch of artist names or Spotify IDs in a single operation.
-- **Data Exporting**: Export metric sets to CSV or JSON formats for custom analysis.
-- **Weighted Analytics Score**: Combine metrics from all platforms into a single weighted health/traction score.
+- Change/threshold alerts (notify when a metric jumps or stalls)
+- Playlist and chart tracking
+- Discovery seeded from a tracked artist's audience graph
+- Manager mode: real multi-user auth replacing the passphrase gate

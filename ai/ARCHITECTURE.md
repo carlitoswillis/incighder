@@ -3,7 +3,7 @@
 PURPOSE: Technical system design and data flow of the Incighder application.
 
 ## Overview
-Incighder aggregates and visualizes artist audience metrics from music and social platforms. It is a **flat Next.js app** (repo root) backed by **MySQL**, with a Python `data-api` for the heavy scraping/discovery work. **No Docker** — everything runs natively (`./start_dev.sh`), and the frontend is structured to deploy to **Vercel** as a single project.
+Incighder aggregates and visualizes artist audience metrics from music and social platforms. It is a **flat Next.js app** (repo root) backed by **TiDB Cloud Serverless in production** (MySQL-compatible, via `DATABASE_URL`; local MySQL 8.4 for offline dev), with a Python `data-api` on the home Mac for the heavy scraping/discovery work plus local LLM/voice bridges. **No Docker** — everything runs natively (`./start_dev.sh`), and the frontend deploys to **Vercel** (live at incighder.vercel.app). Three attached subsystems ride on the same DB and repo: the **GLO agent** (in-app chat/voice analyst), the **knowledgebase** (org memory GLO reads and writes), and the **MCP endpoint** (the same tool registry exposed to external Claude clients) — see components 6–8.
 
 > Migration note (2026-06-29): the app was de-dockerized, moved Postgres→MySQL, flattened out of the old `incighder/incighder/` nesting to the repo root, dropped Playwright/Chromium (all scrapers are now HTTP), and swapped Ollama→Gemini. See `PROJECT_STATE.md` history.
 
@@ -29,9 +29,9 @@ Incighder aggregates and visualizes artist audience metrics from music and socia
 - **Auto-discovery (`scrapers/discovery.py`)**: finds official profiles for an artist name. YouTube/SoundCloud use native search; IG/TikTok use a free web search (`web_search.py` → Google Programmable Search, `GOOGLE_CSE_KEY`/`GOOGLE_CSE_ID` if set, else a name-slug fallback), then AI-verifies candidates.
 - **AI verification (`ai_verify.py`)**: cross-checks discovered IG/TikTok profiles using **Google Gemini** (`gemini-2.5-flash` via `GOOGLE_AI_API_KEY`). Returns `{match, confidence, reason}`. Best-effort — if unavailable the guess is kept unverified.
 
-### 3. Database (MySQL 8.4)
-- **Role**: Source of truth for all artist metrics and history. Local install via Homebrew `mysql@8.4`; DB `incighder`, user `incighder`.
-- **Master schema**: `data-api/schema.sql` (MySQL DDL — `JSON` columns, `AUTO_INCREMENT`, `TIMESTAMP DEFAULT CURRENT_TIMESTAMP`, table-level `FOREIGN KEY`s on InnoDB). Tables: `artists`, `albums`, `tracks`, `metric_snapshots`.
+### 3. Database (TiDB Serverless prod / MySQL 8.4 local)
+- **Role**: Source of truth for all artist metrics, history, events, posts, and knowledge. Production: TiDB Cloud Serverless via `DATABASE_URL`; local dev fallback: Homebrew `mysql@8.4`, DB/user `incighder`.
+- **Master schema**: `data-api/schema.sql` (MySQL DDL — `JSON` columns, `AUTO_INCREMENT`, `TIMESTAMP DEFAULT CURRENT_TIMESTAMP`, table-level `FOREIGN KEY`s). Tables: `artists`, `albums`, `tracks`, `metric_snapshots`, `events` (+ `event_artists`), `artist_posts` (per-post engagement; collation pinned utf8mb4_unicode_ci for the FK), `kb_items` (knowledgebase), `app_config` (published tunnel URL). TiDB quirk: no FULLTEXT — kb search is LIKE-based.
 - **Growth tracking**: `metric_snapshots(artist_id, platform, account_key, value, captured_at)`. `account_key` ties a point to the specific linked profile so account switches start a fresh timeline. Big counts are `BIGINT`.
 - **Applying schema**: `./.venv/bin/python apply_schema.py` from `data-api/` — **idempotent** (`CREATE TABLE IF NOT EXISTS`; existing data untouched), so `start_dev.sh` safely runs it on every boot. Destructive rebuild: `apply_schema.py --reset` (interactive confirmation, or `APPLY_SCHEMA_RESET_CONFIRM=yes`). History: the old drop-and-recreate default silently wiped all data on every dev start — that was the recurring "DB lost everything" bug. There is no incremental-migration framework yet (see tech-debt backlog).
 - **Connection config (all three runtimes)**: `DATABASE_URL` (`mysql://user:pass@host:port/db?sslmode=require`) wins; `DB_HOST`/`DB_PORT`/`DB_USER`/`DB_PASSWORD`/`DB_NAME`/`DB_SSL` fill gaps; defaults target local MySQL. Implemented once per runtime: `src/lib/db.ts` (`getPool()` — single shared mysql2 pool), `scripts/db-config.mjs`, `_db_config()` in `data-api/scrapeArtistData.py` (PyMySQL, TLS via certifi). Point `DATABASE_URL` at a hosted MySQL (TiDB Serverless/Aiven) and the whole stack follows — see `DEPLOY.md`.
@@ -42,6 +42,21 @@ Incighder aggregates and visualizes artist audience metrics from music and socia
 
 ### 5. Scheduler (auto-scrape worker — `data-api/scheduler.py`)
 - Optional recurring metric pulls. Runs `python scheduler.py` (its own process) — a sleep/sweep loop that every `AUTO_SCRAPE_INTERVAL_HOURS` (default 24) calls `scrape_service.scrape_all(force=False)`. TTL means only stale platforms refetch; each sweep appends `metric_snapshots`.
+
+### 6. GLO agent (in-app analyst — `src/lib/agent/`, `src/components/glo/`)
+- **Surface**: floating widget on every page (full-screen sheet on mobile, card on sm+), admin-only. Chat + hands-free voice.
+- **Loop**: `POST /api/agent` (SSE) → `runAgentTurn` (`providers.ts`) over the tool registry `tools.ts` — 17 tools ({name, description, inputSchema, label, run}); all arithmetic (deltas, medians, rankings) happens in TS so the model never does math. Visitor/admin scoping enforced inside each tool via `ctx.admin`.
+- **Providers, in order** (`GLO_PROVIDER` forces): local Claude Code CLI (`cli-provider.ts`, enforced-JSON ReAct loop, `--resume` sessions) → home-Mac CLI via data-api `/agent_turn` (subscription auth — production's normal path; **no metered keys by policy**) → `ANTHROPIC_API_KEY` → Gemini. Remote health check is TTL-cached (5 min); route memoizes groups/page-artist lookups.
+- **Voice**: `/api/agent/transcribe` (faster-whisper on the Mac → Gemini fallback), `/api/agent/speak` (Kokoro/edge-tts → Gemini). Claude has no speech APIs — Gemini is ears/mouth only.
+
+### 7. Knowledgebase (`src/lib/knowledge/`, `/knowledge` UI)
+- `kb_items`: facts / documents / images / links, attachable to an artist or roster group; files ≤24 MB (≤4 MB inline in TiDB, bigger originals on the Mac via `file_path`); AI text extraction (CLI → data-api bridge → API fallbacks) makes uploads searchable.
+- **Search** (`db.ts:searchKb`): LIKE-based, terms ANDed, hand-rolled relevance (title×3, tags×2, summary/body×1).
+- **The loop**: `recall.ts` auto-injects relevant items into every GLO turn's system prompt (stopword term extraction + progressive relaxation); `save_fact` has a near-duplicate gate; `update_knowledge_item` refines instead of duplicating. Prompt rules: proactive saving, update-over-duplicate, cite by title.
+
+### 8. MCP endpoint (`src/app/api/mcp/route.ts`)
+- The same `agentTools` registry served to external MCP clients (Claude Code, Claude Desktop, claude.ai connectors incl. mobile) over streamable HTTP (`mcp-handler` v2 + a JSON-Schema→Zod converter in `src/lib/mcp/schema.ts`). Register a tool once in `tools.ts` → it exists in GLO and MCP.
+- **Auth**: bearer `MCP_TOKEN` (also `?token=` for header-less clients) — an admin credential; fail-closed when unset. `maxDuration = 120` for `refresh_artist`.
 
 ## Data Flow
 1. **Search**: Next.js `/api/spotify-search` → **Spotify Web API directly** (native TS, no data-api).
@@ -57,5 +72,5 @@ See **`DEPLOY.md`** (repo root) for the step-by-step. Shape: Vercel hosts the fl
 - **State & vision**: `ai/PROJECT_STATE.md` (read first).
 - **Rules**: `ai/AGENTS.md`.
 - **Plans**: `ai/SCRAPING_PLAN.md`, `ai/DESIGN_OVERHAUL_PLAN.md`.
-- **Context bundle**: `ai/CONTEXT_BUNDLE.md` is generated by `ai/ai-context.sh` — regenerate after editing docs; don't hand-edit.
-- **Flow**: Human Pilot → AI Implementation → Verification (`./start_dev.sh` + manual QA).
+- **Admin/product split**: `README.md` is public/product-facing; admin-only features (auth gate, GLO, knowledgebase, MCP) live in `ADMIN.md`.
+- **Flow**: Human Pilot → AI Implementation → Verification (`./start_dev.sh` + manual QA). The old generated `CONTEXT_BUNDLE.md` was deleted 2026-08-08 — read the source `ai/*.md` files directly.
