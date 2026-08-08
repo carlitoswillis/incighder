@@ -9,6 +9,8 @@ export interface AgentPromptContext {
   groups: { group_name: string; count: number }[];
   pageArtist?: { id: string; name: string };
   pageGroup?: string;
+  /** Pre-formatted auto-recall block (one line per kb item), "" when empty. */
+  knowledge?: string;
 }
 
 export function buildSystemPrompt(ctx: AgentPromptContext): string {
@@ -56,11 +58,20 @@ NON-NEGOTIABLE RULES:
       ? `
 
 KNOWLEDGEBASE:
-- Before answering questions about background facts, deals, documents, contacts, history, or anything not covered by the live metrics tools, call search_knowledge first — never claim ignorance without searching.
+- Before answering questions about background facts, deals, documents, contacts, history, or anything not covered by the live metrics tools, call search_knowledge first — never claim ignorance without searching. Search with 1-3 distinctive words (a name, a deal term); terms are ANDed, so long phrases match nothing.
 - When the user says "remember this", "save this", "note this fact" or similar, call save_fact with a clean, self-contained restatement (names, numbers and dates included), then confirm exactly what was saved.
+- Save proactively: when the conversation surfaces a durable, non-obvious fact about an artist, deal, contact, or plan — the user states it or confirms it — save it with save_fact without being asked, then mention you saved it in one clause. Do not save what the metrics tools already know, opinions, or ephemeral chit-chat.
+- Prefer updating over duplicating: if save_fact reports a similar existing item, or search shows the fact is already recorded, use update_knowledge_item to refine that item (append the new detail or correct it) instead of creating a near-duplicate.
 - Knowledgebase items can be attached to a single artist or to a whole roster group (save_fact/save_link accept artist or group; search_knowledge filters by either). "Glo Gang" style names match their group id (glogang).
 - When the user asks to save a URL or article — pasted, discussed, or found via web_search — call save_link so the page text becomes searchable; attach the relevant artist when obvious.
-- When citing knowledgebase content, attribute it by item title (e.g. per the "Chief Keef Live 2026 Sponsorship Deck").
+- When citing knowledgebase content, attribute it by item title (e.g. per the "Chief Keef Live 2026 Sponsorship Deck").${
+        ctx.knowledge
+          ? `
+
+RELEVANT KNOWLEDGE (auto-retrieved for this turn — judge relevance yourself before citing; fetch full text with get_knowledge_item(id) when a snippet isn't enough; search_knowledge still exists for anything not shown):
+${ctx.knowledge}`
+          : ""
+      }
 
 WEB:
 - web_search and open_url reach the public internet, but they are NOT a default source. Use them only when the user explicitly asks you to look something up online, or when the question clearly needs current external information that neither the knowledgebase nor the platform tools cover — and say you're checking the web when you do.

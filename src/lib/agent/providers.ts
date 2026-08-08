@@ -253,15 +253,17 @@ async function runAnthropic(opts: RunAgentOptions): Promise<void> {
 
     if (!finalTurn && turn.stopReason === "tool_use" && turn.toolUses.length) {
       conversation.push({ role: "assistant", content: turn.content });
-      const results: Json[] = [];
-      for (const tu of turn.toolUses) {
-        const out = await executeTool(opts.tools, tu.name, tu.input, opts.admin, opts.emit);
-        results.push({
-          type: "tool_result",
-          tool_use_id: tu.id,
-          content: JSON.stringify(out),
-        });
-      }
+      // Tools in one assistant turn are independent reads — run them
+      // concurrently (the CLI provider already does) and return all results
+      // in a single user message, in the model's requested order.
+      const outs = await Promise.all(
+        turn.toolUses.map((tu) => executeTool(opts.tools, tu.name, tu.input, opts.admin, opts.emit)),
+      );
+      const results: Json[] = turn.toolUses.map((tu, i) => ({
+        type: "tool_result",
+        tool_use_id: tu.id,
+        content: JSON.stringify(outs[i]),
+      }));
       conversation.push({ role: "user", content: results });
       iteration++;
       continue;

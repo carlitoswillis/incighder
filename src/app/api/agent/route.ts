@@ -3,6 +3,7 @@ import { getPool } from "@/lib/db";
 import { isAdmin } from "@/lib/auth";
 import { agentTools } from "@/lib/agent/tools";
 import { buildSystemPrompt } from "@/lib/agent/system-prompt";
+import { recallKnowledge, formatRecallBlock } from "@/lib/knowledge/recall";
 import { runAgentTurn, type AgentSSEEvent, type ChatMessage } from "@/lib/agent/providers";
 
 // The GLO endpoint: POST a chat transcript, get an SSE stream of tool
@@ -26,6 +27,16 @@ const MAX_BODY_CHARS = 60_000; // total transcript cap — beyond this we 413
 const RATE_LIMIT = 10; // requests per window
 const RATE_WINDOW_MS = 60_000;
 const rateBuckets = new Map<string, { count: number; windowStart: number }>();
+
+// Per-instance memoization of the per-turn context lookups (groups list and
+// page-artist row). Both are near-static; a short TTL keeps a stuck cache
+// from ever mattering.
+const CONTEXT_TTL_MS = 5 * 60_000;
+const groupsCache = new Map<boolean, { at: number; groups: { group_name: string; count: number }[] }>();
+const artistCache = new Map<
+  string,
+  { at: number; artist: { id: string; name: string } | null; isPublic: boolean }
+>();
 
 function isRateLimited(ip: string): boolean {
   const now = Date.now();
@@ -88,17 +99,24 @@ export async function POST(request: Request) {
   const messages = parseMessages(body.messages);
 
   // Groups for the system prompt — fail soft to [] so the agent still answers
-  // when the DB is momentarily unreachable.
+  // when the DB is momentarily unreachable. Memoized: the roster barely
+  // changes, and this ran on every single message.
   let groups: { group_name: string; count: number }[] = [];
-  try {
-    const [rows] = await getPool().query<RowDataPacket[]>(
-      `SELECT group_name, COUNT(*) AS count FROM artists
-       WHERE group_name IS NOT NULL ${admin ? "" : "AND is_public = 1"}
-       GROUP BY group_name ORDER BY group_name`,
-    );
-    groups = rows.map((r) => ({ group_name: String(r.group_name), count: Number(r.count) }));
-  } catch (e) {
-    console.error("Agent groups lookup failed:", e);
+  const groupsCached = groupsCache.get(admin);
+  if (groupsCached && Date.now() - groupsCached.at < CONTEXT_TTL_MS) {
+    groups = groupsCached.groups;
+  } else {
+    try {
+      const [rows] = await getPool().query<RowDataPacket[]>(
+        `SELECT group_name, COUNT(*) AS count FROM artists
+         WHERE group_name IS NOT NULL ${admin ? "" : "AND is_public = 1"}
+         GROUP BY group_name ORDER BY group_name`,
+      );
+      groups = rows.map((r) => ({ group_name: String(r.group_name), count: Number(r.count) }));
+      groupsCache.set(admin, { at: Date.now(), groups });
+    } catch (e) {
+      console.error("Agent groups lookup failed:", e);
+    }
   }
 
   // Current-page artist context. Private artists behave as nonexistent for
@@ -106,16 +124,43 @@ export async function POST(request: Request) {
   let pageArtist: { id: string; name: string } | undefined;
   const artistId = body.context?.artistId;
   if (typeof artistId === "string" && artistId) {
-    try {
-      const [rows] = await getPool().query<RowDataPacket[]>(
-        "SELECT id, name, is_public FROM artists WHERE id = ?",
-        [artistId],
-      );
-      if (rows.length && (admin || rows[0].is_public)) {
-        pageArtist = { id: String(rows[0].id), name: String(rows[0].name) };
+    const cached = artistCache.get(artistId);
+    if (cached && Date.now() - cached.at < CONTEXT_TTL_MS) {
+      if (cached.artist && (admin || cached.isPublic)) pageArtist = cached.artist;
+    } else {
+      try {
+        const [rows] = await getPool().query<RowDataPacket[]>(
+          "SELECT id, name, is_public FROM artists WHERE id = ?",
+          [artistId],
+        );
+        const artist = rows.length
+          ? { id: String(rows[0].id), name: String(rows[0].name) }
+          : null;
+        artistCache.set(artistId, {
+          at: Date.now(),
+          artist,
+          isPublic: rows.length ? Boolean(rows[0].is_public) : false,
+        });
+        if (artist && (admin || rows[0].is_public)) pageArtist = artist;
+      } catch (e) {
+        console.error("Agent page-artist lookup failed:", e);
       }
-    } catch (e) {
-      console.error("Agent page-artist lookup failed:", e);
+    }
+  }
+
+  // Auto-recall: surface likely-relevant knowledgebase items in the system
+  // prompt so common recall costs no tool round-trip. Admin-only (the
+  // knowledgebase itself is admin-only) and always fail-soft.
+  let knowledge = "";
+  if (admin) {
+    const lastUser = [...messages].reverse().find((m) => m.role === "user");
+    if (lastUser) {
+      const hits = await recallKnowledge({
+        message: lastUser.content,
+        artistId: pageArtist?.id,
+        group: typeof body.context?.group === "string" ? body.context.group : undefined,
+      });
+      knowledge = formatRecallBlock(hits);
     }
   }
 
@@ -125,6 +170,7 @@ export async function POST(request: Request) {
     groups,
     pageArtist,
     pageGroup: typeof body.context?.group === "string" ? body.context.group : undefined,
+    knowledge,
   });
 
   const encoder = new TextEncoder();

@@ -6,7 +6,8 @@ import { dailySeries, daysBetween, deltaOver, valueOnDay, type DayPoint } from "
 import { calculateArtistScore } from "@/utils/score";
 import { formatRelativeTime } from "@/lib/format";
 import { getDataApiUrl, dataApiHeaders } from "@/lib/data-api";
-import { searchKb, getKbItem, insertKbItem } from "@/lib/knowledge/db";
+import { searchKb, getKbItem, insertKbItem, updateKbItem } from "@/lib/knowledge/db";
+import { extractTerms } from "@/lib/knowledge/recall";
 import { extractTextFromUrl } from "@/lib/knowledge/extract";
 import { searchWeb } from "@/lib/agent/web-search";
 
@@ -1182,6 +1183,10 @@ const saveFact: AgentTool = {
         items: { type: "string" },
         description: "Lowercase topic tags",
       },
+      confirm: {
+        type: "boolean",
+        description: "Set true to save even after a possible_duplicate warning",
+      },
     },
     required: ["fact"],
   },
@@ -1190,6 +1195,24 @@ const saveFact: AgentTool = {
     if (!ctx.admin) return { error: "Admin only." };
     const fact = str(args.fact).trim();
     if (!fact) return { error: "Provide the fact to save." };
+    // Dedupe gate: repeated "remember X" used to insert forever. A strong
+    // match on the fact's distinctive terms pauses the save so the model can
+    // update the existing item instead (or re-call with confirm: true).
+    if (args.confirm !== true) {
+      const terms = extractTerms(fact, 2);
+      if (terms.length) {
+        const hits = await searchKb({ q: terms.join(" "), kind: "fact", limit: 3 });
+        const top = hits[0];
+        if (top && top.score >= 3) {
+          return {
+            possible_duplicate: true,
+            existing: { id: top.id, title: top.title, snippet: top.snippet },
+            note:
+              "A similar fact already exists. Use update_knowledge_item to refine it, or call save_fact again with confirm: true if it is genuinely new.",
+          };
+        }
+      }
+    }
     let artistId: string | null = null;
     let artistName: string | null = null;
     const artist = str(args.artist).trim();
@@ -1223,6 +1246,64 @@ const saveFact: AgentTool = {
       createdBy: "chat",
     });
     return { saved: true, id, title, artist: artistName, group: groupName };
+  },
+};
+
+const updateKnowledgeItem: AgentTool = {
+  name: "update_knowledge_item",
+  description:
+    "ADMIN ONLY: refine an existing knowledgebase item instead of creating a near-duplicate — correct its body, append a new detail, retitle, or retag. Use after search_knowledge/save_fact shows the fact is already recorded.",
+  inputSchema: {
+    type: "object",
+    properties: {
+      id: { type: "number", description: "Knowledgebase item id" },
+      title: { type: "string", description: "New title" },
+      body: { type: "string", description: "Replacement body (full rewrite)" },
+      append_body: {
+        type: "string",
+        description: "Paragraph to append to the existing body (use instead of body to add a detail)",
+      },
+      summary: { type: "string", description: "New summary" },
+      tags: {
+        type: "array",
+        items: { type: "string" },
+        description: "Replacement lowercase topic tags",
+      },
+    },
+    required: ["id"],
+  },
+  label: (a) => `Updating knowledgebase item #${str(a.id) || "?"}`,
+  run: async (args, ctx) => {
+    if (!ctx.admin) return { error: "Admin only." };
+    const id = Math.trunc(Number(args.id));
+    if (!Number.isFinite(id) || id <= 0) return { error: "Provide a valid item id." };
+    const item = await getKbItem(id);
+    if (!item) return { error: `No knowledgebase item #${id}.` };
+    const patch: Parameters<typeof updateKbItem>[1] = {};
+    const title = str(args.title).trim();
+    if (title) patch.title = title;
+    const body = str(args.body).trim();
+    const append = str(args.append_body).trim();
+    if (body) {
+      patch.body = body;
+    } else if (append) {
+      patch.body = item.body ? `${item.body}\n\n${append}` : append;
+    }
+    const summary = str(args.summary).trim();
+    if (summary) patch.summary = summary;
+    if (Array.isArray(args.tags)) {
+      patch.tags =
+        args.tags
+          .map((t) => str(t).trim().toLowerCase())
+          .filter(Boolean)
+          .join(",") || null;
+    }
+    if (!Object.keys(patch).length) {
+      return { error: "Nothing to update — provide title, body, append_body, summary, or tags." };
+    }
+    const ok = await updateKbItem(id, patch);
+    if (!ok) return { error: `Update failed for item #${id}.` };
+    return { updated: true, id, title: patch.title ?? item.title, changed: Object.keys(patch) };
   },
 };
 
@@ -1420,6 +1501,7 @@ export const agentTools: AgentTool[] = [
   searchKnowledge,
   getKnowledgeItem,
   saveFact,
+  updateKnowledgeItem,
   saveLink,
   webSearch,
   openUrl,

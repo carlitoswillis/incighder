@@ -88,14 +88,28 @@ export function hasClaudeCli(): boolean {
  * data-api ⇒ the subscription-auth CLI is one hop away. (If the host is up
  * but somehow missing `claude`, /agent_turn answers 501 and the run surfaces
  * that as an error rather than silently switching providers.) */
+// Cached per warm instance: a healthy bridge stays trusted for 5 minutes, an
+// unreachable one is re-probed after 30s. Without this, every GLO message on
+// Vercel paid up to 4s of health-check latency before the model even started.
+let remoteCheck: { ok: boolean; at: number } | null = null;
+const REMOTE_OK_TTL_MS = 5 * 60_000;
+const REMOTE_FAIL_TTL_MS = 30_000;
+
 export async function hasRemoteClaudeCli(): Promise<boolean> {
+  const now = Date.now();
+  if (remoteCheck && now - remoteCheck.at < (remoteCheck.ok ? REMOTE_OK_TTL_MS : REMOTE_FAIL_TTL_MS)) {
+    return remoteCheck.ok;
+  }
+  let ok = false;
   try {
     const url = await getDataApiUrl();
     const res = await fetch(`${url}/health`, { signal: AbortSignal.timeout(4_000) });
-    return res.ok;
+    ok = res.ok;
   } catch {
-    return false;
+    ok = false;
   }
+  remoteCheck = { ok, at: now };
+  return ok;
 }
 
 /** One headless CLI call: prompt over stdin, JSON envelope on stdout. */
