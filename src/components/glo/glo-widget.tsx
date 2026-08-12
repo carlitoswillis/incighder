@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAdmin } from "@/components/admin-context";
+import { GLO_ENABLED } from "@/lib/agent/enabled";
 import { GloChat } from "./glo-chat";
 
 /**
@@ -71,7 +72,7 @@ export function GloWidget() {
     };
   }, [open]);
 
-  if (!admin) return null;
+  if (!GLO_ENABLED || !admin) return null;
 
   return (
     <>

@@ -1,6 +1,7 @@
 import { RowDataPacket } from "mysql2/promise";
 import { getPool } from "@/lib/db";
 import { isAdmin } from "@/lib/auth";
+import { GLO_ENABLED, gloDisabledResponse } from "@/lib/agent/enabled";
 import { agentTools } from "@/lib/agent/tools";
 import { buildSystemPrompt } from "@/lib/agent/system-prompt";
 import { recallKnowledge, formatRecallBlock } from "@/lib/knowledge/recall";
@@ -77,6 +78,7 @@ function totalContentChars(raw: unknown): number {
 }
 
 export async function POST(request: Request) {
+  if (!GLO_ENABLED) return gloDisabledResponse();
   let body: AgentRequestBody = {};
   try {
     body = ((await request.json()) as AgentRequestBody | null) ?? {};

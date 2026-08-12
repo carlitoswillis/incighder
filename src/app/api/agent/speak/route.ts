@@ -1,5 +1,6 @@
 import { dataApiHeaders, getDataApiUrl } from "@/lib/data-api";
 import { isAdmin } from "@/lib/auth";
+import { GLO_ENABLED, gloDisabledResponse } from "@/lib/agent/enabled";
 
 // Text-to-speech for GLO's spoken replies: Gemini's TTS model reading in a
 // natural British delivery (style + voice overridable via env). Same runtime
@@ -103,6 +104,7 @@ async function speakViaDataApi(text: string): Promise<{ audio: Buffer; mime: str
 }
 
 export async function POST(request: Request) {
+  if (!GLO_ENABLED) return gloDisabledResponse();
   if (!(await isAdmin())) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
