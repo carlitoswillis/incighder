@@ -1,0 +1,10 @@
+# Canonical identity for this repo's history. Commits from 2026-05-16 through
+# 2026-08-11 were authored under git's placeholder identity because a repo-local
+# user.name/user.email was set in .git/config; earlier commits used a machine
+# hostname address and a short-name variant. History is not rewritten (the repo
+# is deployed from), so this maps every variant to one person for git shortlog,
+# git log --use-mailmap, and GitHub's contributor views.
+Carlitos Willis <carlitoswillis@berkeley.edu>
+Carlitos Willis <carlitoswillis@berkeley.edu> <you@example.com>
+Carlitos Willis <carlitoswillis@berkeley.edu> <carlitoswillis@CarlitoacStudio.lan>
+Carlitos Willis <carlitoswillis@berkeley.edu> <cw@carlitoswillis.com>
