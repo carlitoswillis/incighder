@@ -26,12 +26,46 @@ def _log(msg: str) -> None:
     print(f"[scheduler {datetime.now(timezone.utc).isoformat()}] {msg}", flush=True)
 
 
+def _tally(summary: dict, key: str) -> dict:
+    """Collapse a per-artist {platform: reason} map into {platform: (count,
+    one example reason)} across the whole sweep."""
+    out: dict[str, list] = {}
+    for s in summary.values():
+        for platform, reason in (s.get(key) or {}).items():
+            entry = out.setdefault(platform, [0, reason])
+            entry[0] += 1
+    return {p: (n, reason) for p, (n, reason) in out.items()}
+
+
 def run_once() -> dict:
     _log("starting auto-scrape sweep")
     summary = scrape_all(force=False)
     ok = sum(1 for s in summary.values() if s.get("ok"))
     failed = len(summary) - ok
-    _log(f"sweep complete: {len(summary)} artists, {ok} ok, {failed} failed")
+
+    # "ok" only means scrape_artist didn't raise for that artist. A platform
+    # that failed, or that succeeded while losing a metric it owns (the Spotify
+    # monthly-listeners render misses on roughly one sweep in five), used to be
+    # reported as part of "N ok, 0 failed" and was only findable by grepping the
+    # scraper's stderr. Surface both in the summary line instead.
+    partials = _tally(summary, "partial")
+    errors = _tally(summary, "platform_errors")
+    line = f"sweep complete: {len(summary)} artists, {ok} ok, {failed} failed"
+    if partials:
+        n = sum(c for c, _ in partials.values())
+        line += f", {n} partial (" + ", ".join(
+            f"{p} x{c}" for p, (c, _) in sorted(partials.items())) + ")"
+    if errors:
+        n = sum(c for c, _ in errors.values())
+        line += f", {n} platform error{'s' if n != 1 else ''} (" + ", ".join(
+            f"{p} x{c}" for p, (c, _) in sorted(errors.items())) + ")"
+    _log(line)
+
+    # One example reason per affected platform, so `pm2 logs` shows WHY without
+    # a grep through the scrapers' stderr.
+    for label, tally in (("partial", partials), ("error", errors)):
+        for platform, (count, reason) in sorted(tally.items()):
+            _log(f"  {label}: {platform} x{count} — e.g. {reason}")
     return summary
 
 

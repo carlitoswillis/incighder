@@ -472,6 +472,16 @@ def _sweep_one(aid: str, force: bool) -> tuple[str, dict]:
             "scraped": [p for p, r in results.items()
                         if r.get("ok") and not r.get("skipped")],
             "skipped": [p for p, r in results.items() if r.get("skipped")],
+            # An artist is "ok" as long as scrape_artist didn't raise, so a
+            # platform that failed outright, or succeeded while losing a metric
+            # it owns (partial — e.g. the Spotify monthly-listeners render),
+            # would otherwise be invisible to the caller. Report both per
+            # platform so the scheduler's summary can surface them.
+            "partial": {p: r["partial"] for p, r in results.items()
+                        if r.get("ok") and r.get("partial")},
+            "platform_errors": {p: (r.get("error") or "failed")
+                                for p, r in results.items()
+                                if not r.get("ok") and not r.get("skipped")},
         }
     except Exception as e:  # never let one artist abort the whole sweep
         return aid, {"ok": False, "error": str(e)}
