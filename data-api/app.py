@@ -1,11 +1,16 @@
 from flask import Flask, request, jsonify
 import subprocess
+import collections
+import functools
+import hmac
 import json
 import os
 import shutil
 import sys
 import atexit
 import tempfile
+import threading
+import time
 import traceback
 
 # Load repo-root .env so API keys / DB settings are available when run natively
@@ -25,11 +30,19 @@ atexit.register(_scraper_shutdown)
 def _require_shared_secret():
     """The cloudflared tunnel makes this API publicly reachable, so every
     request (except the liveness probe) must present the shared secret the
-    Next.js proxies send. No DATA_API_SECRET configured = open (local dev)."""
-    secret = os.getenv('DATA_API_SECRET')
-    if not secret or request.path == '/health':
+    Next.js proxies send.
+
+    Fails CLOSED: an unset DATA_API_SECRET used to mean "open", which is a
+    misconfiguration away from publishing an unauthenticated /agent_turn to the
+    internet. Set DATA_API_SECRET in the repo-root .env for local dev too — the
+    Next side (src/lib/data-api.ts) reads the same file."""
+    if request.path == '/health':
         return None
-    if request.headers.get('X-Data-Api-Secret') != secret:
+    secret = os.getenv('DATA_API_SECRET')
+    if not secret:
+        return jsonify({'error': 'server misconfigured: DATA_API_SECRET unset'}), 503
+    presented = request.headers.get('X-Data-Api-Secret') or ''
+    if not hmac.compare_digest(presented, secret):
         return jsonify({'error': 'unauthorized'}), 401
 
 
@@ -49,7 +62,66 @@ def _claude_bin():
     return fallback if os.access(fallback, os.X_OK) else None
 
 
+# /agent_turn, /web_search and /extract_doc each spawn a real Claude Code
+# process per request, so a leaked shared secret would otherwise buy unmetered
+# use of this machine's subscription. Two independent brakes, both GLOBAL rather
+# than per-caller: every request arrives from Vercel through one cloudflared
+# tunnel, so remote_addr is the tunnel for everyone and per-IP buckets would be
+# meaningless.
+CLAUDE_RATE_LIMIT = int(os.getenv('CLAUDE_RATE_LIMIT', '20'))     # per window
+CLAUDE_RATE_WINDOW = float(os.getenv('CLAUDE_RATE_WINDOW', '60')) # seconds
+CLAUDE_MAX_CONCURRENT = int(os.getenv('CLAUDE_MAX_CONCURRENT', '2'))
+# Hard ceiling per turn. This CLI has no --max-turns; --max-budget-usd is the
+# equivalent bound, and it is enforced even on subscription auth (the CLI still
+# accounts list-price cost per turn).
+CLAUDE_MAX_BUDGET_USD = os.getenv('CLAUDE_MAX_BUDGET_USD', '0.75')
+
+_rate_lock = threading.Lock()
+_rate_hits: collections.deque = collections.deque()
+_agent_slots = threading.BoundedSemaphore(max(1, CLAUDE_MAX_CONCURRENT))
+
+
+def _rate_limited():
+    """Sliding window over the last CLAUDE_RATE_WINDOW seconds. Returns the
+    seconds to wait when over the limit, else None (and records the hit)."""
+    if CLAUDE_RATE_LIMIT <= 0:
+        return None
+    now = time.monotonic()
+    with _rate_lock:
+        cutoff = now - CLAUDE_RATE_WINDOW
+        while _rate_hits and _rate_hits[0] < cutoff:
+            _rate_hits.popleft()
+        if len(_rate_hits) >= CLAUDE_RATE_LIMIT:
+            return max(1, int(_rate_hits[0] + CLAUDE_RATE_WINDOW - now) + 1)
+        _rate_hits.append(now)
+        return None
+
+
+def _claude_guarded(fn):
+    """Rate-limit and concurrency-cap a route that spawns the Claude CLI.
+
+    One shared budget across every such route: they all draw on the same
+    subscription on the same machine, so limiting them separately would just
+    move a leaked-secret abuser from /agent_turn to /web_search."""
+    @functools.wraps(fn)
+    def wrapper(*args, **kwargs):
+        retry_after = _rate_limited()
+        if retry_after:
+            return (jsonify({'error': 'rate limited'}), 429,
+                    {'Retry-After': str(retry_after)})
+        # Non-blocking: queueing here would pile requests up behind the ~150s
+        # subprocess timeout and exhaust gunicorn's 8 threads.
+        if not _agent_slots.acquire(blocking=False):
+            return (jsonify({'error': 'agent busy'}), 429, {'Retry-After': '10'})
+        try:
+            return fn(*args, **kwargs)
+        finally:
+            _agent_slots.release()
+    return wrapper
+
+
 @app.route('/agent_turn', methods=['POST'])
+@_claude_guarded
 def agent_turn():
     """One GLO model turn on this machine's logged-in Claude Code CLI
     (subscription auth), so the deployed site needs no API key. Called by the
@@ -68,7 +140,19 @@ def agent_turn():
             # Blackout the headless session's own capabilities: without this the
             # model can go hunting in its real environment (observed live: it
             # ran ToolSearch, found only unrelated MCP tools, and refused).
-            '--tools', '', '--strict-mcp-config']
+            # Defence in depth, because this process is reachable from the
+            # public internet through the tunnel: --tools '' removes the
+            # built-in set, --allowed-tools '' leaves the permission allowlist
+            # empty so nothing re-enables one, --permission-prompts none denies
+            # (rather than hangs on) anything that would still ask, and
+            # --restricted drops the command/code-running tools and ignores
+            # user/project settings files so a stray ~/.claude settings file
+            # cannot widen any of it.
+            '--tools', '', '--allowed-tools', '', '--restricted',
+            '--permission-prompts', 'none', '--strict-mcp-config',
+            # Per-turn ceiling. This CLI has no --max-turns; --max-budget-usd is
+            # the equivalent bound and is enforced on subscription auth too.
+            '--max-budget-usd', str(CLAUDE_MAX_BUDGET_USD)]
     if body.get('schema'):
         args += ['--json-schema', json.dumps(body['schema'])]
     if body.get('system'):
@@ -198,6 +282,7 @@ _WEB_SEARCH_SCHEMA = {
 
 
 @app.route('/web_search', methods=['POST'])
+@_claude_guarded
 def web_search():
     """Web search via this machine's logged-in Claude Code CLI and its
     WebSearch tool — the deployed site's bridge for the agent's web_search
@@ -225,6 +310,8 @@ def web_search():
     args = [claude, '-p', '--output-format', 'json',
             '--model', os.getenv('GLO_CLI_MODEL', 'sonnet'),
             '--strict-mcp-config', '--allowedTools', 'WebSearch',
+            '--permission-prompts', 'none',
+            '--max-budget-usd', str(CLAUDE_MAX_BUDGET_USD),
             '--json-schema', json.dumps(_WEB_SEARCH_SCHEMA)]
     try:
         # Neutral cwd so the run never loads this repo's agent context.
@@ -249,6 +336,7 @@ def web_search():
 
 
 @app.route('/extract_doc', methods=['POST'])
+@_claude_guarded
 def extract_doc():
     """Extract text/metadata from an uploaded document or image using this
     machine's logged-in Claude Code CLI (subscription auth) — the deployed
@@ -305,6 +393,8 @@ def extract_doc():
         args = [claude, '-p', '--output-format', 'json',
                 '--model', os.getenv('GLO_CLI_MODEL', 'sonnet'),
                 '--strict-mcp-config', '--allowedTools', f'Read(/{tmp_path})',
+                '--permission-prompts', 'none',
+                '--max-budget-usd', str(CLAUDE_MAX_BUDGET_USD),
                 '--json-schema', json.dumps(_EXTRACT_SCHEMA)]
         try:
             # Neutral cwd so the run never loads this repo's agent context.
