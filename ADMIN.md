@@ -41,6 +41,18 @@ Org memory for facts, documents, links, and images (`kb_items`; UI at `/knowledg
 
 **Auth**: bearer `MCP_TOKEN` (env, both local and Vercel) — an **admin-level credential** (all tools run in admin context, including writes and `refresh_artist`). Also accepted as `?token=` in the URL for clients that can't send headers (claude.ai connectors); treat such URLs as passwords and rotate the token if one leaks.
 
+**Never inline the token in a client config.** A `?token=` URL lands in Vercel's request logs, and an inlined bearer string lands in whatever file the client stores — for Claude Code that is `~/.claude*/.claude.json`, which is backed up and synced. Keep the value in one `0600` file and reference it:
+
+```bash
+# ~/.config/incighder/mcp.env  (chmod 600) — same value as Vercel's MCP_TOKEN
+MCP_TOKEN=...
+INCIGHDER_TOKEN=...
+```
+
+Source that from `~/.zshenv` (not `.zshrc`, so non-interactive shells get it too), then let configs use `${INCIGHDER_TOKEN}` — both Claude Code's `.claude.json` and `workspace/assistant/mcp.json` expand it at load.
+
+**To rotate**: generate a new value into that file, set `MCP_TOKEN` in the Vercel project (Settings → Environment Variables, Production) and **redeploy** — it is read at request time by `src/app/api/mcp/route.ts`, but a redeploy is what picks up the new value. Update the repo-root `.env` for local dev, and re-add any claude.ai custom connector, whose `?token=` URL embeds the old value.
+
 **Connect**:
 
 ```bash
@@ -59,5 +71,5 @@ claude mcp add --transport http --scope user incighder \
 
 - **Live scraping from the Mac**: `./go_live.sh` — self-healing (sleep/wake tunnel recovery, watchdog, pm2-aware); publishes the tunnel URL to `app_config` so no redeploy is needed.
 - **Deploys**: Vercel CLI (`npx vercel deploy --prod`). Env vars live in Vercel project settings: `DATABASE_URL`, `ADMIN_PASSWORDS`, `AUTH_SECRET`, `MCP_TOKEN`, `DATA_API_SECRET`, plus the scraper keys.
-- **Secrets hygiene**: `.env` is gitignored and has never been committed; source only references `process.env.*`. The data-api requires `X-Data-Api-Secret` on everything but `/health`.
+- **Secrets hygiene**: `.env` is gitignored and has never been committed; source only references `process.env.*`. `MCP_TOKEN` lives in `~/.config/incighder/mcp.env` (0600) and is referenced, never inlined, by MCP client configs. The data-api requires `X-Data-Api-Secret` on everything but `/health`.
 - **Scheduler/data-api don't hot-reload scrape code** — restart after editing (gunicorn runs `--reload` for app code in dev).
