@@ -101,7 +101,7 @@ SCRAPE_DO_TOKEN=...
 # SCRAPE_THROTTLE_MIN/MAX, AUTO_SCRAPE_INTERVAL_HOURS, DATA_API_PORT, WEB_PORT
 ```
 
-Auth, GLO, and MCP env vars are covered in [`ADMIN.md`](ADMIN.md).
+Auth, GLO, and MCP env vars are covered in [`ADMIN.md`](ADMIN.md). Known-but-unfixed issues and the housekeeping log are in [`MAINTENANCE.md`](MAINTENANCE.md).
 
 ### 2. Run
 
